@@ -1,0 +1,37 @@
+name: 'Setup Test Environment'
+description: 'Install Weaver and start mock LLM server'
+
+inputs:
+  python-version:
+    description: 'Python version for the mock server'
+    required: false
+    default: '3.12'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Weaver
+      shell: bash
+      run: |
+        curl -sSfL https://github.com/open-telemetry/weaver/releases/latest/download/weaver-installer.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install mock server
+      shell: bash
+      run: pip install -e mock-server/
+
+    - name: Start mock server
+      shell: bash
+      run: python -m mock_server.server &
+
+    - name: Wait for mock server
+      shell: bash
+      run: |
+        for i in $(seq 1 30); do
+          curl -s http://127.0.0.1:8080/health && break
+          sleep 1
+        done

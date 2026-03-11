@@ -1,0 +1,4 @@
+litellm>=1.0
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc

@@ -1,0 +1,5 @@
+pydantic-ai-slim[openai]>=0.1
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
+openinference-instrumentation-pydantic-ai

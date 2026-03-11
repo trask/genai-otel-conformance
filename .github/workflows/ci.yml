@@ -1,0 +1,258 @@
+name: GenAI OTel Conformance Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+env:
+  MOCK_LLM_URL: http://127.0.0.1:8080
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
+
+jobs:
+  # ── Discover test matrices ─────────────────────────────────────────
+  discover-tests:
+    runs-on: ubuntu-latest
+    outputs:
+      python-matrix: ${{ steps.matrices.outputs.python }}
+      js-matrix: ${{ steps.matrices.outputs.js }}
+      java-matrix: ${{ steps.matrices.outputs.java }}
+      dotnet-matrix: ${{ steps.matrices.outputs.dotnet }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate matrices
+        id: matrices
+        run: |
+          # Python: scan for test_*.py files
+          python_matrix='{"test":['
+          first=true
+          for f in tests/python/*/test_*.py; do
+            dir=$(basename "$(dirname "$f")")
+            variant=$(basename "$f" .py | sed 's/^test_//')
+            reqs="tests/python/${dir}/requirements-${variant}.txt"
+            [[ -f "$reqs" ]] || continue
+            name="${dir}-${variant}"
+            $first || python_matrix+=','
+            first=false
+            python_matrix+="{\"name\":\"${name}\",\"file\":\"${f}\",\"reqs\":\"${reqs}\"}"
+          done
+          python_matrix+=']}'
+          echo "python=${python_matrix}" >> "$GITHUB_OUTPUT"
+
+          # JS: scan for test_*.ts files
+          js_matrix='{"test":['
+          first=true
+          for f in tests/js/*/test_*.ts; do
+            dir=$(basename "$(dirname "$f")")
+            variant=$(basename "$f" .ts | sed 's/^test_//')
+            name="${dir}-${variant}"
+            $first || js_matrix+=','
+            first=false
+            js_matrix+="{\"name\":\"${name}\",\"dir\":\"tests/js/${dir}\"}"
+          done
+          js_matrix+=']}'
+          echo "js=${js_matrix}" >> "$GITHUB_OUTPUT"
+
+          # Java: one entry per directory, detect ecosystem from build.gradle.kts
+          java_matrix='{"test":['
+          first=true
+          for d in tests/java/*/; do
+            [[ -d "$d" ]] || continue
+            dir=$(basename "$d")
+            if grep -q 'spring-boot' "$d/build.gradle.kts" 2>/dev/null; then
+              eco="native"
+            else
+              eco="otelcontrib"
+            fi
+            name="${dir}-${eco}"
+            $first || java_matrix+=','
+            first=false
+            java_matrix+="{\"name\":\"${name}\",\"dir\":\"${d%/}\"}"
+          done
+          java_matrix+=']}'
+          echo "java=${java_matrix}" >> "$GITHUB_OUTPUT"
+
+          # .NET: one entry per directory, all native
+          dotnet_matrix='{"test":['
+          first=true
+          for d in tests/dotnet/*/; do
+            [[ -d "$d" ]] || continue
+            dir=$(basename "$d")
+            name="${dir}-native"
+            $first || dotnet_matrix+=','
+            first=false
+            dotnet_matrix+="{\"name\":\"${name}\",\"dir\":\"${d%/}\"}"
+          done
+          dotnet_matrix+=']}'
+          echo "dotnet=${dotnet_matrix}" >> "$GITHUB_OUTPUT"
+
+  # ── Python Tests ───────────────────────────────────────────────────
+  python:
+    runs-on: ubuntu-latest
+    needs: discover-tests
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-tests.outputs.python-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup-test-env
+
+      - name: Install test dependencies
+        run: |
+          pip install -e tests/python
+          pip install -r ${{ matrix.test.reqs }}
+
+      - name: Run conformance test
+        run: ./run_test.sh "python-${{ matrix.test.name }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: results-python-${{ matrix.test.name }}
+          path: results/
+
+  # ── Java Tests ─────────────────────────────────────────────────────
+  java:
+    runs-on: ubuntu-latest
+    needs: discover-tests
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-tests.outputs.java-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: ./.github/actions/setup-test-env
+
+      - name: Run conformance test
+        run: ./run_test.sh "java-${{ matrix.test.name }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: results-java-${{ matrix.test.name }}
+          path: results/
+
+  # ── .NET Tests ─────────────────────────────────────────────────────
+  dotnet:
+    runs-on: ubuntu-latest
+    needs: discover-tests
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-tests.outputs.dotnet-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: ./.github/actions/setup-test-env
+
+      - name: Build .NET test
+        run: dotnet build ${{ matrix.test.dir }}/
+
+      - name: Run conformance test
+        run: ./run_test.sh "dotnet-${{ matrix.test.name }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: results-dotnet-${{ matrix.test.name }}
+          path: results/
+
+  # ── JS/TS Tests ────────────────────────────────────────────────────
+  js:
+    runs-on: ubuntu-latest
+    needs: discover-tests
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-tests.outputs.js-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - uses: ./.github/actions/setup-test-env
+
+      - name: Install JS dependencies
+        run: cd ${{ matrix.test.dir }} && npm install
+
+      - name: Run conformance test
+        run: ./run_test.sh "js-${{ matrix.test.name }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: results-js-${{ matrix.test.name }}
+          path: results/
+
+  # ── Dashboard ──────────────────────────────────────────────────────
+  dashboard:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [python, java, dotnet, js]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download all result artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: all-results
+          pattern: results-*
+          merge-multiple: true
+
+      - name: Install dashboard dependencies
+        run: pip install jinja2
+
+      - name: Generate dashboard
+        run: python generate_dashboard.py --results-dir all-results --output-dir docs
+
+      - name: Upload dashboard artifact
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: dashboard
+          path: docs/
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+  # ── Deploy to GitHub Pages ─────────────────────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: dashboard
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

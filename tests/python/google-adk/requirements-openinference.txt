@@ -1,0 +1,6 @@
+google-adk>=0.1
+google-genai>=1.0
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
+openinference-instrumentation-google-adk

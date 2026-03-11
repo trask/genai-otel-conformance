@@ -1,0 +1,16 @@
+name: Nightly GenAI OTel Conformance
+
+on:
+  schedule:
+    # Run daily at 04:00 UTC
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+env:
+  MOCK_LLM_URL: http://127.0.0.1:8080
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
+
+jobs:
+  # Reuse the same CI workflow
+  conformance:
+    uses: ./.github/workflows/ci.yml

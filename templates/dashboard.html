@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenAI OTel Conformance Dashboard</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+<div class="container">
+<h1>GenAI OTel Conformance Dashboard</h1>
+<p class="subtitle">Generated {{ now }} &mdash;
+  <a href="https://github.com/trask/genai-otel-conformance">genai-otel-conformance</a></p>
+
+{# ── Attribute heatmap matrices (one per span type) ── #}
+{% for heatmap in heatmaps %}
+<div class="matrix-wrap">
+<h2>{{ heatmap.label }} Spans</h2>
+<table class="matrix heatmap"><thead><tr>
+<th class="lib-header">Library</th>
+<th class="lib-header">Lang</th>
+<th class="lib-header">Instrumentation</th>
+{% for col in heatmap.columns -%}
+<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr></thead>
+<tbody>
+{% for row in heatmap.rows -%}
+<tr><td class="lib">{{ row.lib_display }}</td>
+<td class="lib">{{ row.language }}</td>
+<td class="lib"><a href="#{{ row.test_name }}">{{ row.eco_display }}</a></td>
+{% for cell in row.cells -%}
+<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
+{% endfor -%}
+</tr>
+{% endfor -%}
+</tbody></table></div>
+{% endfor %}
+
+{# ── Detailed results ── #}
+<div class="details-wrap">
+<h2>Detailed Results</h2>
+
+{% for detail in details %}
+<div class="test-section" id="{{ detail.test_name }}"><h3>{{ detail.label }}</h3>
+{% if detail.instrumentation_version %}<div class="instrumentation-version">Instrumentation: <code>{{ detail.instrumentation_version }}</code></div>{% endif %}
+<div class="body">
+
+{% if detail.has_data %}
+{% if detail.entity_summary or detail.stats %}
+<div class="stat-grid">
+{% if detail.entity_summary -%}
+<div class="stat-item">Entities: <span class="val">{{ detail.entity_summary }}</span></div>
+{% endif -%}
+{% if detail.stats -%}
+{% if detail.stats.coverage is not none -%}
+<div class="stat-item">Registry coverage: <span class="val">{{ "%.1f%%"|format(detail.stats.coverage * 100) }}</span></div>
+{% endif -%}
+{% if detail.stats.advisories is not none -%}
+<div class="stat-item">Total advisories: <span class="val">{{ detail.stats.advisories }}</span></div>
+{% endif -%}
+{% endif -%}
+</div>
+{% endif %}
+
+{% for section in detail.span_sections %}
+<div class="span-detail">
+<div class="span-header">{{ section.label }} Attributes</div>
+{% for group in section.groups %}
+<div class="req-group"><div class="req-group-label">{{ group.label }}</div>
+<div class="attr-check">
+{% for attr in group.attrs -%}
+{% if attr.present -%}
+<div class="icon present">&#x2713;</div>
+<div><span class="name">{{ attr.name }}</span> <span class="val">&times;{{ attr.count }}</span></div>
+{% else -%}
+<div class="icon missing">&#x2013;</div>
+<div><span class="name missing">{{ attr.name }}</span></div>
+{% endif -%}
+{% endfor -%}
+</div></div>
+{% endfor %}
+</div>
+{% endfor %}
+
+{% if detail.non_registry_attrs %}
+<br><strong>Non-registry attributes ({{ detail.non_registry_attrs|length }}):</strong>
+<div class="attr-list">
+{% for attr in detail.non_registry_attrs -%}
+<div class="attr"><code>{{ attr.name }}</code> &times;{{ attr.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+
+{% if detail.events %}
+<br><strong>Events ({{ detail.events|length }}):</strong>
+<div class="attr-list">
+{% for evt in detail.events -%}
+<div class="attr"><code>{{ evt.name }}</code> &times;{{ evt.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+{% endif %}
+
+{% if detail.advice_messages %}
+<br><strong>Advisories ({{ detail.violation_count }} violations):</strong>
+{% for adv in detail.advice_messages -%}
+<div class="finding"><div class="msg">{{ adv.msg }}</div>
+<div class="meta">&times;{{ adv.count }}</div></div>
+{% endfor -%}
+{% endif %}
+
+{% if not detail.has_data and not detail.advice_messages %}
+<p>No results data available.</p>
+{% endif %}
+
+</div></div>
+{% endfor %}
+</div>
+
+</div>
+</body>
+</html>
