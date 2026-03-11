@@ -1,0 +1,12 @@
+{
+  "span_types": {
+    "execute_tool": {
+      "gen_ai.operation.name": "absent",
+      "error.type": "absent",
+      "gen_ai.tool.call.id": "absent",
+      "gen_ai.tool.description": "absent",
+      "gen_ai.tool.name": "absent",
+      "gen_ai.tool.type": "absent"
+    }
+  }
+}

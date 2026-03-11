@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenAI OTel Conformance Dashboard</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+<div class="container">
+<h1>GenAI OTel Conformance Dashboard</h1>
+<p class="subtitle">Generated {{ now }} &mdash;
+  <a href="https://github.com/trask/genai-otel-conformance">genai-otel-conformance</a>
+  | <a href="details.html">Detailed Results</a></p>
+
+{# ── Attribute heatmap matrices (one per span type) ── #}
+{% for heatmap in heatmaps %}
+<div class="matrix-wrap">
+<h2>{{ heatmap.label }} Spans</h2>
+<table class="matrix heatmap"><thead><tr>
+<th class="lib-header">Library</th>
+<th class="lib-header">Lang</th>
+<th class="lib-header">Instrumentation</th>
+{% for col in heatmap.columns -%}
+<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr></thead>
+<tbody>
+{% for row in heatmap.rows -%}
+<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+{% if row.lib_rowspan > 0 -%}
+<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+{% endif -%}
+{% if row.lang_rowspan > 0 -%}
+<td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
+{% endif -%}
+<td class="lib"><a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a></td>
+{% for cell in row.cells -%}
+<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
+{% endfor -%}
+</tr>
+{% endfor -%}
+</tbody></table></div>
+{% endfor %}
+
+{# ── Event heatmap ── #}
+{% if event_heatmap %}
+<div class="matrix-wrap">
+<h2>{{ event_heatmap.label }}</h2>
+<table class="matrix heatmap"><thead><tr>
+<th class="lib-header">Library</th>
+<th class="lib-header">Lang</th>
+<th class="lib-header">Instrumentation</th>
+{% for col in event_heatmap.columns -%}
+<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr></thead>
+<tbody>
+{% for row in event_heatmap.rows -%}
+<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+{% if row.lib_rowspan > 0 -%}
+<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+{% endif -%}
+{% if row.lang_rowspan > 0 -%}
+<td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
+{% endif -%}
+<td class="lib"><a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a></td>
+{% for cell in row.cells -%}
+<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
+{% endfor -%}
+</tr>
+{% endfor -%}
+</tbody></table></div>
+{% endif %}
+
+{# ── Metric heatmap ── #}
+{% if metric_heatmap %}
+<div class="matrix-wrap">
+<h2>{{ metric_heatmap.label }}</h2>
+<table class="matrix heatmap"><thead><tr>
+<th class="lib-header">Library</th>
+<th class="lib-header">Lang</th>
+<th class="lib-header">Instrumentation</th>
+{% for col in metric_heatmap.columns -%}
+<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr></thead>
+<tbody>
+{% for row in metric_heatmap.rows -%}
+<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+{% if row.lib_rowspan > 0 -%}
+<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+{% endif -%}
+{% if row.lang_rowspan > 0 -%}
+<td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
+{% endif -%}
+<td class="lib"><a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a></td>
+{% for cell in row.cells -%}
+<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
+{% endfor -%}
+</tr>
+{% endfor -%}
+</tbody></table></div>
+{% endif %}
+
+</div>
+</body>
+</html>
