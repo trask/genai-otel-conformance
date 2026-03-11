@@ -1,0 +1,144 @@
+"""Semantic convention span type specs, event types, and metric types."""
+
+_COMMON_REQUIRED = ["gen_ai.operation.name"]
+_PROVIDER_REQUIRED = ["gen_ai.provider.name", "gen_ai.system"]
+_COMMON_COND_REQUIRED = ["error.type"]
+_CLIENT_COND_REQUIRED = ["gen_ai.request.model", "server.port"]
+_CLIENT_RECOMMENDED = ["server.address"]
+_INFERENCE_COND_REQUIRED = [
+    "gen_ai.conversation.id",
+    "gen_ai.output.type",
+    "gen_ai.request.choice.count",
+    "gen_ai.request.seed",
+]
+_INFERENCE_RECOMMENDED = [
+    "gen_ai.request.frequency_penalty",
+    "gen_ai.request.max_tokens",
+    "gen_ai.request.presence_penalty",
+    "gen_ai.request.stop_sequences",
+    "gen_ai.request.temperature",
+    "gen_ai.request.top_p",
+    "gen_ai.response.finish_reasons",
+    "gen_ai.response.id",
+    "gen_ai.response.model",
+    "gen_ai.usage.cache_creation.input_tokens",
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.input_tokens",
+    "gen_ai.usage.output_tokens",
+]
+
+SPAN_TYPE_SPECS: dict[str, dict] = {
+    "inference": {
+        "label": "Inference",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.response.finish_reasons", "gen_ai.response.id",
+            "gen_ai.usage.output_tokens", "gen_ai.request.max_tokens",
+            "gen_ai.request.temperature", "gen_ai.output.type",
+            "gen_ai.usage.input_tokens",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED,
+        "recommended": _INFERENCE_RECOMMENDED + ["gen_ai.request.top_k"] + _CLIENT_RECOMMENDED,
+    },
+    "embeddings": {
+        "label": "Embeddings",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.embeddings.dimension.count", "gen_ai.request.encoding_formats",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED,
+        "recommended": [
+            "gen_ai.embeddings.dimension.count",
+            "gen_ai.request.encoding_formats",
+            "gen_ai.response.model",
+            "gen_ai.usage.input_tokens",
+        ] + _CLIENT_RECOMMENDED,
+    },
+    "retrieval": {
+        "label": "Retrieval",
+        "expected_kind": "client",
+        "discriminator_attrs": {"gen_ai.data_source.id"},
+        "required": _COMMON_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + [
+            "gen_ai.data_source.id",
+            "gen_ai.provider.name",
+            "gen_ai.system",
+        ] + _CLIENT_COND_REQUIRED,
+        "recommended": ["gen_ai.request.top_k"] + _CLIENT_RECOMMENDED,
+    },
+    "execute_tool": {
+        "label": "Execute Tool",
+        "expected_kind": "internal",
+        "discriminator_attrs": {
+            "gen_ai.tool.call.id", "gen_ai.tool.name", "gen_ai.tool.type",
+        },
+        "required": _COMMON_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED,
+        "recommended": [
+            "gen_ai.tool.call.id",
+            "gen_ai.tool.description",
+            "gen_ai.tool.name",
+            "gen_ai.tool.type",
+        ],
+    },
+    "create_agent": {
+        "label": "Create Agent",
+        "expected_kind": "client",
+        "discriminator_attrs": {"gen_ai.agent.id", "gen_ai.agent.name"},
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + [
+            "gen_ai.agent.description",
+            "gen_ai.agent.id",
+            "gen_ai.agent.name",
+            "gen_ai.agent.version",
+        ],
+        "recommended": _CLIENT_RECOMMENDED,
+    },
+    "invoke_agent": {
+        "label": "Invoke Agent",
+        "expected_kind": "client",
+        "discriminator_attrs": {"gen_ai.agent.id", "gen_ai.agent.name"},
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED + [
+            "gen_ai.agent.description",
+            "gen_ai.agent.id",
+            "gen_ai.agent.name",
+            "gen_ai.agent.version",
+            "gen_ai.data_source.id",
+        ],
+        "recommended": _INFERENCE_RECOMMENDED + _CLIENT_RECOMMENDED,
+    },
+    "invoke_workflow": {
+        "label": "Invoke Workflow",
+        "expected_kind": "internal",
+        "discriminator_attrs": {"gen_ai.workflow.name"},
+        "required": _COMMON_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + ["gen_ai.workflow.name"],
+        "recommended": [],
+    },
+}
+
+SPAN_TYPE_ORDER = [
+    "create_agent",
+    "invoke_agent",
+    "invoke_workflow",
+    "inference",
+    "embeddings",
+    "retrieval",
+    "execute_tool",
+]
+
+GENAI_EVENT_TYPES = [
+    "gen_ai.system.message",
+    "gen_ai.user.message",
+    "gen_ai.assistant.message",
+    "gen_ai.tool.message",
+    "gen_ai.choice",
+]
+
+GENAI_METRIC_TYPES = [
+    "gen_ai.client.token.usage",
+    "gen_ai.client.operation.duration",
+]

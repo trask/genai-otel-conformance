@@ -1,0 +1,13 @@
+{
+  "name": "genai-conformance-js-llamaindex",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts"
+  },
+  "dependencies": {
+    "@llamaindex/openai": "0.4.23",
+    "@traceloop/instrumentation-llamaindex": "0.22.6",
+    "llamaindex": "0.12.1"
+  }
+}

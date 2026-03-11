@@ -1,0 +1,14 @@
+{
+  "name": "genai-conformance-js-anthropic",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:openinference": "tsx test_openinference.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.78.0",
+    "@arizeai/openinference-instrumentation-anthropic": "0.1.7",
+    "@traceloop/instrumentation-anthropic": "0.22.6"
+  }
+}

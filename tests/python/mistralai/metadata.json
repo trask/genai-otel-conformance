@@ -1,0 +1,7 @@
+{
+  "display_name": "Mistral AI",
+  "version_packages": {
+    "openllmetry": "opentelemetry-instrumentation-mistralai",
+    "openinference": "openinference-instrumentation-mistralai"
+  }
+}

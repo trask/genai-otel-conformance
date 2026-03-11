@@ -1,0 +1,7 @@
+{
+  "display_name": "AWS Bedrock",
+  "version_packages": {
+    "openllmetry": "opentelemetry-instrumentation-bedrock",
+    "openinference": "openinference-instrumentation-bedrock"
+  }
+}

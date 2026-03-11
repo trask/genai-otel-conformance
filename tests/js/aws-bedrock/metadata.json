@@ -1,0 +1,8 @@
+{
+  "display_name": "AWS Bedrock",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-bedrock",
+    "openinference": "@arizeai/openinference-instrumentation-bedrock",
+    "otelcontrib": "@opentelemetry/instrumentation-aws-sdk"
+  }
+}

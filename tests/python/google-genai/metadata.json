@@ -1,0 +1,8 @@
+{
+  "display_name": "Google GenAI",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-google-genai",
+    "openllmetry": "opentelemetry-instrumentation-google-generativeai",
+    "openinference": "openinference-instrumentation-google-genai"
+  }
+}

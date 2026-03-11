@@ -1,0 +1,18 @@
+{
+  "name": "genai-conformance-js-aws-bedrock",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:openinference": "tsx test_openinference.ts",
+    "test:otelcontrib": "tsx test_otelcontrib.ts"
+  },
+  "dependencies": {
+    "@arizeai/openinference-instrumentation-bedrock": "0.4.8",
+    "@aws-sdk/client-bedrock-runtime": "3.1009.0",
+    "@opentelemetry/instrumentation": "0.213.0",
+    "@opentelemetry/instrumentation-aws-sdk": "0.68.0",
+    "@opentelemetry/sdk-node": "0.213.0",
+    "@traceloop/instrumentation-bedrock": "0.22.6"
+  }
+}

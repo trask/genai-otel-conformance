@@ -1,0 +1,15 @@
+{
+  "name": "genai-conformance-js-langchain",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:openinference": "tsx test_openinference.ts"
+  },
+  "dependencies": {
+    "@arizeai/openinference-instrumentation-langchain": "4.0.6",
+    "@langchain/core": "1.1.32",
+    "@langchain/openai": "1.2.13",
+    "@traceloop/instrumentation-langchain": "0.22.6"
+  }
+}

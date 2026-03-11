@@ -1,0 +1,7 @@
+{
+  "display_name": "Cohere",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-cohere",
+    "openllmetry": "opentelemetry-instrumentation-cohere"
+  }
+}

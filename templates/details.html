@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenAI OTel Conformance &mdash; Detailed Results</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+<div class="container">
+<h1>GenAI OTel Conformance &mdash; Detailed Results</h1>
+<p class="subtitle">Generated {{ now }} &mdash;
+  <a href="https://github.com/trask/genai-otel-conformance">genai-otel-conformance</a>
+  | <a href="index.html">Dashboard</a></p>
+
+{% for detail in details %}
+<div class="test-section" id="{{ detail.test_name }}"><h3>{{ detail.label }}</h3>
+{% if detail.instrumentation_version or detail.repo %}<div class="instrumentation-version">{% if detail.repo %}Instrumentation: <a href="https://github.com/{{ detail.repo }}">{{ detail.repo }}</a>{% if detail.instrumentation_version %} &mdash; <code>{{ detail.instrumentation_version }}</code>{% endif %}{% elif detail.instrumentation_version %}Instrumentation: <code>{{ detail.instrumentation_version }}</code>{% endif %}</div>{% endif %}
+<div class="body">
+
+{% if detail.has_local_run %}
+{% if detail.entity_summary %}
+<div class="stat-grid">
+<div class="stat-item">Entities: <span class="val">{{ detail.entity_summary }}</span></div>
+</div>
+{% endif %}
+
+{% if detail.has_data %}
+{% for section in detail.span_sections %}
+<div class="span-detail">
+<div class="span-header">{{ section.label }} Attributes</div>
+{% for group in section.groups %}
+<div class="req-group"><div class="req-group-label">{{ group.label }}</div>
+<div class="attr-check">
+{% for attr in group.attrs -%}
+{% if attr.present -%}
+<div class="icon present">&#x2713;</div>
+<div><span class="name">{{ attr.name }}</span> <span class="val">&times;{{ attr.count }}</span></div>
+{% else -%}
+<div class="icon missing">&#x2013;</div>
+<div><span class="name missing">{{ attr.name }}</span></div>
+{% endif -%}
+{% endfor -%}
+</div></div>
+{% endfor %}
+</div>
+{% endfor %}
+
+{% if detail.non_registry_attrs %}
+<br><strong>Non-registry attributes ({{ detail.non_registry_attrs|length }}):</strong>
+<div class="attr-list">
+{% for attr in detail.non_registry_attrs -%}
+<div class="attr"><code>{{ attr.name }}</code> &times;{{ attr.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+
+{% if detail.events %}
+<br><strong>Events ({{ detail.events|length }}):</strong>
+<div class="attr-list">
+{% for evt in detail.events -%}
+<div class="attr"><code>{{ evt.name }}</code> &times;{{ evt.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+
+{% if detail.metrics %}
+<br><strong>Metrics ({{ detail.metrics|length }}):</strong>
+<div class="attr-list">
+{% for metric in detail.metrics -%}
+<div class="attr"><code>{{ metric.name }}</code> &times;{{ metric.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+
+{% elif detail.has_empty_run %}
+<p>Local Weaver run completed, but it produced no telemetry.</p>
+{% endif %}
+{% endif %}
+
+{% if detail.violation_messages %}
+<br><strong>Violations ({{ detail.violation_messages|length }}):</strong>
+{% for msg in detail.violation_messages -%}
+<div class="finding"><div class="msg">{{ msg }}</div></div>
+{% endfor -%}
+{% endif %}
+
+{% if not detail.has_local_run and not detail.violation_messages %}
+<p>Results not yet available.</p>
+{% endif %}
+
+</div></div>
+{% endfor %}
+
+</div>
+</body>
+</html>

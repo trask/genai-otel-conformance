@@ -1,0 +1,355 @@
+"""Test result parsing and span classification."""
+
+from __future__ import annotations
+
+import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import NamedTuple
+
+from genai_otel_conformance import TESTS_DIR
+from genai_otel_conformance.metadata import LANGUAGE_DISPLAY_NAMES
+from genai_otel_conformance.locations import TestLocation
+
+
+class TestName(NamedTuple):
+    language: str
+    library: str
+    ecosystem: str
+
+
+@dataclass
+class TestResult:
+    language: str
+    library: str
+    ecosystem: str
+    statistics: dict | None
+    violation_count: int
+    violation_messages: list[str]
+    entity_counts: dict[str, int]
+    seen_attrs: dict[str, int]
+    seen_non_registry_attrs: dict[str, int]
+    seen_events: dict[str, int]
+    seen_metrics: dict[str, int]
+    has_data: bool
+    detected_span_types: set[str] = field(default_factory=set)
+    per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
+    detected_events: dict[str, int] = field(default_factory=dict)
+    detected_metrics: dict[str, int] = field(default_factory=dict)
+
+
+def split_test_name(name: str) -> tuple[str, str, str]:
+    """Parse a test name into language/library/ecosystem slugs."""
+    try:
+        location = TestLocation.from_test_name(name)
+    except ValueError as exc:
+        raise ValueError(f"Invalid test name: {name}") from exc
+
+    if location.lang not in LANGUAGE_DISPLAY_NAMES or not location.library or not location.ecosystem:
+        raise ValueError(f"Invalid test name: {name}")
+
+    return location.lang, location.library, location.ecosystem
+
+
+def parse_test_name(test_name: str) -> TestName:
+    """Parse a supported test name into display values."""
+    lang, library, ecosystem = split_test_name(test_name)
+    return TestName(LANGUAGE_DISPLAY_NAMES[lang], library, ecosystem)
+
+
+def try_parse_json(content: str) -> list[dict]:
+    """Parse JSON content, handling a single object, array, or JSONL."""
+    objects: list[dict] = []
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        data = None
+
+    if isinstance(data, list):
+        objects.extend(data)
+        return objects
+    if isinstance(data, dict):
+        objects.append(data)
+        return objects
+
+    for line in content.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            objects.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+
+    return objects
+
+
+def _has_any_attr(span_attrs: dict[str, object], *names: str) -> bool:
+    for name in names:
+        if span_attrs.get(name):
+            return True
+    return False
+
+
+def _has_all_attrs(span_attrs: dict[str, object], *names: str) -> bool:
+    for name in names:
+        if span_attrs.get(name) is None:
+            return False
+    return True
+
+
+def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
+    """Classify a span into span types using heuristics on individual span data."""
+    name_lower = span_name.lower()
+    op_name = str(span_attrs.get("gen_ai.operation.name", "")).lower()
+    oi_kind = str(span_attrs.get("openinference.span.kind", "")).upper()
+    llm_type = str(span_attrs.get("llm.request.type", "")).lower()
+
+    matched_types: set[str] = set()
+
+    if (
+        "embed" in name_lower
+        or _has_any_attr(span_attrs, "embedding.model_name")
+        or oi_kind == "EMBEDDING"
+        or llm_type in ("embedding", "embeddings")
+        or op_name in ("embedding", "embeddings")
+    ):
+        matched_types.add("embeddings")
+
+    if (
+        op_name == "chat"
+        or oi_kind == "LLM"
+        or llm_type in ("chat", "completion")
+        or op_name == "generate_content"
+        or _has_all_attrs(span_attrs, "gen_ai.usage.output_tokens", "gen_ai.response.finish_reasons")
+        or _has_all_attrs(span_attrs, "llm.response.model", "llm.usage.completion_tokens")
+    ):
+        matched_types.add("inference")
+
+    if op_name == "create_agent":
+        matched_types.add("create_agent")
+
+    if (
+        oi_kind == "AGENT"
+        or op_name == "invoke_agent"
+        or (
+            _has_any_attr(span_attrs, "gen_ai.agent.name", "gen_ai.agent.id")
+            and op_name != "create_agent"
+        )
+        or _has_any_attr(span_attrs, "crewai.agent.id", "crewai.agent.role")
+        or (
+            str(span_attrs.get("rpc.service", "")).lower() == "bedrockagentruntime"
+            and str(span_attrs.get("rpc.method", "")).lower() == "invokeagent"
+        )
+        or ("agentsclient" in name_lower and ("run" in name_lower or "process" in name_lower))
+        or ("threads" in name_lower and "run" in name_lower and "thread.run" not in name_lower)
+    ):
+        matched_types.add("invoke_agent")
+
+    if (
+        op_name == "execute_tool"
+        or oi_kind == "TOOL"
+        or _has_any_attr(span_attrs, "gen_ai.tool.name", "gen_ai.tool.call.id")
+    ):
+        matched_types.add("execute_tool")
+
+    if (
+        op_name == "invoke_workflow"
+        or _has_any_attr(span_attrs, "traceloop.workflow.name")
+        or name_lower == "crewai.workflow"
+        or _has_any_attr(span_attrs, "crewai.crew.id")
+    ):
+        matched_types.add("invoke_workflow")
+
+    if (
+        op_name == "retrieval"
+        or oi_kind == "RETRIEVER"
+        or _has_any_attr(span_attrs, "gen_ai.data_source.id")
+    ):
+        matched_types.add("retrieval")
+
+    return matched_types
+
+
+def _span_attributes(span: dict[str, object]) -> dict[str, object]:
+    attrs: dict[str, object] = {}
+    for attr in span.get("attributes", []):
+        attrs[attr.get("name", "")] = attr.get("value")
+    return attrs
+
+
+def _summarize_samples(
+    all_objects: list[dict],
+) -> tuple[set[str], dict[str, set[str]], dict[str, int], dict[str, int]]:
+    """Scan sample payloads once and collect detected spans, events, and metrics."""
+    span_types: set[str] = set()
+    per_type_attrs: dict[str, set[str]] = {}
+    events: dict[str, int] = {}
+    metrics: dict[str, int] = {}
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        for sample in obj.get("samples", []):
+            span = sample.get("span")
+            if span:
+                attrs = _span_attributes(span)
+                classified = _classify_span(span.get("name", ""), attrs)
+                span_types.update(classified)
+                attr_names = set(attrs.keys())
+                for span_type in classified:
+                    per_type_attrs.setdefault(span_type, set()).update(attr_names)
+
+            log = sample.get("log")
+            if log:
+                event_name = log.get("event_name", "")
+                if event_name.startswith("gen_ai."):
+                    events[event_name] = events.get(event_name, 0) + 1
+
+            metric = sample.get("metric")
+            if metric:
+                metric_name = metric.get("name", "")
+                if metric_name.startswith("gen_ai."):
+                    metrics[metric_name] = metrics.get(metric_name, 0) + 1
+
+    return span_types, per_type_attrs, events, metrics
+
+
+def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
+    if not statistics:
+        return {}
+    counts: dict[str, int] = {}
+    for name, count in statistics.get(key, {}).items():
+        if count > 0:
+            counts[name] = count
+    return counts
+
+
+def _combined_non_zero_counts(statistics: dict | None, *keys: str) -> dict[str, int]:
+    combined: dict[str, int] = {}
+    for key in keys:
+        for name, count in _non_zero_counts(statistics, key).items():
+            combined[name] = count
+    return combined
+
+
+def _extract_statistics(all_objects: list[dict]) -> dict | None:
+    statistics = None
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        if "statistics" in obj and isinstance(obj["statistics"], dict):
+            statistics = obj["statistics"]
+            continue
+        if "registry_coverage" in obj or "advice_level_counts" in obj:
+            statistics = obj
+    return statistics
+
+
+def _violation_messages(statistics: dict | None) -> list[str]:
+    if not statistics:
+        return []
+
+    messages: set[str] = set()
+    for message in statistics.get("advice_message_counts", {}):
+        if "not stable" in message.lower():
+            continue
+        messages.add(message)
+    return sorted(messages)
+
+
+def _merge_detected_signal_counts(
+    detected_counts: dict[str, int],
+    statistics: dict | None,
+    statistics_key: str,
+) -> None:
+    if not statistics:
+        return
+
+    for signal_name, count in statistics.get(statistics_key, {}).items():
+        if count <= 0 or not signal_name.startswith("gen_ai."):
+            continue
+        current_count = detected_counts.get(signal_name, 0)
+        if count > current_count:
+            detected_counts[signal_name] = count
+
+
+def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
+    """Parse a single test's Weaver output directory into a TestResult."""
+    if not result_dir.is_dir():
+        return None
+
+    all_objects: list[dict] = []
+    for json_file in sorted(result_dir.glob("**/*.json")):
+        try:
+            all_objects.extend(try_parse_json(json_file.read_text(encoding="utf-8")))
+        except (OSError, ValueError) as exc:
+            print(f"Warning: Could not parse {json_file}: {exc}", file=sys.stderr)
+
+    statistics = _extract_statistics(all_objects)
+
+    seen_attrs = _non_zero_counts(statistics, "seen_registry_attributes")
+    seen_non_registry_attrs = _non_zero_counts(statistics, "seen_non_registry_attributes")
+    seen_events = _combined_non_zero_counts(
+        statistics,
+        "seen_registry_events",
+        "seen_non_registry_events",
+    )
+    seen_metrics = _combined_non_zero_counts(
+        statistics,
+        "seen_registry_metrics",
+        "seen_non_registry_metrics",
+    )
+
+    violation_count = 0
+    if statistics:
+        violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
+
+    violation_messages = _violation_messages(statistics)
+
+    entity_counts: dict[str, int] = {}
+    if statistics:
+        entity_counts = statistics.get("total_entities_by_type", {})
+
+    try:
+        language, library, ecosystem = parse_test_name(test_name)
+    except ValueError:
+        print(f"Warning: Could not parse test name: {test_name}", file=sys.stderr)
+        return None
+
+    has_data = False
+    if statistics and statistics.get("total_entities", 0) > 0:
+        has_data = True
+    detected_span_types, per_type_attrs, detected_events, detected_metrics = _summarize_samples(
+        all_objects
+    )
+
+    _merge_detected_signal_counts(
+        detected_events,
+        statistics,
+        "seen_non_registry_events",
+    )
+    _merge_detected_signal_counts(
+        detected_metrics,
+        statistics,
+        "seen_non_registry_metrics",
+    )
+
+    return TestResult(
+        language=language,
+        library=library,
+        ecosystem=ecosystem,
+        statistics=statistics,
+        violation_count=violation_count,
+        violation_messages=violation_messages,
+        entity_counts=entity_counts,
+        seen_attrs=seen_attrs,
+        seen_non_registry_attrs=seen_non_registry_attrs,
+        seen_events=seen_events,
+        seen_metrics=seen_metrics,
+        has_data=has_data,
+        detected_span_types=detected_span_types,
+        per_type_attrs=per_type_attrs,
+        detected_events=detected_events,
+        detected_metrics=detected_metrics,
+    )

@@ -1,0 +1,16 @@
+{
+  "name": "genai-conformance-js-openai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:openinference": "tsx test_openinference.ts",
+    "test:otelcontrib": "tsx test_otelcontrib.ts"
+  },
+  "dependencies": {
+    "openai": "6.29.0",
+    "@traceloop/instrumentation-openai": "0.22.5",
+    "@arizeai/openinference-instrumentation-openai": "4.0.5",
+    "@opentelemetry/instrumentation-openai": "0.11.0"
+  }
+}

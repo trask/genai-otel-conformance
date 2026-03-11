@@ -1,0 +1,12 @@
+{
+  "name": "genai-conformance-js-vertexai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "1.10.0",
+    "@traceloop/instrumentation-vertexai": "0.22.5"
+  }
+}

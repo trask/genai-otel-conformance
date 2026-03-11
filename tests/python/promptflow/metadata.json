@@ -1,0 +1,7 @@
+{
+  "display_name": "Promptflow",
+  "repo": "microsoft/promptflow",
+  "version_packages": {
+    "native": "promptflow-tracing"
+  }
+}

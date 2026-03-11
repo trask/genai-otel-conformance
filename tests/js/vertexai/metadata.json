@@ -1,0 +1,6 @@
+{
+  "display_name": "Vertex AI",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-vertexai"
+  }
+}

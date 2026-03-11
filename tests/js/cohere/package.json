@@ -1,0 +1,12 @@
+{
+  "name": "genai-conformance-js-cohere",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:openllmetry": "tsx test_openllmetry.ts"
+  },
+  "dependencies": {
+    "cohere-ai": "7.20.0",
+    "@traceloop/instrumentation-cohere": "0.22.6"
+  }
+}

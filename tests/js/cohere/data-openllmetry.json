@@ -1,0 +1,42 @@
+{
+  "events": {
+    "gen_ai.system.message": "absent",
+    "gen_ai.user.message": "absent",
+    "gen_ai.assistant.message": "absent",
+    "gen_ai.tool.message": "absent",
+    "gen_ai.choice": "absent"
+  },
+  "metrics": {
+    "gen_ai.client.token.usage": "absent",
+    "gen_ai.client.operation.duration": "absent"
+  },
+  "span_types": {
+    "inference": {
+      "gen_ai.operation.name": "absent",
+      "gen_ai.provider.name": "absent",
+      "gen_ai.system": "present",
+      "error.type": "absent",
+      "gen_ai.request.model": "present",
+      "server.port": "absent",
+      "gen_ai.conversation.id": "absent",
+      "gen_ai.output.type": "absent",
+      "gen_ai.request.choice.count": "absent",
+      "gen_ai.request.seed": "absent",
+      "gen_ai.request.frequency_penalty": "absent",
+      "gen_ai.request.max_tokens": "absent",
+      "gen_ai.request.presence_penalty": "absent",
+      "gen_ai.request.stop_sequences": "absent",
+      "gen_ai.request.temperature": "absent",
+      "gen_ai.request.top_p": "absent",
+      "gen_ai.response.finish_reasons": "absent",
+      "gen_ai.response.id": "absent",
+      "gen_ai.response.model": "absent",
+      "gen_ai.usage.cache_creation.input_tokens": "absent",
+      "gen_ai.usage.cache_read.input_tokens": "absent",
+      "gen_ai.usage.input_tokens": "absent",
+      "gen_ai.usage.output_tokens": "absent",
+      "gen_ai.request.top_k": "absent",
+      "server.address": "absent"
+    }
+  }
+}

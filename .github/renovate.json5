@@ -1,0 +1,61 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "customManagers": [
+    {
+      customType: 'regex',
+      fileMatch: ['^versions\.env$'],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+WEAVER_VERSION=(?<currentValue>\\S+)',
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+SEMCONV_VERSION=(?<currentValue>\\S+)',
+      ],
+    },
+  ],
+  // Override default ignorePaths to remove **/tests/** and **/test/** so that
+  // Renovate picks up dependency files under the tests/ directory.
+  "ignorePaths": [
+    "**/node_modules/**"
+  ],
+  "packageRules": [
+    {
+      groupName: 'github actions',
+      matchManagers: [
+        'github-actions',
+      ],
+      schedule: [
+        '* * 2 * *', // monthly, on the 2nd
+      ],
+    },
+    {
+      description: 'Group Python OpenTelemetry SDK packages',
+      matchManagers: ['pip_requirements'],
+      matchPackagePatterns: ['^opentelemetry-(?!instrumentation)'],
+      groupName: 'python-opentelemetry',
+    },
+    {
+      description: 'Group JS OpenTelemetry SDK packages',
+      matchManagers: ['npm'],
+      matchPackagePatterns: ['^@opentelemetry/(?!instrumentation)'],
+      groupName: 'js-opentelemetry',
+    },
+    {
+      description: 'Group Java OpenTelemetry SDK packages',
+      matchManagers: ['gradle'],
+      matchPackagePatterns: ['^io\\.opentelemetry(?!\\.instrumentation)'],
+      groupName: 'java-opentelemetry',
+    },
+    {
+      description: 'Group all .NET OpenTelemetry packages',
+      matchManagers: ['nuget'],
+      matchPackagePatterns: ['^OpenTelemetry'],
+      groupName: 'dotnet-opentelemetry',
+    },
+  ],
+  "labels": [
+    "dependencies"
+  ]
+}

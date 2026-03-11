@@ -1,0 +1,6 @@
+{
+  "display_name": "Claude Agent SDK",
+  "version_packages": {
+    "openinference": "openinference-instrumentation-claude-agent-sdk"
+  }
+}

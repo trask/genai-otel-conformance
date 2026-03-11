@@ -1,0 +1,128 @@
+"""Build heatmap statuses and attribute lookups from test results."""
+
+from __future__ import annotations
+
+from genai_otel_conformance.results import TestResult
+
+
+def merge_signal_counts(
+    statistics_counts: dict[str, int],
+    detected_counts: dict[str, int],
+) -> dict[str, int]:
+    """Merge statistic-derived and sample-derived signal counts."""
+    merged = dict(statistics_counts)
+    for name, count in detected_counts.items():
+        merged[name] = max(merged.get(name, 0), count)
+    return merged
+
+
+def present_attributes(result: TestResult) -> set[str]:
+    """Return all attribute names present in registry and non-registry stats."""
+    attrs = set(result.seen_attrs)
+    attrs.update(result.seen_non_registry_attrs)
+    return attrs
+
+
+_SPAN_TYPE_LEVELS = (
+    ("required", "Required"),
+    ("conditionally_required", "Conditionally Required"),
+    ("recommended", "Recommended"),
+)
+
+
+def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
+    """Return ordered attribute groups for a span-type specification."""
+    groups: list[dict[str, object]] = []
+    for level, label in _SPAN_TYPE_LEVELS:
+        attrs = list(spec.get(level, []))
+        if attrs:
+            groups.append({"key": level, "label": label, "attrs": attrs})
+    return groups
+
+
+def span_type_heatmap_columns(spec: dict) -> list[dict[str, object]]:
+    """Return ordered heatmap columns for a span-type specification."""
+    columns: list[dict[str, object]] = []
+    for group in span_type_attribute_groups(spec):
+        attrs = group["attrs"]
+        for index, attr in enumerate(attrs):
+            columns.append({"header_text": attr, "is_group_start": index == 0})
+    return columns
+
+
+def span_type_present_attributes(result: TestResult, span_type_key: str) -> set[str]:
+    """Return attrs present for a span type, falling back to global presence."""
+    all_present = present_attributes(result)
+    return result.per_type_attrs.get(span_type_key, all_present)
+
+
+def _expected_span_type_attributes(spec: dict) -> list[str]:
+    attrs: list[str] = []
+    for group in span_type_attribute_groups(spec):
+        attrs.extend(group["attrs"])
+    return attrs
+
+
+def _is_relevant_span_type(
+    result: TestResult,
+    span_type_key: str,
+    spec: dict,
+) -> bool:
+    all_present = present_attributes(result)
+    discriminators = spec.get("discriminator_attrs", set())
+    if discriminators:
+        for attr in discriminators:
+            if attr in all_present:
+                return True
+        return span_type_key in result.detected_span_types
+
+    for attr in _expected_span_type_attributes(spec):
+        if attr in all_present:
+            return True
+    return False
+
+
+def relevant_span_type_keys(
+    result: TestResult,
+    span_type_order: list[str],
+    span_type_specs: dict[str, dict],
+) -> list[str]:
+    """Return span-type keys that are relevant for this result."""
+    relevant: list[str] = []
+    for span_type_key in span_type_order:
+        spec = span_type_specs[span_type_key]
+        if not _expected_span_type_attributes(spec):
+            continue
+        if _is_relevant_span_type(result, span_type_key, spec):
+            relevant.append(span_type_key)
+    return relevant
+
+
+def build_signal_statuses(
+    signal_names: list[str],
+    statistics_counts: dict[str, int],
+    detected_counts: dict[str, int],
+) -> dict[str, str]:
+    """Return present/absent statuses for the given signal names."""
+    merged_counts = merge_signal_counts(statistics_counts, detected_counts)
+    statuses: dict[str, str] = {}
+    for name in signal_names:
+        statuses[name] = "present" if merged_counts.get(name, 0) > 0 else "absent"
+    return statuses
+
+
+def build_span_type_statuses(
+    result: TestResult,
+    span_type_order: list[str],
+    span_type_specs: dict[str, dict],
+) -> dict[str, dict[str, str]]:
+    """Return present/absent attribute statuses for relevant span types."""
+    statuses: dict[str, dict[str, str]] = {}
+    for span_type_key in relevant_span_type_keys(result, span_type_order, span_type_specs):
+        spec = span_type_specs[span_type_key]
+        type_present = span_type_present_attributes(result, span_type_key)
+        attr_statuses: dict[str, str] = {}
+        for attr in _expected_span_type_attributes(spec):
+            attr_statuses[attr] = "present" if attr in type_present else "absent"
+        statuses[span_type_key] = attr_statuses
+    return statuses

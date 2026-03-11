@@ -1,0 +1,14 @@
+{
+  "name": "genai-conformance-js-vercel-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:native": "tsx test_native.ts",
+    "test:openinference": "tsx test_openinference.ts"
+  },
+  "dependencies": {
+    "ai": "6.0.116",
+    "@ai-sdk/openai": "3.0.41",
+    "@arizeai/openinference-vercel": "2.7.1"
+  }
+}
