@@ -1,0 +1,8 @@
+{
+  "display_name": "AutoGen",
+  "repo": "microsoft/autogen",
+  "version_packages": {
+    "native": "autogen-agentchat",
+    "openinference": "openinference-instrumentation-autogen-agentchat"
+  }
+}

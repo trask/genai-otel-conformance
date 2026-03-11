@@ -1,0 +1,19 @@
+# Weaver results (generated under tests/<lang>/<lib>/results/<eco>/)
+results/
+
+# Python
+__pycache__/
+*.egg-info/
+
+# Node.js
+node_modules/
+package-lock.json
+.cache/
+
+# .NET
+bin/
+obj/
+
+# Java
+build/
+.gradle/

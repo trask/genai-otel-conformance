@@ -1,0 +1,11 @@
+[project]
+name = "genai-otel-conformance-mock-server"
+version = "0.1.0"
+description = "Mock LLM server for GenAI OTel conformance testing"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0",
+]
+
+[project.scripts]
+genai-mock-server = "mock_server.server:main"

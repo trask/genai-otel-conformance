@@ -1,0 +1,29 @@
+# Shared OTel declarative configuration for Java conformance tests.
+# Uses simple (synchronous) processors so telemetry reaches Weaver immediately.
+#
+# Passed to the JVM via -Dotel.config.file=<path-to-this-file>
+# The OTLP endpoint is supplied via OTEL_EXPORTER_OTLP_ENDPOINT env var.
+
+file_format: "1.0"
+
+tracer_provider:
+  processors:
+    - simple:
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+
+logger_provider:
+  processors:
+    - simple:
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+
+meter_provider:
+  readers:
+    - periodic:
+        interval: 5000
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}

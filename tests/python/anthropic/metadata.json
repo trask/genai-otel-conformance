@@ -1,0 +1,8 @@
+{
+  "display_name": "Anthropic",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-anthropic",
+    "openllmetry": "opentelemetry-instrumentation-anthropic",
+    "openinference": "openinference-instrumentation-anthropic"
+  }
+}

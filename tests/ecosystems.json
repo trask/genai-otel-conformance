@@ -1,0 +1,28 @@
+{
+  "otelcontrib": {
+    "display_name": "OTel Contrib",
+    "repos": {
+      "python": "open-telemetry/opentelemetry-python-contrib",
+      "java": "open-telemetry/opentelemetry-java-instrumentation",
+      "js": "open-telemetry/opentelemetry-js-contrib",
+      "dotnet": "open-telemetry/opentelemetry-dotnet-contrib"
+    }
+  },
+  "openllmetry": {
+    "display_name": "OpenLLMetry",
+    "repos": {
+      "python": "traceloop/openllmetry",
+      "js": "traceloop/openllmetry"
+    }
+  },
+  "openinference": {
+    "display_name": "OpenInference",
+    "repos": {
+      "python": "Arize-ai/openinference",
+      "js": "Arize-ai/openinference"
+    }
+  },
+  "native": {
+    "display_name": "Native"
+  }
+}
