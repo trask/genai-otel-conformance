@@ -58,7 +58,11 @@ ECOSYSTEM_REPOS = {
 
 # For "native" ecosystem, the repo depends on the library.
 NATIVE_REPOS = {
+    "autogen": "microsoft/autogen",
+    "extensions-ai": "dotnet/extensions",
+    "google-adk": "google/adk-python",
     "spring-ai": "spring-projects/spring-ai",
+    "spring-ai-openinference": "spring-projects/spring-ai",
     "litellm": "BerriAI/litellm",
     "dspy": "stanfordnlp/dspy",
     "vercel-ai": "vercel/ai",
