@@ -28,6 +28,14 @@ TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
 ECOSYSTEM_SUFFIXES = ["otelcontrib", "openllmetry", "openinference", "native"]
 
+# New-style test name language prefixes (e.g. "python-cohere-openllmetry").
+LANG_PREFIXES = {
+    "python-": "Python",
+    "js-": "JS/TS",
+    "java-": "Java",
+    "dotnet-": "C#",
+}
+
 ECOSYSTEM_DISPLAY = {
     "otelcontrib": "OTel Contrib",
     "openllmetry": "OpenLLMetry",
@@ -287,13 +295,6 @@ def parse_test_name(test_name) -> TestName:
         "_dotnet": "C#",
     }
 
-    lang_prefixes = {
-        "python-": "Python",
-        "js-": "JS/TS",
-        "java-": "Java",
-        "dotnet-": "C#",
-    }
-
     # Extract language suffix if present (old-style naming)
     language = "Python"
     base = test_name
@@ -305,7 +306,7 @@ def parse_test_name(test_name) -> TestName:
 
     # Extract language prefix if present (new-style naming)
     if language == "Python":
-        for prefix, lang_display in lang_prefixes.items():
+        for prefix, lang_display in LANG_PREFIXES.items():
             if base.startswith(prefix):
                 language = lang_display
                 base = base[len(prefix):]
@@ -592,7 +593,7 @@ def _build_heatmap_rows(results: dict[str, TestResult]) -> list[HeatmapRow]:
             ),
         ))
 
-    rows.sort(key=lambda x: (x.lib_display.lower(), x.language.lower(), x.repo.lower()))
+    rows.sort(key=lambda x: (x.language.lower(), x.lib_display.lower(), x.eco_display.lower()))
     return rows
 
 
@@ -673,6 +674,34 @@ def _prepare_heatmaps(heatmap_rows: list[HeatmapRow]) -> list[dict]:
                 "instrumentation_version": short_version,
                 "cells": cells,
             })
+
+        # Compute rowspan values for Language → Library hierarchy.
+        # lang_rowspan > 0 means "emit a language cell with this rowspan";
+        # lib_rowspan > 0 means "emit a library cell with this rowspan";
+        # 0 means "skip the cell (covered by a previous rowspan)".
+        for r in rows:
+            r["lang_rowspan"] = 0
+            r["lib_rowspan"] = 0
+
+        if rows:
+            i = 0
+            while i < len(rows):
+                # Find the extent of this language group.
+                lang = rows[i]["language"]
+                lang_start = i
+                while i < len(rows) and rows[i]["language"] == lang:
+                    i += 1
+                lang_end = i
+                rows[lang_start]["lang_rowspan"] = lang_end - lang_start
+
+                # Within the language group, find library sub-groups.
+                j = lang_start
+                while j < lang_end:
+                    lib = rows[j]["lib_display"]
+                    lib_start = j
+                    while j < lang_end and rows[j]["lib_display"] == lib:
+                        j += 1
+                    rows[lib_start]["lib_rowspan"] = j - lib_start
 
         heatmaps.append({"label": spec["label"], "columns": columns, "rows": rows})
 

@@ -55,6 +55,11 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 .heatmap td.kind-mismatch { background: #fce4ec; text-align: center; color: #c62828; font-size: 0.75rem; }
 .heatmap .group-start { border-left: 3px solid #555 !important; }
 
+/* Hierarchy grouping */
+.heatmap td.lang-cell { vertical-align: top; font-weight: 600; background: #f0f1f4; border-right: 2px solid #bbb; }
+.heatmap td.lib-cell { vertical-align: top; background: #f8f9fa; }
+.heatmap tr.lang-group-start td { border-top: 2px solid #999; }
+
 /* Version display */
 .version { font-size: 0.7rem; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; display: block; }
 .instrumentation-version { padding: 0.3rem 1rem; font-size: 0.82rem; color: var(--muted); background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
@@ -99,7 +104,7 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <body>
 <div class="container">
 <h1>GenAI OTel Conformance Dashboard</h1>
-<p class="subtitle">Generated 2026-03-14 16:48 UTC &mdash;
+<p class="subtitle">Generated 2026-03-14 22:09 UTC &mdash;
   <a href="https://github.com/trask/genai-otel-conformance">genai-otel-conformance</a></p>
 
 
@@ -107,8 +112,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <div class="matrix-wrap">
 <h2>Invoke Agent Spans</h2>
 <table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
 <th class="lib-header">Lang</th>
+<th class="lib-header">Library</th>
 <th class="lib-header">Instrumentation</th>
 <th class="attr-header group-start"><span>gen_ai.operation.name</span></th>
 <th class="attr-header"><span>gen_ai.provider.name / gen_ai.system</span></th>
@@ -140,8 +145,9 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <th class="attr-header"><span>server.address</span></th>
 </tr></thead>
 <tbody>
-<tr><td class="lib">AutoGen</td>
-<td class="lib">Python</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="6">Python</td>
+<td class="lib lib-cell" rowspan="1">AutoGen</td>
 <td class="lib"><a href="#autogen-native">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -172,9 +178,9 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">AutoGen AgentChat</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#python-autogen-agentchat-openinference">OpenInference</a></td>
+<tr>
+<td class="lib lib-cell" rowspan="1">AutoGen AgentChat</td>
+<td class="lib"><a href="#python-autogen-agentchat-openinference">OpenInference</a> <span class="version">0.1.6</span></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
 <td class="absent group-start"></td>
@@ -204,8 +210,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">CrewAI</td>
-<td class="lib">Python</td>
+<tr>
+<td class="lib lib-cell" rowspan="1">CrewAI</td>
 <td class="lib"><a href="#crewai-openllmetry">OpenLLMetry</a></td>
 <td class="absent group-start"></td>
 <td class="deprecated">✓</td>
@@ -236,8 +242,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">OpenAI Agents</td>
-<td class="lib">Python</td>
+<tr>
+<td class="lib lib-cell" rowspan="2">OpenAI Agents</td>
 <td class="lib"><a href="#openai-agents-native">Native</a></td>
 <td class="absent group-start"></td>
 <td class="deprecated">✓</td>
@@ -268,8 +274,7 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">OpenAI Agents</td>
-<td class="lib">Python</td>
+<tr>
 <td class="lib"><a href="#openai-agents-openllmetry">OpenLLMetry</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -300,8 +305,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">Pydantic AI</td>
-<td class="lib">Python</td>
+<tr>
+<td class="lib lib-cell" rowspan="1">Pydantic AI</td>
 <td class="lib"><a href="#pydantic-ai-native">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="present">✓</td>
@@ -337,8 +342,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <div class="matrix-wrap">
 <h2>Inference Spans</h2>
 <table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
 <th class="lib-header">Lang</th>
+<th class="lib-header">Library</th>
 <th class="lib-header">Instrumentation</th>
 <th class="attr-header group-start"><span>gen_ai.operation.name</span></th>
 <th class="attr-header"><span>gen_ai.provider.name / gen_ai.system</span></th>
@@ -366,484 +371,9 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <th class="attr-header"><span>server.address</span></th>
 </tr></thead>
 <tbody>
-<tr><td class="lib">Anthropic</td>
-<td class="lib">JS/TS</td>
-<td class="lib"><a href="#anthropic-openllmetry_js">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Anthropic</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#anthropic-otelcontrib">OTel Contrib</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Anthropic</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#anthropic-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">AWS Bedrock</td>
-<td class="lib">Java</td>
-<td class="lib"><a href="#aws-bedrock-otelcontrib_java">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="present">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">AWS Bedrock</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#aws-bedrock-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Cohere</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#cohere-otelcontrib">OTel Contrib</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Cohere</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#python-cohere-otelcontrib">OTel Contrib</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Cohere</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#cohere-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Cohere</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#python-cohere-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">DSPy</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#dspy-native">Native</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Google GenAI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#google-genai-otelcontrib">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Google GenAI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#google-genai-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Groq</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#python-groq-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">LangChain</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#langchain-otelcontrib">OTel Contrib</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">LangChain</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#langchain-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">LiteLLM</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#litellm-native">Native</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">LlamaIndex</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#llamaindex-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">Microsoft.Extensions.AI</td>
-<td class="lib">C#</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="2">C#</td>
+<td class="lib lib-cell" rowspan="1">Microsoft.Extensions.AI</td>
 <td class="lib"><a href="#extensions-ai-native_dotnet">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="present">✓</td>
@@ -870,204 +400,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="present">✓</td>
 </tr>
-<tr><td class="lib">Mistral AI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#mistralai-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">Java</td>
-<td class="lib"><a href="#openai-otelcontrib_java">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="present">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">JS/TS</td>
-<td class="lib"><a href="#openai-otelcontrib_js">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#openai-otelcontrib">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#openai-openllmetry">OpenLLMetry</a></td>
-<td class="absent group-start"></td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-</tr>
-<tr><td class="lib">OpenAI Agents</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#openai-agents-otelcontrib">OTel Contrib</a></td>
-<td class="present group-start">✓</td>
-<td class="deprecated">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">Pydantic AI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#pydantic-ai-native">Native</a></td>
-<td class="present group-start">✓</td>
-<td class="present">✓</td>
-<td class="absent group-start"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent group-start"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="absent"></td>
-<td class="present">✓</td>
-<td class="present">✓</td>
-<td class="absent"></td>
-<td class="present">✓</td>
-</tr>
-<tr><td class="lib">Semantic Kernel</td>
-<td class="lib">C#</td>
+<tr>
+<td class="lib lib-cell" rowspan="1">Semantic Kernel</td>
 <td class="lib"><a href="#semantic-kernel-native_dotnet">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -1094,8 +428,65 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="present">✓</td>
 </tr>
-<tr><td class="lib">Spring AI</td>
-<td class="lib">Java</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="4">Java</td>
+<td class="lib lib-cell" rowspan="1">AWS Bedrock</td>
+<td class="lib"><a href="#aws-bedrock-otelcontrib_java">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="present">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">OpenAI</td>
+<td class="lib"><a href="#openai-otelcontrib_java">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="present">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">Spring AI</td>
 <td class="lib"><a href="#spring-ai-native_java">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -1122,8 +513,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">spring-ai-openinference</td>
-<td class="lib">Java</td>
+<tr>
+<td class="lib lib-cell" rowspan="1">spring-ai-openinference</td>
 <td class="lib"><a href="#spring-ai-openinference-native_java">Native</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -1150,8 +541,65 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">Vercel AI SDK</td>
-<td class="lib">JS/TS</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="3">JS/TS</td>
+<td class="lib lib-cell" rowspan="1">Anthropic</td>
+<td class="lib"><a href="#anthropic-openllmetry_js">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">OpenAI</td>
+<td class="lib"><a href="#openai-otelcontrib_js">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">Vercel AI SDK</td>
 <td class="lib"><a href="#vercel-ai-native_js">Native</a></td>
 <td class="absent group-start"></td>
 <td class="deprecated">✓</td>
@@ -1178,9 +626,176 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">Vertex AI</td>
-<td class="lib">Python</td>
-<td class="lib"><a href="#vertexai-otelcontrib">OTel Contrib</a></td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="20">Python</td>
+<td class="lib lib-cell" rowspan="2">Anthropic</td>
+<td class="lib"><a href="#anthropic-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib"><a href="#anthropic-otelcontrib">OTel Contrib</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">AWS Bedrock</td>
+<td class="lib"><a href="#aws-bedrock-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="2">Cohere</td>
+<td class="lib"><a href="#python-cohere-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib"><a href="#python-cohere-otelcontrib">OTel Contrib</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">DSPy</td>
+<td class="lib"><a href="#dspy-native">Native</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="2">Google GenAI</td>
+<td class="lib"><a href="#google-genai-openllmetry">OpenLLMetry</a></td>
 <td class="absent group-start"></td>
 <td class="deprecated">✓</td>
 <td class="absent group-start"></td>
@@ -1206,9 +821,341 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="absent"></td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">Vertex AI</td>
-<td class="lib">Python</td>
+<tr>
+<td class="lib"><a href="#google-genai-otelcontrib">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">Groq</td>
+<td class="lib"><a href="#python-groq-openllmetry">OpenLLMetry</a> <span class="version">0.53.0</span></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="2">LangChain</td>
+<td class="lib"><a href="#langchain-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib"><a href="#langchain-otelcontrib">OTel Contrib</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">LiteLLM</td>
+<td class="lib"><a href="#litellm-native">Native</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">LlamaIndex</td>
+<td class="lib"><a href="#llamaindex-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">Mistral AI</td>
+<td class="lib"><a href="#mistralai-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="2">OpenAI</td>
+<td class="lib"><a href="#openai-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib"><a href="#openai-otelcontrib">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">OpenAI Agents</td>
+<td class="lib"><a href="#openai-agents-otelcontrib">OTel Contrib</a></td>
+<td class="present group-start">✓</td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="1">Pydantic AI</td>
+<td class="lib"><a href="#pydantic-ai-native">Native</a></td>
+<td class="present group-start">✓</td>
+<td class="present">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="present">✓</td>
+</tr>
+<tr>
+<td class="lib lib-cell" rowspan="2">Vertex AI</td>
 <td class="lib"><a href="#vertexai-openllmetry">OpenLLMetry</a></td>
+<td class="absent group-start"></td>
+<td class="deprecated">✓</td>
+<td class="absent group-start"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent group-start"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+<td class="present">✓</td>
+<td class="present">✓</td>
+<td class="absent"></td>
+<td class="absent"></td>
+</tr>
+<tr>
+<td class="lib"><a href="#vertexai-otelcontrib">OTel Contrib</a></td>
 <td class="absent group-start"></td>
 <td class="deprecated">✓</td>
 <td class="absent group-start"></td>
@@ -1239,8 +1186,8 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <div class="matrix-wrap">
 <h2>Embeddings Spans</h2>
 <table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
 <th class="lib-header">Lang</th>
+<th class="lib-header">Library</th>
 <th class="lib-header">Instrumentation</th>
 <th class="attr-header group-start"><span>gen_ai.operation.name</span></th>
 <th class="attr-header"><span>gen_ai.provider.name / gen_ai.system</span></th>
@@ -1254,8 +1201,9 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <th class="attr-header"><span>server.address</span></th>
 </tr></thead>
 <tbody>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">Java</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="1">Java</td>
+<td class="lib lib-cell" rowspan="1">OpenAI</td>
 <td class="lib"><a href="#openai-otelcontrib_java">OTel Contrib</a></td>
 <td class="present group-start">✓</td>
 <td class="present">✓</td>
@@ -1268,8 +1216,9 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <td class="present">✓</td>
 <td class="absent"></td>
 </tr>
-<tr><td class="lib">OpenAI</td>
-<td class="lib">Python</td>
+<tr class="lang-group-start">
+<td class="lib lang-cell" rowspan="1">Python</td>
+<td class="lib lib-cell" rowspan="1">OpenAI</td>
 <td class="lib"><a href="#openai-otelcontrib">OTel Contrib</a></td>
 <td class="present group-start">✓</td>
 <td class="deprecated">✓</td>
@@ -1289,86 +1238,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <div class="details-wrap">
 <h2>Detailed Results</h2>
 
-
-<div class="test-section" id="anthropic-openinference"><h3>Anthropic (Python) — OpenInference</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">2 spans, 1 resource, 35 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.3%</span></div>
-<div class="stat-item">Total advisories: <span class="val">31</span></div>
-</div>
-
-
-
-
-
-<br><strong>Non-registry attributes (16):</strong>
-<div class="attr-list">
-<div class="attr"><code>input.mime_type</code> &times;2</div>
-<div class="attr"><code>input.value</code> &times;2</div>
-<div class="attr"><code>llm.input_messages.0.message.content</code> &times;2</div>
-<div class="attr"><code>llm.input_messages.0.message.role</code> &times;2</div>
-<div class="attr"><code>llm.invocation_parameters</code> &times;2</div>
-<div class="attr"><code>llm.model_name</code> &times;2</div>
-<div class="attr"><code>llm.output_messages.0.message.content</code> &times;2</div>
-<div class="attr"><code>llm.output_messages.0.message.role</code> &times;2</div>
-<div class="attr"><code>llm.provider</code> &times;2</div>
-<div class="attr"><code>llm.system</code> &times;2</div>
-<div class="attr"><code>llm.token_count.completion</code> &times;2</div>
-<div class="attr"><code>llm.token_count.prompt</code> &times;2</div>
-<div class="attr"><code>llm.token_count.total</code> &times;1</div>
-<div class="attr"><code>openinference.span.kind</code> &times;2</div>
-<div class="attr"><code>output.mime_type</code> &times;2</div>
-<div class="attr"><code>output.value</code> &times;2</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (31 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;llm.model_name&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.completion&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.mime_type&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.prompt&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.provider&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.system&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.invocation_parameters&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;output.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;output.mime_type&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;openinference.span.kind&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.total&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-
-
-
-
-</div></div>
 
 <div class="test-section" id="anthropic-openllmetry"><h3>Anthropic (Python) — OpenLLMetry</h3>
 
@@ -1919,74 +1788,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 </div></div>
 
-<div class="test-section" id="aws-bedrock-openinference"><h3>AWS Bedrock (Python) — OpenInference</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">1 span, 1 resource, 16 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.3%</span></div>
-<div class="stat-item">Total advisories: <span class="val">12</span></div>
-</div>
-
-
-
-
-
-<br><strong>Non-registry attributes (12):</strong>
-<div class="attr-list">
-<div class="attr"><code>input.value</code> &times;1</div>
-<div class="attr"><code>llm.input_messages.0.message.contents.0.message_content.text</code> &times;1</div>
-<div class="attr"><code>llm.input_messages.0.message.contents.0.message_content.type</code> &times;1</div>
-<div class="attr"><code>llm.input_messages.0.message.role</code> &times;1</div>
-<div class="attr"><code>llm.model_name</code> &times;1</div>
-<div class="attr"><code>llm.output_messages.0.message.content</code> &times;1</div>
-<div class="attr"><code>llm.output_messages.0.message.role</code> &times;1</div>
-<div class="attr"><code>llm.token_count.completion</code> &times;1</div>
-<div class="attr"><code>llm.token_count.prompt</code> &times;1</div>
-<div class="attr"><code>llm.token_count.total</code> &times;1</div>
-<div class="attr"><code>openinference.span.kind</code> &times;1</div>
-<div class="attr"><code>output.value</code> &times;1</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (12 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;openinference.span.kind&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.prompt&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.contents.0.message_content.type&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.model_name&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.total&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.completion&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;output.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.contents.0.message_content.text&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-
-
-
-
-</div></div>
-
 <div class="test-section" id="aws-bedrock-openllmetry"><h3>AWS Bedrock (Python) — OpenLLMetry</h3>
 
 <div class="body">
@@ -2246,20 +2047,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 </div></div>
 
-<div class="test-section" id="claude-agent-sdk-openinference"><h3>Claude Agent SDK (Python) — OpenInference</h3>
-
-<div class="body">
-
-
-
-
-
-
-<p>No results data available.</p>
-
-
-</div></div>
-
 <div class="test-section" id="claude-agent-sdk-otelcontrib"><h3>Claude Agent SDK (Python) — OTel Contrib</h3>
 
 <div class="body">
@@ -2270,282 +2057,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 
 <p>No results data available.</p>
-
-
-</div></div>
-
-<div class="test-section" id="cohere-openllmetry"><h3>Cohere (Python) — OpenLLMetry</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">1 span, 1 resource, 16 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.6%</span></div>
-<div class="stat-item">Total advisories: <span class="val">22</span></div>
-</div>
-
-
-
-<div class="span-detail">
-<div class="span-header">Inference Attributes</div>
-
-<div class="req-group"><div class="req-group-label">Required</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.operation.name</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.provider.name</span></div>
-</div></div>
-
-<div class="req-group"><div class="req-group-label">Conditionally Required</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">error.type</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.request.model</span> <span class="val">&times;1</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">server.port</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.conversation.id</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.output.type</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.choice.count</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.seed</span></div>
-</div></div>
-
-<div class="req-group"><div class="req-group-label">Recommended</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.frequency_penalty</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.max_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.presence_penalty</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.stop_sequences</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.temperature</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.top_p</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.response.finish_reasons</span> <span class="val">&times;1</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.response.id</span> <span class="val">&times;1</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.response.model</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.cache_creation.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.cache_read.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.output_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.top_k</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">server.address</span></div>
-</div></div>
-
-</div>
-
-
-
-<br><strong>Non-registry attributes (9):</strong>
-<div class="attr-list">
-<div class="attr"><code>gen_ai.completion.0.content</code> &times;1</div>
-<div class="attr"><code>gen_ai.completion.0.role</code> &times;1</div>
-<div class="attr"><code>gen_ai.prompt.0.content</code> &times;1</div>
-<div class="attr"><code>gen_ai.prompt.0.role</code> &times;1</div>
-<div class="attr"><code>gen_ai.system</code> &times;1</div>
-<div class="attr"><code>gen_ai.usage.completion_tokens</code> &times;1</div>
-<div class="attr"><code>gen_ai.usage.prompt_tokens</code> &times;1</div>
-<div class="attr"><code>llm.request.type</code> &times;1</div>
-<div class="attr"><code>llm.usage.total_tokens</code> &times;1</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (11 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.completion.0.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.completion.0.content&#39; collides with existing namespace &#39;gen_ai&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.completion_tokens&#39; has type &#39;double&#39;. Type should be &#39;int&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Enum attribute &#39;gen_ai.system&#39; has value &#39;Cohere&#39; which is not documented.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.request.type&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.completion_tokens&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.usage.output_tokens`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.prompt.0.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.prompt_tokens&#39; has type &#39;double&#39;. Type should be &#39;int&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.completion.0.role&#39; collides with existing namespace &#39;gen_ai&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.prompt.0.content&#39; collides with existing namespace &#39;gen_ai.prompt&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.prompt.0.role&#39; collides with existing namespace &#39;gen_ai.prompt&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.prompt_tokens&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.usage.input_tokens`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.completion.0.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.usage.total_tokens&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.system&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.provider.name`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.prompt.0.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-
-
-
-
-</div></div>
-
-<div class="test-section" id="cohere-otelcontrib"><h3>Cohere (Python) — OTel Contrib</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">1 span, 1 resource, 16 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.6%</span></div>
-<div class="stat-item">Total advisories: <span class="val">22</span></div>
-</div>
-
-
-
-<div class="span-detail">
-<div class="span-header">Inference Attributes</div>
-
-<div class="req-group"><div class="req-group-label">Required</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.operation.name</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.provider.name</span></div>
-</div></div>
-
-<div class="req-group"><div class="req-group-label">Conditionally Required</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">error.type</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.request.model</span> <span class="val">&times;1</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">server.port</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.conversation.id</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.output.type</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.choice.count</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.seed</span></div>
-</div></div>
-
-<div class="req-group"><div class="req-group-label">Recommended</div>
-<div class="attr-check">
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.frequency_penalty</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.max_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.presence_penalty</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.stop_sequences</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.temperature</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.top_p</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.response.finish_reasons</span> <span class="val">&times;1</span></div>
-<div class="icon present">&#x2713;</div>
-<div><span class="name">gen_ai.response.id</span> <span class="val">&times;1</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.response.model</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.cache_creation.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.cache_read.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.input_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.usage.output_tokens</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">gen_ai.request.top_k</span></div>
-<div class="icon missing">&#x2013;</div>
-<div><span class="name missing">server.address</span></div>
-</div></div>
-
-</div>
-
-
-
-<br><strong>Non-registry attributes (9):</strong>
-<div class="attr-list">
-<div class="attr"><code>gen_ai.completion.0.content</code> &times;1</div>
-<div class="attr"><code>gen_ai.completion.0.role</code> &times;1</div>
-<div class="attr"><code>gen_ai.prompt.0.content</code> &times;1</div>
-<div class="attr"><code>gen_ai.prompt.0.role</code> &times;1</div>
-<div class="attr"><code>gen_ai.system</code> &times;1</div>
-<div class="attr"><code>gen_ai.usage.completion_tokens</code> &times;1</div>
-<div class="attr"><code>gen_ai.usage.prompt_tokens</code> &times;1</div>
-<div class="attr"><code>llm.request.type</code> &times;1</div>
-<div class="attr"><code>llm.usage.total_tokens</code> &times;1</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (11 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.prompt.0.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.prompt.0.role&#39; collides with existing namespace &#39;gen_ai.prompt&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.prompt_tokens&#39; has type &#39;double&#39;. Type should be &#39;int&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.completion_tokens&#39; has type &#39;double&#39;. Type should be &#39;int&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.prompt.0.content&#39; collides with existing namespace &#39;gen_ai.prompt&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.usage.total_tokens&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.completion.0.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Enum attribute &#39;gen_ai.system&#39; has value &#39;Cohere&#39; which is not documented.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.request.type&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.system&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.provider.name`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.completion_tokens&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.usage.output_tokens`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.prompt.0.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.completion.0.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.completion.0.role&#39; collides with existing namespace &#39;gen_ai&#39;</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;gen_ai.usage.prompt_tokens&#39; is deprecated; reason = &#39;renamed&#39;, note = &#39;Replaced by `gen_ai.usage.input_tokens`.&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute name &#39;gen_ai.completion.0.content&#39; collides with existing namespace &#39;gen_ai&#39;</div>
-<div class="meta">&times;1</div></div>
-
-
 
 
 </div></div>
@@ -3906,62 +3417,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 </div></div>
 
-<div class="test-section" id="groq-openinference"><h3>Groq (Python) — OpenInference</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">1 span, 1 resource, 14 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.6%</span></div>
-<div class="stat-item">Total advisories: <span class="val">8</span></div>
-</div>
-
-
-
-
-
-<br><strong>Non-registry attributes (7):</strong>
-<div class="attr-list">
-<div class="attr"><code>exception.escaped</code> &times;1</div>
-<div class="attr"><code>input.mime_type</code> &times;1</div>
-<div class="attr"><code>input.value</code> &times;1</div>
-<div class="attr"><code>llm.input_messages.0.message.content</code> &times;1</div>
-<div class="attr"><code>llm.input_messages.0.message.role</code> &times;1</div>
-<div class="attr"><code>llm.invocation_parameters</code> &times;1</div>
-<div class="attr"><code>openinference.span.kind</code> &times;1</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (8 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.mime_type&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;exception.escaped&#39; has type &#39;string&#39;. Type should be &#39;boolean&#39;.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.invocation_parameters&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;openinference.span.kind&#39; does not exist in the registry.</div>
-<div class="meta">&times;1</div></div>
-<div class="finding"><div class="msg">Attribute &#39;exception.escaped&#39; is deprecated; reason = &#39;obsoleted&#39;, note = &#39;It&#39;s no longer recommended to record exceptions that are handled and do not escape the scope of a span.
-&#39;.</div>
-<div class="meta">&times;1</div></div>
-
-
-
-
-</div></div>
-
 <div class="test-section" id="haystack-openinference"><h3>Haystack (Python) — OpenInference</h3>
 
 <div class="body">
@@ -4648,20 +4103,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 </div></div>
 
-<div class="test-section" id="langchain4j-otelcontrib_java"><h3>LangChain4j (Java) — OTel Contrib</h3>
-
-<div class="body">
-
-
-
-
-
-
-<p>No results data available.</p>
-
-
-</div></div>
-
 <div class="test-section" id="litellm-native"><h3>LiteLLM (Python) — Native</h3>
 
 <div class="body">
@@ -5040,83 +4481,6 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 <div class="meta">&times;1</div></div>
 <div class="finding"><div class="msg">Attribute &#39;embedding.embeddings.0.embedding.vector&#39; does not exist in the registry.</div>
 <div class="meta">&times;1</div></div>
-
-
-
-
-</div></div>
-
-<div class="test-section" id="llamaindex-openinference"><h3>LlamaIndex (Python) — OpenInference</h3>
-
-<div class="body">
-
-
-
-<div class="stat-grid">
-<div class="stat-item">Entities: <span class="val">2 spans, 1 resource, 34 attributes</span></div>
-<div class="stat-item">Registry coverage: <span class="val">0.3%</span></div>
-<div class="stat-item">Total advisories: <span class="val">30</span></div>
-</div>
-
-
-
-
-
-<br><strong>Non-registry attributes (15):</strong>
-<div class="attr-list">
-<div class="attr"><code>input.mime_type</code> &times;2</div>
-<div class="attr"><code>input.value</code> &times;2</div>
-<div class="attr"><code>llm.input_messages.0.message.content</code> &times;2</div>
-<div class="attr"><code>llm.input_messages.0.message.role</code> &times;2</div>
-<div class="attr"><code>llm.invocation_parameters</code> &times;2</div>
-<div class="attr"><code>llm.model_name</code> &times;2</div>
-<div class="attr"><code>llm.output_messages.0.message.content</code> &times;2</div>
-<div class="attr"><code>llm.output_messages.0.message.role</code> &times;2</div>
-<div class="attr"><code>llm.provider</code> &times;2</div>
-<div class="attr"><code>llm.system</code> &times;2</div>
-<div class="attr"><code>llm.token_count.completion</code> &times;2</div>
-<div class="attr"><code>llm.token_count.prompt</code> &times;2</div>
-<div class="attr"><code>llm.token_count.total</code> &times;2</div>
-<div class="attr"><code>openinference.span.kind</code> &times;2</div>
-<div class="attr"><code>output.value</code> &times;2</div>
-</div>
-
-
-
-
-
-
-<br><strong>Advisories (30 violations):</strong>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.output_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.prompt&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.model_name&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.content&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.input_messages.0.message.role&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.invocation_parameters&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.provider&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.system&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.total&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;output.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.mime_type&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;input.value&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;openinference.span.kind&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
-<div class="finding"><div class="msg">Attribute &#39;llm.token_count.completion&#39; does not exist in the registry.</div>
-<div class="meta">&times;2</div></div>
 
 
 

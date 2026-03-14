@@ -49,6 +49,11 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 .heatmap td.kind-mismatch { background: #fce4ec; text-align: center; color: #c62828; font-size: 0.75rem; }
 .heatmap .group-start { border-left: 3px solid #555 !important; }
 
+/* Hierarchy grouping */
+.heatmap td.lang-cell { vertical-align: top; font-weight: 600; background: #f0f1f4; border-right: 2px solid #bbb; }
+.heatmap td.lib-cell { vertical-align: top; background: #f8f9fa; }
+.heatmap tr.lang-group-start td { border-top: 2px solid #999; }
+
 /* Version display */
 .version { font-size: 0.7rem; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; display: block; }
 .instrumentation-version { padding: 0.3rem 1rem; font-size: 0.82rem; color: var(--muted); background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
