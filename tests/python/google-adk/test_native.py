@@ -40,38 +40,34 @@ class SpanCounter(SpanProcessor):
 def run_agent():
     """Scenario: basic agent execution via Google ADK with native tracing."""
     # Lazy imports — tracer provider must be set BEFORE ADK modules load
-    from google import genai
     from google.genai import types
     from google.adk.agents import Agent
+    from google.adk.models.google_llm import Gemini
     from google.adk.runners import Runner
     from google.adk.sessions import InMemorySessionService
 
     print("  [agent_run] basic ADK agent execution")
 
-    client = genai.Client(
-        api_key="mock-key",
-        http_options=types.HttpOptions(
-            base_url=MOCK_BASE_URL,
-            api_version="v1beta",
-        ),
-    )
+    # ADK's Gemini creates its own Client internally;
+    # it reads GOOGLE_API_KEY from the environment.
+    os.environ.setdefault("GOOGLE_API_KEY", "mock-key")
 
     agent = Agent(
         name="test_agent",
-        model="gemini-2.0-flash",
+        model=Gemini(model="gemini-2.0-flash", base_url=MOCK_BASE_URL),
         instruction="You are a helpful assistant.",
-        client=client,
     )
 
     session_service = InMemorySessionService()
-    session = session_service.create_session(app_name="test_app", user_id="test_user")
-
     runner = Runner(agent=agent, app_name="test_app", session_service=session_service)
 
     event_count = 0
 
     async def _run():
         nonlocal event_count
+        session = await session_service.create_session(
+            app_name="test_app", user_id="test_user",
+        )
         try:
             async for event in runner.run_async(
                 user_id="test_user",
@@ -86,7 +82,6 @@ def run_agent():
                     text = event.content.parts[0].text
                     if text:
                         print(f"    -> {text[:60]}")
-                        return
         except Exception as exc:
             print(f"    [error] agent execution failed: {exc}")
 

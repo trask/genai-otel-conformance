@@ -1,4 +1,4 @@
-haystack-ai>=2.0
+haystack-ai>=2.12
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc

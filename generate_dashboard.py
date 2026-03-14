@@ -290,6 +290,8 @@ def parse_test_name(test_name) -> TestName:
     lang_prefixes = {
         "python-": "Python",
         "js-": "JS/TS",
+        "java-": "Java",
+        "dotnet-": "C#",
     }
 
     # Extract language suffix if present (old-style naming)
