@@ -48,23 +48,13 @@
 
 {% for detail in details %}
 <div class="test-section" id="{{ detail.test_name }}"><h3>{{ detail.label }}</h3>
-{% if detail.instrumentation_version %}<div class="instrumentation-version">Instrumentation: <code>{{ detail.instrumentation_version }}</code></div>{% endif %}
+{% if detail.instrumentation_version or detail.repo %}<div class="instrumentation-version">{% if detail.repo %}Instrumentation: <a href="https://github.com/{{ detail.repo }}">{{ detail.repo }}</a>{% if detail.instrumentation_version %} &mdash; <code>{{ detail.instrumentation_version }}</code>{% endif %}{% elif detail.instrumentation_version %}Instrumentation: <code>{{ detail.instrumentation_version }}</code>{% endif %}</div>{% endif %}
 <div class="body">
 
 {% if detail.has_data %}
-{% if detail.entity_summary or detail.stats %}
+{% if detail.entity_summary %}
 <div class="stat-grid">
-{% if detail.entity_summary -%}
 <div class="stat-item">Entities: <span class="val">{{ detail.entity_summary }}</span></div>
-{% endif -%}
-{% if detail.stats -%}
-{% if detail.stats.coverage is not none -%}
-<div class="stat-item">Registry coverage: <span class="val">{{ "%.1f%%"|format(detail.stats.coverage * 100) }}</span></div>
-{% endif -%}
-{% if detail.stats.advisories is not none -%}
-<div class="stat-item">Total advisories: <span class="val">{{ detail.stats.advisories }}</span></div>
-{% endif -%}
-{% endif -%}
 </div>
 {% endif %}
 
@@ -107,15 +97,14 @@
 {% endif %}
 {% endif %}
 
-{% if detail.advice_messages %}
-<br><strong>Advisories ({{ detail.violation_count }} violations):</strong>
-{% for adv in detail.advice_messages -%}
-<div class="finding"><div class="msg">{{ adv.msg }}</div>
-<div class="meta">&times;{{ adv.count }}</div></div>
+{% if detail.violation_messages %}
+<br><strong>Violations ({{ detail.violation_messages|length }}):</strong>
+{% for msg in detail.violation_messages -%}
+<div class="finding"><div class="msg">{{ msg }}</div></div>
 {% endfor -%}
 {% endif %}
 
-{% if not detail.has_data and not detail.advice_messages %}
+{% if not detail.has_data and not detail.violation_messages %}
 <p>No results data available.</p>
 {% endif %}
 

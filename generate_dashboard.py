@@ -31,7 +31,7 @@ ECOSYSTEM_SUFFIXES = ["otelcontrib", "openllmetry", "openinference", "native"]
 # New-style test name language prefixes (e.g. "python-cohere-openllmetry").
 LANG_PREFIXES = {
     "python-": "Python",
-    "js-": "JS/TS",
+    "js-": "JS",
     "java-": "Java",
     "dotnet-": "C#",
 }
@@ -48,12 +48,12 @@ ECOSYSTEM_DISPLAY = {
 ECOSYSTEM_REPOS = {
     ("otelcontrib", "Python"): "open-telemetry/opentelemetry-python-contrib",
     ("otelcontrib", "Java"): "open-telemetry/opentelemetry-java-instrumentation",
-    ("otelcontrib", "JS/TS"): "open-telemetry/opentelemetry-js-contrib",
+    ("otelcontrib", "JS"): "open-telemetry/opentelemetry-js-contrib",
     ("otelcontrib", "C#"): "open-telemetry/opentelemetry-dotnet-contrib",
     ("openllmetry", "Python"): "traceloop/openllmetry",
-    ("openllmetry", "JS/TS"): "traceloop/openllmetry",
+    ("openllmetry", "JS"): "traceloop/openllmetry",
     ("openinference", "Python"): "Arize-ai/openinference",
-    ("openinference", "JS/TS"): "Arize-ai/openinference",
+    ("openinference", "JS"): "Arize-ai/openinference",
 }
 
 # For "native" ecosystem, the repo depends on the library.
@@ -73,7 +73,7 @@ NATIVE_REPOS = {
 TESTS_DIR = SCRIPT_DIR / "tests"
 
 # Language directory names → display language names.
-_LANG_DIRS = {"python": "Python", "java": "Java", "js": "JS/TS", "dotnet": "C#"}
+_LANG_DIRS = {"python": "Python", "java": "Java", "js": "JS", "dotnet": "C#"}
 
 
 def _discover_library_display_names() -> dict[str, str]:
@@ -257,7 +257,7 @@ class TestResult:
     ecosystem: str
     statistics: dict | None
     violation_count: int
-    advice_messages: dict[str, int]
+    violation_messages: list[str]
     entity_counts: dict[str, int]
     seen_attrs: dict[str, int]
     seen_non_registry_attrs: dict[str, int]
@@ -291,7 +291,7 @@ def parse_test_name(test_name) -> TestName:
     """
     lang_suffixes = {
         "_java": "Java",
-        "_js": "JS/TS",
+        "_js": "JS",
         "_dotnet": "C#",
     }
 
@@ -511,13 +511,13 @@ def parse_results(results_dir):
         if statistics:
             violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
 
-        # Advice messages for detail display (filtered: skip not_stable)
-        advice_messages = {}
+        # Collect distinct advisory messages (filtered: skip "not stable").
+        # Uses advice_message_counts from statistics for completeness.
+        violation_messages: set[str] = set()
         if statistics:
-            for msg, count in statistics.get("advice_message_counts", {}).items():
-                if "not stable" in msg.lower():
-                    continue
-                advice_messages[msg] = count
+            for msg in statistics.get("advice_message_counts", {}):
+                if "not stable" not in msg.lower():
+                    violation_messages.add(msg)
 
         # Entity counts from statistics
         entity_counts = {}
@@ -543,7 +543,7 @@ def parse_results(results_dir):
             ecosystem=ecosystem,
             statistics=statistics,
             violation_count=violation_count,
-            advice_messages=advice_messages,
+            violation_messages=sorted(violation_messages),
             entity_counts=entity_counts,
             seen_attrs=seen_attrs,
             seen_non_registry_attrs=seen_non_registry_attrs,
@@ -722,18 +722,23 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
             r.ecosystem, r.library, r.versions,
         )
 
+        if r.ecosystem == "native":
+            repo = NATIVE_REPOS.get(r.library, "")
+        else:
+            repo = ECOSYSTEM_REPOS.get((r.ecosystem, r.language), "")
+
         detail: dict = {
             "test_name": test_name,
             "label": label,
             "has_data": r.has_data,
             "violation_count": r.violation_count,
             "instrumentation_version": instrumentation_version,
+            "repo": repo,
             "entity_summary": "",
-            "stats": None,
             "span_sections": [],
             "non_registry_attrs": [],
             "events": [],
-            "advice_messages": [],
+            "violation_messages": [],
         }
 
         if r.has_data:
@@ -744,12 +749,6 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                 if count > 0:
                     entity_parts.append(f"{count} {etype}{'s' if count != 1 else ''}")
             detail["entity_summary"] = ", ".join(entity_parts)
-
-            if r.statistics:
-                detail["stats"] = {
-                    "coverage": r.statistics.get("registry_coverage", 0),
-                    "advisories": r.statistics.get("total_advisories", 0),
-                }
 
             # Span-type attribute checklists
             all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
@@ -800,12 +799,9 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                     for a, c in sorted(r.seen_events.items())
                 ]
 
-        # Advice messages
-        if r.advice_messages:
-            detail["advice_messages"] = [
-                {"msg": msg, "count": count}
-                for msg, count in sorted(r.advice_messages.items(), key=lambda x: -x[1])
-            ]
+        # Violation messages
+        if r.violation_messages:
+            detail["violation_messages"] = r.violation_messages
 
         details.append(detail)
 
@@ -840,8 +836,8 @@ def main():
         help="Directory containing Weaver output subdirectories (default: results)",
     )
     parser.add_argument(
-        "--output-dir", default="docs",
-        help="Directory to write index.html (default: docs)",
+        "--output-dir", default="build",
+        help="Directory to write index.html (default: build)",
     )
     args = parser.parse_args()
 
