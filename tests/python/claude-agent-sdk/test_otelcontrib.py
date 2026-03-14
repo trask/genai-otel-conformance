@@ -7,10 +7,14 @@ NOTE: The Claude Agent SDK communicates via a subprocess transport to the
 Claude Code CLI, not via HTTP. A MockTransport is used so the test can run
 without the CLI or a live Anthropic API key.
 
-NOTE: The OTel instrumentation package (opentelemetry-instrumentation-claude-agent-sdk)
-is not yet published on PyPI and the instrumentor is currently a stub — it sets
-up tracer/logger/meter providers but does not yet patch any SDK methods.
-This test is structured to produce telemetry once the instrumentation matures.
+KNOWN LIMITATION — EMPTY RESULTS EXPECTED:
+    The OTel instrumentation package (opentelemetry-instrumentation-claude-agent-sdk)
+    is not yet published on PyPI and the instrumentor is currently a stub — it
+    registers tracer/logger/meter providers but does NOT patch any SDK methods.
+    Consequently it produces 0 spans.  This is NOT a test-infrastructure bug;
+    the instrumentor simply has no hooks implemented yet.  This test is
+    structured to produce telemetry once the instrumentation matures and actual
+    monkey-patching of claude_agent_sdk entry-points is added.
 """
 
 import asyncio
@@ -19,7 +23,28 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from opentelemetry.sdk.trace import SpanProcessor
+
 from otel_setup import setup_otel, flush_and_shutdown
+
+
+class SpanCounter(SpanProcessor):
+    """Lightweight span counter for diagnosing whether instrumentation fires."""
+
+    def __init__(self):
+        self.count = 0
+
+    def on_start(self, span, parent_context=None):
+        pass
+
+    def on_end(self, span):
+        self.count += 1
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self, timeout_millis=None):
+        return True
 
 
 def instrument():
@@ -145,9 +170,21 @@ def main():
     print("=== OTel Contrib: Claude Agent SDK Conformance Test ===")
 
     tp, lp, mp = setup_otel()
+
+    span_counter = SpanCounter()
+    tp.add_span_processor(span_counter)
+
     instrument()
 
     asyncio.run(run_agent_query())
+
+    print(f"\n  [diagnostic] Spans generated: {span_counter.count}")
+    if span_counter.count == 0:
+        print(
+            "  [diagnostic] 0 spans — expected: the "
+            "opentelemetry-instrumentation-claude-agent-sdk package is "
+            "currently a stub and does not patch any SDK methods yet."
+        )
 
     flush_and_shutdown(tp, lp, mp)
 

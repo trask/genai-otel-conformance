@@ -1,15 +1,17 @@
 // Conformance test: OTel contrib instrumentation for LangChain4J.
 //
-// Exercises: chat, chat_streaming
+// Exercises: chat, chat_streaming, agent
 // against a mock OpenAI server, with OTel SDK registered globally.
 
 package com.example.langchain4jtest;
 
+import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.service.AiServices;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
@@ -74,6 +76,7 @@ public class LangChain4JOtelContribTest {
         // Run scenarios
         runChat(chatModel);
         runChatStreaming(streamingModel);
+        runAgent(chatModel);
 
         // Flush and shutdown
         System.out.println("Flushing telemetry...");
@@ -89,6 +92,29 @@ public class LangChain4JOtelContribTest {
     static void runChat(OpenAiChatModel model) {
         System.out.println("  [chat] basic chat completion");
         String response = model.generate("Say hello.");
+        System.out.println("    -> " + response.substring(0, Math.min(60, response.length())));
+    }
+
+    // Tool provider for the agent scenario
+    static class WeatherTools {
+        @Tool("Get the current weather for a location")
+        String getWeather(String location) {
+            return "Sunny, 72°F in " + location;
+        }
+    }
+
+    // Agent interface – AiServices generates the implementation
+    interface Assistant {
+        String chat(String userMessage);
+    }
+
+    static void runAgent(OpenAiChatModel model) {
+        System.out.println("  [agent] agent with tool calling");
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatLanguageModel(model)
+                .tools(new WeatherTools())
+                .build();
+        String response = assistant.chat("What's the weather in Seattle?");
         System.out.println("    -> " + response.substring(0, Math.min(60, response.length())));
     }
 

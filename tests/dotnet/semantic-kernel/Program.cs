@@ -1,7 +1,16 @@
 // Conformance test: Semantic Kernel native OTel instrumentation.
 //
-// Exercises: chat completion via Semantic Kernel with built-in OTel tracing.
+// Exercises: chat completion, streaming chat, agent with tool calling.
 // Points at a mock OpenAI server.
+//
+// NOTE: The [agent] scenario exercises agent-style automatic function calling
+// via FunctionChoiceBehavior.Auto() with a WeatherPlugin tool. However,
+// Semantic Kernel's built-in OTel instrumentation currently only emits
+// inference-level chat spans (gen_ai.chat), not gen_ai.agent.* semantic
+// convention attributes (e.g., gen_ai.agent.name, gen_ai.agent.description).
+// This is a known gap — the agent test exists to track when SK adds
+// agent-specific span emission conforming to the OpenTelemetry GenAI
+// semantic conventions.
 
 using System;
 using System.ComponentModel;
@@ -86,6 +95,8 @@ class Program
         Console.WriteLine($"    -> {text[..Math.Min(60, text.Length)]}");
 
         // Scenario: agent with auto function calling
+        // NOTE: SK emits chat-level spans here, not gen_ai.agent.* spans.
+        // This scenario tracks when Semantic Kernel adds agent-specific OTel attributes.
         Console.WriteLine("  [agent] agent with tool calling");
         kernel.ImportPluginFromType<WeatherPlugin>();
         var agentSettings = new OpenAIPromptExecutionSettings

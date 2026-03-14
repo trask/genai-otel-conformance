@@ -10,6 +10,18 @@ instruments the underlying Anthropic SDK used by the Claude Agent SDK.
 NOTE: The Claude Agent SDK communicates via a subprocess transport to the
 Claude Code CLI, not via HTTP. A MockTransport is used so the test can run
 without the CLI or a live Anthropic API key.
+
+KNOWN LIMITATION — EMPTY RESULTS EXPECTED:
+    The OpenInference AnthropicInstrumentor works by monkey-patching the
+    Anthropic HTTP client (anthropic.Anthropic / anthropic.AsyncAnthropic).
+    However, the Claude Agent SDK does NOT use the Anthropic HTTP client
+    internally — it communicates with the Claude Code CLI via a
+    subprocess/transport protocol (stdin/stdout JSON messages).  Because
+    of this architectural mismatch the instrumentor never intercepts any
+    calls and therefore produces 0 spans.  This is NOT a test-infrastructure
+    bug; it is a genuine instrumentation gap that will remain until either:
+      • a dedicated OpenInference Claude-Agent-SDK instrumentor is created, or
+      • the AnthropicInstrumentor is extended to hook into the transport layer.
 """
 
 import asyncio
@@ -19,8 +31,28 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from opentelemetry import trace
+from opentelemetry.sdk.trace import SpanProcessor
 
 from otel_setup import setup_otel, flush_and_shutdown
+
+
+class SpanCounter(SpanProcessor):
+    """Lightweight span counter for diagnosing whether instrumentation fires."""
+
+    def __init__(self):
+        self.count = 0
+
+    def on_start(self, span, parent_context=None):
+        pass
+
+    def on_end(self, span):
+        self.count += 1
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self, timeout_millis=None):
+        return True
 
 
 def instrument():
@@ -143,9 +175,21 @@ def main():
     print("=== OpenInference: Claude Agent SDK Conformance Test ===")
 
     tp, lp, mp = setup_otel()
+
+    span_counter = SpanCounter()
+    tp.add_span_processor(span_counter)
+
     instrument()
 
     asyncio.run(run_agent_query())
+
+    print(f"\n  [diagnostic] Spans generated: {span_counter.count}")
+    if span_counter.count == 0:
+        print(
+            "  [diagnostic] 0 spans — expected: the AnthropicInstrumentor hooks "
+            "into the HTTP client, but the Claude Agent SDK uses a "
+            "transport/subprocess protocol that bypasses it."
+        )
 
     flush_and_shutdown(tp, lp, mp)
 
