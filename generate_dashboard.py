@@ -226,12 +226,6 @@ SPAN_TYPE_SPECS = {
         "discriminator_attrs": {
             "gen_ai.agent.id", "gen_ai.agent.name",
         },
-        # Non-standard attributes that indicate agent workflow but don't follow
-        # the spec.  Tests matching only these show up in the heatmap to
-        # highlight the conformance gap.
-        "non_standard_discriminator_attrs": {
-            "crewai.agent.id", "crewai.agent.role",
-        },
         "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
         "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED + [
             "gen_ai.agent.description",
@@ -437,24 +431,51 @@ def _extract_instrumentation_version(
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     """Classify a span into span types using heuristics on individual span data.
 
-    Returns a set of matching span type keys (e.g. {"embeddings"}).
+    Returns a set of matching span type keys (e.g. {"embeddings", "inference"}).
     This enables detection of non-conforming spans that lack standard
-    discriminator attributes but are clearly embedding operations.
+    discriminator attributes.
     """
     types: set[str] = set()
     name_lower = span_name.lower()
+    op_name = str(span_attrs.get("gen_ai.operation.name", "")).lower()
+    oi_kind = str(span_attrs.get("openinference.span.kind", "")).upper()
+    llm_type = str(span_attrs.get("llm.request.type", "")).lower()
 
-    # Embedding heuristics
+    # ── Embeddings ────────────────────────────────────────────────
     if "embed" in name_lower:
         types.add("embeddings")
     elif span_attrs.get("embedding.model_name"):
         types.add("embeddings")
-    elif str(span_attrs.get("openinference.span.kind", "")).upper() == "EMBEDDING":
+    elif oi_kind == "EMBEDDING":
         types.add("embeddings")
-    elif str(span_attrs.get("llm.request.type", "")).lower() in ("embedding", "embeddings"):
+    elif llm_type in ("embedding", "embeddings"):
         types.add("embeddings")
-    elif str(span_attrs.get("gen_ai.operation.name", "")).lower() in ("embedding", "embeddings"):
+    elif op_name in ("embedding", "embeddings"):
         types.add("embeddings")
+
+    # ── Inference (chat / completion) ─────────────────────────────
+    if op_name == "chat":
+        types.add("inference")
+    elif oi_kind == "LLM":
+        types.add("inference")
+    elif llm_type in ("chat", "completion"):
+        types.add("inference")
+    elif op_name == "generate_content":
+        types.add("inference")
+
+    # ── Invoke Agent ──────────────────────────────────────────────
+    if oi_kind == "AGENT":
+        types.add("invoke_agent")
+    elif span_attrs.get("gen_ai.agent.name") or span_attrs.get("gen_ai.agent.id"):
+        types.add("invoke_agent")
+    elif span_attrs.get("crewai.agent.id") or span_attrs.get("crewai.agent.role"):
+        types.add("invoke_agent")
+
+    # ── Execute Tool ──────────────────────────────────────────────
+    if oi_kind == "TOOL":
+        types.add("execute_tool")
+    elif span_attrs.get("gen_ai.tool.name") or span_attrs.get("gen_ai.tool.call.id"):
+        types.add("execute_tool")
 
     return types
 
@@ -686,10 +707,9 @@ def _prepare_heatmaps(heatmap_rows: list[HeatmapRow], results: dict[str, TestRes
         # Look up which tests have this span type detected from samples.
         detected_tests = {tn for tn, tr in results.items() if st_key in tr.detected_span_types}
         discriminators = spec.get("discriminator_attrs", set())
-        non_std_discriminators = spec.get("non_standard_discriminator_attrs", set())
         if discriminators:
             relevant = [r for r in heatmap_rows
-                        if (r.present_attrs & (discriminators | non_std_discriminators))
+                        if r.present_attrs & discriminators
                         or r.test_name in detected_tests]
         else:
             relevant = [r for r in heatmap_rows if r.present_attrs & all_spec_attrs]
@@ -819,9 +839,8 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                     all_spec_attrs.update(spec.get(level, []))
 
                 discriminators = spec.get("discriminator_attrs", set())
-                non_std_discriminators = spec.get("non_standard_discriminator_attrs", set())
                 if discriminators:
-                    if not ((all_present & (discriminators | non_std_discriminators))
+                    if not ((all_present & discriminators)
                             or st_key in r.detected_span_types):
                         continue
                 elif not (all_present & all_spec_attrs):
