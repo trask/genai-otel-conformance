@@ -4,4 +4,4 @@ openai>=1.0
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-instrumentation-langchain<0.50
+opentelemetry-instrumentation-langchain<0.54
