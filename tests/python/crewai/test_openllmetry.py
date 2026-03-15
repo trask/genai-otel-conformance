@@ -19,28 +19,34 @@ def instrument():
 def run_crew():
     print("  [crew] basic crew task execution")
     from crewai import Agent, Task, Crew
+    from crewai.tools import tool
 
     os.environ["OPENAI_API_KEY"] = "mock-key"
     os.environ["OPENAI_API_BASE"] = MOCK_BASE_URL
+
+    @tool
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        return "Sunny, 72°F"
 
     researcher = Agent(
         role="Researcher",
         goal="Find information",
         backstory="You are a helpful research assistant.",
+        tools=[get_weather],
         verbose=False,
         allow_delegation=False,
     )
 
     task = Task(
-        description="Say hello in a creative way.",
-        expected_output="A creative greeting.",
+        description="What's the weather in Seattle?",
+        expected_output="The current weather.",
         agent=researcher,
     )
 
     crew = Crew(agents=[researcher], tasks=[task], verbose=False)
     result = crew.kickoff()
     print(f"    -> {str(result)[:60]}")
-
 
 def main():
     print("=== OpenLLMetry: CrewAI Conformance Test ===")

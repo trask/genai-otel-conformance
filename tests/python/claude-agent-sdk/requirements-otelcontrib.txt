@@ -1,9 +1,0 @@
-claude-agent-sdk>=0.1.14
-opentelemetry-api
-opentelemetry-sdk
-opentelemetry-exporter-otlp-proto-grpc
-# opentelemetry-instrumentation-claude-agent-sdk is not yet published on PyPI.
-# Install from the otel-python-contrib repo source:
-#   pip install "opentelemetry-instrumentation-claude-agent-sdk @ git+https://github.com/open-telemetry/opentelemetry-python-contrib.git@main#subdirectory=instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk"
-# Uncomment the line below once a PyPI release is available:
-# opentelemetry-instrumentation-claude-agent-sdk

@@ -75,6 +75,26 @@ def run_embeddings():
     print(f"    -> embedding dim: {len(result)}")
 
 
+def run_retrieval():
+    """Scenario: LlamaIndex retrieval from in-memory vector store."""
+    print("  [retrieval] vector store retrieval")
+    from llama_index.core import VectorStoreIndex, Document
+    from llama_index.embeddings.openai import OpenAIEmbedding
+
+    embed_model = OpenAIEmbedding(
+        model_name="text-embedding-3-small",
+        api_base=MOCK_BASE_URL,
+        api_key="mock-key",
+    )
+    index = VectorStoreIndex.from_documents(
+        [Document(text="The weather in Seattle is rainy.")],
+        embed_model=embed_model,
+    )
+    retriever = index.as_retriever()
+    results = retriever.retrieve("What's the weather?")
+    print(f"    -> retrieved {len(results)} node(s)")
+
+
 def run(title, instrument_fn):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")
@@ -97,5 +117,9 @@ def run(title, instrument_fn):
     except Exception as e:
         print(f"    WARNING: agent failed: {e}")
     run_embeddings()
+    try:
+        run_retrieval()
+    except Exception as e:
+        print(f"    WARNING: retrieval failed: {e}")
 
     flush_and_shutdown(tp, lp, mp)

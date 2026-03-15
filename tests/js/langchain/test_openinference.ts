@@ -55,7 +55,7 @@ async function main() {
 
   const llm = new ChatOpenAI({
     model: "gpt-4o-mini",
-    openAIApiKey: "mock-key",
+    apiKey: "mock-key",
     configuration: { baseURL: MOCK_BASE_URL },
   });
 
@@ -79,7 +79,7 @@ async function main() {
   const { OpenAIEmbeddings } = await import("@langchain/openai");
   const embedModel = new OpenAIEmbeddings({
     model: "text-embedding-3-small",
-    openAIApiKey: "mock-key",
+    apiKey: "mock-key",
     configuration: { baseURL: MOCK_BASE_URL },
   });
   const embResult = await embedModel.embedQuery("Hello, world!");

@@ -220,6 +220,21 @@ SPAN_TYPE_SPECS = {
             "gen_ai.tool.type",
         ],
     },
+    "create_agent": {
+        "label": "Create Agent",
+        "expected_kind": "internal",
+        "discriminator_attrs": {
+            "gen_ai.agent.id", "gen_ai.agent.name",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + [
+            "gen_ai.agent.description",
+            "gen_ai.agent.id",
+            "gen_ai.agent.name",
+            "gen_ai.agent.version",
+        ],
+        "recommended": [],
+    },
     "invoke_agent": {
         "label": "Invoke Agent",
         "expected_kind": "client",
@@ -236,7 +251,38 @@ SPAN_TYPE_SPECS = {
         ],
         "recommended": _INFERENCE_RECOMMENDED + _CLIENT_RECOMMENDED,
     },
+    "invoke_workflow": {
+        "label": "Invoke Workflow",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.workflow.name",
+        },
+        "required": _COMMON_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + [
+            "gen_ai.provider.name",
+            "gen_ai.workflow.name",
+        ],
+        "recommended": _CLIENT_RECOMMENDED,
+    },
 }
+
+# ── GenAI event types (from gen-ai-events.md) ────────────────────────
+# Events are emitted as OTel log records with an event_name field.
+
+GENAI_EVENT_TYPES = [
+    "gen_ai.system.message",
+    "gen_ai.user.message",
+    "gen_ai.assistant.message",
+    "gen_ai.tool.message",
+    "gen_ai.choice",
+]
+
+# ── GenAI metric types (from gen-ai-metrics.md) ─────────────────────
+
+GENAI_METRIC_TYPES = [
+    "gen_ai.client.token.usage",
+    "gen_ai.client.operation.duration",
+]
 
 
 # ── Data structures ──────────────────────────────────────────────────
@@ -263,6 +309,8 @@ class TestResult:
     has_data: bool
     versions: dict[str, str]
     detected_span_types: set[str] = field(default_factory=set)
+    detected_events: set[str] = field(default_factory=set)
+    detected_metrics: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -440,6 +488,7 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     op_name = str(span_attrs.get("gen_ai.operation.name", "")).lower()
     oi_kind = str(span_attrs.get("openinference.span.kind", "")).upper()
     llm_type = str(span_attrs.get("llm.request.type", "")).lower()
+    tl_kind = str(span_attrs.get("traceloop.span.kind", "")).lower()
 
     # ── Embeddings ────────────────────────────────────────────────
     if "embed" in name_lower:
@@ -472,13 +521,18 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
             and span_attrs.get("llm.usage.completion_tokens") is not None:
         types.add("inference")
 
+    # ── Create Agent ──────────────────────────────────────────────
+    if op_name == "create_agent":
+        types.add("create_agent")
+
     # ── Invoke Agent ──────────────────────────────────────────────
     if oi_kind == "AGENT":
         types.add("invoke_agent")
-    elif op_name in ("create_agent", "invoke_agent"):
+    elif op_name == "invoke_agent":
         types.add("invoke_agent")
     elif span_attrs.get("gen_ai.agent.name") or span_attrs.get("gen_ai.agent.id"):
-        types.add("invoke_agent")
+        if op_name != "create_agent":
+            types.add("invoke_agent")
     elif span_attrs.get("crewai.agent.id") or span_attrs.get("crewai.agent.role"):
         types.add("invoke_agent")
 
@@ -489,6 +543,24 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         types.add("execute_tool")
     elif span_attrs.get("gen_ai.tool.name") or span_attrs.get("gen_ai.tool.call.id"):
         types.add("execute_tool")
+
+    # ── Invoke Workflow ───────────────────────────────────────────
+    if op_name == "invoke_workflow":
+        types.add("invoke_workflow")
+    elif span_attrs.get("traceloop.workflow.name"):
+        types.add("invoke_workflow")
+    elif name_lower == "crewai.workflow":
+        types.add("invoke_workflow")
+    elif span_attrs.get("crewai.crew.id"):
+        types.add("invoke_workflow")
+
+    # ── Retrieval ─────────────────────────────────────────────────
+    if op_name == "retrieval":
+        types.add("retrieval")
+    elif oi_kind == "RETRIEVER":
+        types.add("retrieval")
+    elif span_attrs.get("gen_ai.data_source.id"):
+        types.add("retrieval")
 
     return types
 
@@ -511,6 +583,38 @@ def _extract_span_types_from_samples(all_objects: list[dict]) -> set[str]:
                 attrs[attr.get("name", "")] = attr.get("value")
             span_types |= _classify_span(span_name, attrs)
     return span_types
+
+
+def _extract_events_from_samples(all_objects: list[dict]) -> set[str]:
+    """Extract GenAI event names from log records in samples."""
+    events: set[str] = set()
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        for sample in obj.get("samples", []):
+            log = sample.get("log")
+            if not log:
+                continue
+            event_name = log.get("event_name", "")
+            if event_name.startswith("gen_ai."):
+                events.add(event_name)
+    return events
+
+
+def _extract_metrics_from_samples(all_objects: list[dict]) -> set[str]:
+    """Extract GenAI metric names from metric records in samples."""
+    metrics: set[str] = set()
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        for sample in obj.get("samples", []):
+            metric = sample.get("metric")
+            if not metric:
+                continue
+            metric_name = metric.get("name", "")
+            if metric_name.startswith("gen_ai."):
+                metrics.add(metric_name)
+    return metrics
 
 
 def parse_results(results_dir):
@@ -624,6 +728,17 @@ def parse_results(results_dir):
         # Classify individual spans from samples for span-type detection.
         detected_span_types = _extract_span_types_from_samples(all_objects)
 
+        # Extract GenAI events and metrics from log/metric samples.
+        detected_events = _extract_events_from_samples(all_objects)
+        detected_metrics = _extract_metrics_from_samples(all_objects)
+
+        # Also pick up gen_ai events from non-registry event statistics
+        # (Weaver may not include them in the registry yet).
+        if statistics:
+            for ev_name, count in statistics.get("seen_non_registry_events", {}).items():
+                if count > 0 and ev_name.startswith("gen_ai."):
+                    detected_events.add(ev_name)
+
         results[test_name] = TestResult(
             language=language,
             library=library,
@@ -638,6 +753,8 @@ def parse_results(results_dir):
             has_data=has_data,
             versions=versions,
             detected_span_types=detected_span_types,
+            detected_events=detected_events,
+            detected_metrics=detected_metrics,
         )
 
     return results
@@ -645,7 +762,7 @@ def parse_results(results_dir):
 
 # ── HTML generation ──────────────────────────────────────────────────
 
-SPAN_TYPE_ORDER = ["invoke_agent", "inference", "embeddings", "retrieval", "execute_tool"]
+SPAN_TYPE_ORDER = ["create_agent", "invoke_agent", "invoke_workflow", "inference", "embeddings", "retrieval", "execute_tool"]
 
 
 def _build_heatmap_rows(results: dict[str, TestResult]) -> list[HeatmapRow]:
@@ -768,36 +885,91 @@ def _prepare_heatmaps(heatmap_rows: list[HeatmapRow], results: dict[str, TestRes
             })
 
         # Compute rowspan values for Language → Library hierarchy.
-        # lang_rowspan > 0 means "emit a language cell with this rowspan";
-        # lib_rowspan > 0 means "emit a library cell with this rowspan";
-        # 0 means "skip the cell (covered by a previous rowspan)".
-        for r in rows:
-            r["lang_rowspan"] = 0
-            r["lib_rowspan"] = 0
-
-        if rows:
-            i = 0
-            while i < len(rows):
-                # Find the extent of this language group.
-                lang = rows[i]["language"]
-                lang_start = i
-                while i < len(rows) and rows[i]["language"] == lang:
-                    i += 1
-                lang_end = i
-                rows[lang_start]["lang_rowspan"] = lang_end - lang_start
-
-                # Within the language group, find library sub-groups.
-                j = lang_start
-                while j < lang_end:
-                    lib = rows[j]["lib_display"]
-                    lib_start = j
-                    while j < lang_end and rows[j]["lib_display"] == lib:
-                        j += 1
-                    rows[lib_start]["lib_rowspan"] = j - lib_start
+        _compute_rowspans(rows)
 
         heatmaps.append({"label": spec["label"], "columns": columns, "rows": rows})
 
     return heatmaps
+
+
+def _compute_rowspans(rows: list[dict]) -> None:
+    """Compute lang_rowspan / lib_rowspan for Language → Library hierarchy."""
+    for r in rows:
+        r["lang_rowspan"] = 0
+        r["lib_rowspan"] = 0
+    if not rows:
+        return
+    i = 0
+    while i < len(rows):
+        lang = rows[i]["language"]
+        lang_start = i
+        while i < len(rows) and rows[i]["language"] == lang:
+            i += 1
+        rows[lang_start]["lang_rowspan"] = i - lang_start
+        j = lang_start
+        while j < i:
+            lib = rows[j]["lib_display"]
+            lib_start = j
+            while j < i and rows[j]["lib_display"] == lib:
+                j += 1
+            rows[lib_start]["lib_rowspan"] = j - lib_start
+
+
+def _prepare_simple_heatmap(
+    label: str,
+    type_names: list[str],
+    heatmap_rows: list[HeatmapRow],
+    results: dict[str, TestResult],
+    detected_field: str,
+) -> dict | None:
+    """Prepare a simple heatmap (events or metrics) where columns are type names.
+
+    detected_field is the TestResult attribute name holding a set[str] of
+    detected type names (e.g. "detected_events" or "detected_metrics").
+    """
+    # Filter to rows that have at least one detected type
+    relevant = [
+        r for r in heatmap_rows
+        if getattr(results[r.test_name], detected_field, set()) & set(type_names)
+    ]
+    if not relevant:
+        return None
+
+    # Discover additional types seen in the data but not in the standard list
+    all_detected: set[str] = set()
+    for r in relevant:
+        all_detected |= getattr(results[r.test_name], detected_field, set())
+    extra_types = sorted(all_detected - set(type_names))
+    all_types = type_names + extra_types
+
+    columns = [{"header_text": t, "is_group_start": False} for t in all_types]
+
+    rows = []
+    for row in relevant:
+        detected = getattr(results[row.test_name], detected_field, set())
+        cells = []
+        for t in all_types:
+            present = t in detected
+            cls = "present" if present else "absent"
+            symbol = "\u2713" if present else ""
+            cells.append({"cls": cls, "symbol": symbol})
+
+        short_version = ""
+        if row.instrumentation_version:
+            parts = row.instrumentation_version.rsplit(" ", 1)
+            short_version = parts[-1] if len(parts) == 2 else row.instrumentation_version
+
+        rows.append({
+            "test_name": row.test_name,
+            "lib_display": row.lib_display,
+            "language": row.language,
+            "eco_display": row.eco_display,
+            "instrumentation_version": short_version,
+            "cells": cells,
+        })
+
+    _compute_rowspans(rows)
+    return {"label": label, "columns": columns, "rows": rows}
 
 
 def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
@@ -906,6 +1078,12 @@ def generate_html(results: dict[str, TestResult]) -> str:
 
     heatmap_rows = _build_heatmap_rows(results)
     heatmaps = _prepare_heatmaps(heatmap_rows, results)
+    event_heatmap = _prepare_simple_heatmap(
+        "GenAI Events", GENAI_EVENT_TYPES, heatmap_rows, results, "detected_events",
+    )
+    metric_heatmap = _prepare_simple_heatmap(
+        "GenAI Metrics", GENAI_METRIC_TYPES, heatmap_rows, results, "detected_metrics",
+    )
     details = _prepare_details(results)
 
     css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
@@ -915,7 +1093,11 @@ def generate_html(results: dict[str, TestResult]) -> str:
         autoescape=jinja2.select_autoescape(["html"]),
     )
     template = env.get_template("dashboard.html")
-    return template.render(css=css, now=now, heatmaps=heatmaps, details=details)
+    return template.render(
+        css=css, now=now, heatmaps=heatmaps,
+        event_heatmap=event_heatmap, metric_heatmap=metric_heatmap,
+        details=details,
+    )
 
 
 # ── Main ─────────────────────────────────────────────────────────────

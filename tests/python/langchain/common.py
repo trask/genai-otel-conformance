@@ -27,24 +27,35 @@ def run_agent(llm):
     """Scenario: LangChain agent with tool calling."""
     print("  [agent] agent with tool calling")
     from langchain_core.tools import tool
-    from langchain.agents import create_tool_calling_agent, AgentExecutor
-    from langchain_core.prompts import ChatPromptTemplate
 
     @tool
     def get_weather(location: str) -> str:
         """Get the current weather for a location."""
         return "Sunny, 72°F"
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant."),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
+    try:
+        # langchain >= 1.0: LangGraph-based create_agent
+        from langchain.agents import create_agent
+        agent = create_agent(llm, tools=[get_weather])
+        result = agent.invoke({"messages": [{"role": "user", "content": "What's the weather in Seattle?"}]})
+        msgs = result.get("messages", [])
+        output = msgs[-1].content if msgs else ""
+        print(f"    -> {str(output)[:60]}")
+    except ImportError:
+        # langchain < 1.0: legacy AgentExecutor
+        from langchain.agents import create_tool_calling_agent, AgentExecutor
+        from langchain_core.prompts import ChatPromptTemplate
 
-    agent = create_tool_calling_agent(llm, [get_weather], prompt)
-    executor = AgentExecutor(agent=agent, tools=[get_weather])
-    result = executor.invoke({"input": "What's the weather in Seattle?"})
-    print(f"    -> {str(result.get('output', ''))[:60]}")
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a helpful assistant."),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        agent = create_tool_calling_agent(llm, [get_weather], prompt)
+        executor = AgentExecutor(agent=agent, tools=[get_weather])
+        result = executor.invoke({"input": "What's the weather in Seattle?"})
+        print(f"    -> {str(result.get('output', ''))[:60]}")
 
 
 def run_embeddings():
@@ -58,6 +69,24 @@ def run_embeddings():
     )
     result = embeddings.embed_query("Hello, world!")
     print(f"    -> embedding dim: {len(result)}")
+
+
+def run_retrieval():
+    """Scenario: LangChain retrieval from in-memory vector store."""
+    print("  [retrieval] vector store retrieval")
+    from langchain_core.vectorstores import InMemoryVectorStore
+    from langchain_openai import OpenAIEmbeddings
+
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        openai_api_base=MOCK_BASE_URL,
+        openai_api_key="mock-key",
+    )
+    vectorstore = InMemoryVectorStore(embeddings)
+    vectorstore.add_texts(["The weather in Seattle is rainy."])
+    retriever = vectorstore.as_retriever()
+    results = retriever.invoke("What's the weather?")
+    print(f"    -> retrieved {len(results)} document(s)")
 
 
 def run(title, instrument_fn, **llm_kwargs):
@@ -77,5 +106,9 @@ def run(title, instrument_fn, **llm_kwargs):
     except Exception as e:
         print(f"    WARNING: agent failed: {e}")
     run_embeddings()
+    try:
+        run_retrieval()
+    except Exception as e:
+        print(f"    WARNING: retrieval failed: {e}")
 
     flush_and_shutdown(tp, lp, mp)
