@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "packageRules": [
+    {
+      groupName: 'github actions',
+      matchManagers: [
+        'github-actions',
+      ],
+      schedule: [
+        '* * 2 * *', // monthly, on the 2nd
+      ],
+    },
+  ],
+  "labels": [
+    "dependencies"
+  ]
+}
