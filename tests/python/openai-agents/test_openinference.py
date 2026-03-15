@@ -21,9 +21,14 @@ def instrument():
 
 async def run_agent():
     """Run a simple agent with the OpenAI Agents SDK."""
-    from agents import Agent, Runner
+    from agents import Agent, Runner, function_tool
     from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
     import openai
+
+    @function_tool
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        return "Sunny, 72\u00b0F"
 
     client = openai.AsyncOpenAI(base_url=MOCK_BASE_URL, api_key="mock-key")
     model = OpenAIChatCompletionsModel(model="gpt-4o-mini", openai_client=client)
@@ -32,10 +37,11 @@ async def run_agent():
         name="test-agent",
         instructions="You are a helpful assistant.",
         model=model,
+        tools=[get_weather],
     )
 
-    print("  [agent_run] basic agent execution")
-    result = await Runner.run(agent, "Say hello.")
+    print("  [agent_run] agent with tool calling")
+    result = await Runner.run(agent, "What's the weather in Seattle?")
     print(f"    -> {str(result.final_output)[:60]}")
 
 
