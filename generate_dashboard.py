@@ -268,6 +268,7 @@ class TestResult:
     seen_events: dict[str, int]
     has_data: bool
     versions: dict[str, str]
+    detected_span_types: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -433,6 +434,51 @@ def _extract_instrumentation_version(
     return ""
 
 
+def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
+    """Classify a span into span types using heuristics on individual span data.
+
+    Returns a set of matching span type keys (e.g. {"embeddings"}).
+    This enables detection of non-conforming spans that lack standard
+    discriminator attributes but are clearly embedding operations.
+    """
+    types: set[str] = set()
+    name_lower = span_name.lower()
+
+    # Embedding heuristics
+    if "embed" in name_lower:
+        types.add("embeddings")
+    elif span_attrs.get("embedding.model_name"):
+        types.add("embeddings")
+    elif str(span_attrs.get("openinference.span.kind", "")).upper() == "EMBEDDING":
+        types.add("embeddings")
+    elif str(span_attrs.get("llm.request.type", "")).lower() in ("embedding", "embeddings"):
+        types.add("embeddings")
+    elif str(span_attrs.get("gen_ai.operation.name", "")).lower() in ("embedding", "embeddings"):
+        types.add("embeddings")
+
+    return types
+
+
+def _extract_span_types_from_samples(all_objects: list[dict]) -> set[str]:
+    """Scan Weaver sample spans and classify each one."""
+    span_types: set[str] = set()
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        samples = obj.get("samples", [])
+        for sample in samples:
+            span = sample.get("span")
+            if not span:
+                continue
+            span_name = span.get("name", "")
+            # Build a simple attr-name -> value dict from the span's attributes.
+            attrs: dict[str, object] = {}
+            for attr in span.get("attributes", []):
+                attrs[attr.get("name", "")] = attr.get("value")
+            span_types |= _classify_span(span_name, attrs)
+    return span_types
+
+
 def parse_results(results_dir):
     """Parse all Weaver output directories under results_dir.
 
@@ -541,6 +587,9 @@ def parse_results(results_dir):
             except (OSError, json.JSONDecodeError):
                 pass
 
+        # Classify individual spans from samples for span-type detection.
+        detected_span_types = _extract_span_types_from_samples(all_objects)
+
         results[test_name] = TestResult(
             language=language,
             library=library,
@@ -554,6 +603,7 @@ def parse_results(results_dir):
             seen_events=seen_events,
             has_data=has_data,
             versions=versions,
+            detected_span_types=detected_span_types,
         )
 
     return results
@@ -565,13 +615,15 @@ SPAN_TYPE_ORDER = ["invoke_agent", "inference", "embeddings", "retrieval", "exec
 
 
 def _build_heatmap_rows(results: dict[str, TestResult]) -> list[HeatmapRow]:
-    """Build one HeatmapRow per test that has gen_ai.* attribute data."""
+    """Build one HeatmapRow per test that has gen_ai.* attribute data
+    or spans detected via heuristics (e.g. non-conforming embeddings)."""
     rows = []
     for test_name, r in results.items():
         if not r.has_data:
             continue
         all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
-        if not any(a.startswith("gen_ai.") for a in all_present):
+        has_genai = any(a.startswith("gen_ai.") for a in all_present)
+        if not has_genai and not r.detected_span_types:
             continue
 
         lib_display = _library_display_name(r.library)
@@ -601,7 +653,7 @@ def _build_heatmap_rows(results: dict[str, TestResult]) -> list[HeatmapRow]:
     return rows
 
 
-def _prepare_heatmaps(heatmap_rows: list[HeatmapRow]) -> list[dict]:
+def _prepare_heatmaps(heatmap_rows: list[HeatmapRow], results: dict[str, TestResult]) -> list[dict]:
     """Prepare per-span-type heatmap data for the template."""
     heatmaps = []
 
@@ -630,12 +682,15 @@ def _prepare_heatmaps(heatmap_rows: list[HeatmapRow]) -> list[dict]:
         for level in ("required", "conditionally_required", "recommended"):
             all_spec_attrs.update(spec.get(level, []))
 
-        # Filter rows by discriminator attributes
+        # Filter rows by discriminator attributes or span-level detection.
+        # Look up which tests have this span type detected from samples.
+        detected_tests = {tn for tn, tr in results.items() if st_key in tr.detected_span_types}
         discriminators = spec.get("discriminator_attrs", set())
         non_std_discriminators = spec.get("non_standard_discriminator_attrs", set())
         if discriminators:
             relevant = [r for r in heatmap_rows
-                        if r.present_attrs & (discriminators | non_std_discriminators)]
+                        if (r.present_attrs & (discriminators | non_std_discriminators))
+                        or r.test_name in detected_tests]
         else:
             relevant = [r for r in heatmap_rows if r.present_attrs & all_spec_attrs]
 
@@ -766,7 +821,8 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                 discriminators = spec.get("discriminator_attrs", set())
                 non_std_discriminators = spec.get("non_standard_discriminator_attrs", set())
                 if discriminators:
-                    if not (all_present & (discriminators | non_std_discriminators)):
+                    if not ((all_present & (discriminators | non_std_discriminators))
+                            or st_key in r.detected_span_types):
                         continue
                 elif not (all_present & all_spec_attrs):
                     continue
@@ -817,7 +873,7 @@ def generate_html(results: dict[str, TestResult]) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     heatmap_rows = _build_heatmap_rows(results)
-    heatmaps = _prepare_heatmaps(heatmap_rows)
+    heatmaps = _prepare_heatmaps(heatmap_rows, results)
     details = _prepare_details(results)
 
     css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
