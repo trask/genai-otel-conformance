@@ -71,6 +71,7 @@ OPENAI_CHAT_TOOL_CALL_RESPONSE = {
 }
 
 OPENAI_EMBEDDING_RESPONSE = {
+    "id": "embd-mock-001",
     "object": "list",
     "data": [
         {
@@ -355,6 +356,27 @@ def _stream_google_genai_json_array():
     The Vertex AI gapic REST transport expects the streaming response body
     to be a JSON array (``[{chunk}, {chunk}, ...]``), not NDJSON.
     """
+    chunks = _google_genai_stream_chunks()
+    yield "["
+    for i, chunk in enumerate(chunks):
+        if i > 0:
+            yield ","
+        yield json.dumps(chunk)
+    yield "]"
+
+
+def _stream_google_genai_sse():
+    """Yield SSE-formatted chunks for Vertex AI JS SDK streaming.
+
+    The JS ``@google-cloud/vertexai`` SDK requests ``?alt=sse`` and expects
+    ``data: <json>\\n\\n`` framing.
+    """
+    for chunk in _google_genai_stream_chunks():
+        yield f"data: {json.dumps(chunk)}\n\n"
+
+
+def _google_genai_stream_chunks():
+    """Return the list of streaming chunks for Google GenAI / Vertex AI."""
     chunks = []
     for word in ["This ", "is ", "a ", "mock ", "streamed ", "response."]:
         chunks.append({
@@ -379,19 +401,31 @@ def _stream_google_genai_json_array():
             "totalTokenCount": 31,
         },
     })
-    yield "["
-    for i, chunk in enumerate(chunks):
-        if i > 0:
-            yield ","
-        yield json.dumps(chunk)
-    yield "]"
+    return chunks
+
+
+GOOGLE_GENAI_EMBEDDING_RESPONSE = {
+    "embedding": {
+        "values": [0.001] * 256,
+    },
+}
+
+GOOGLE_GENAI_BATCH_EMBEDDING_RESPONSE = {
+    "embeddings": [
+        {"values": [0.001] * 256},
+    ],
+}
 
 
 @app.route("/v1beta/models/<path:model_action>", methods=["POST"])
 def google_genai(model_action):
-    """Handle Google GenAI API requests (generateContent, streamGenerateContent)."""
+    """Handle Google GenAI API requests (generateContent, streamGenerateContent, embedContent)."""
     if ":streamGenerateContent" in model_action:
         return Response(_stream_google_genai(), mimetype="application/x-ndjson")
+    if ":batchEmbedContents" in model_action:
+        return GOOGLE_GENAI_BATCH_EMBEDDING_RESPONSE
+    if ":embedContent" in model_action:
+        return GOOGLE_GENAI_EMBEDDING_RESPONSE
     # :generateContent or any other action
     return GOOGLE_GENAI_RESPONSE
 
@@ -400,9 +434,24 @@ def google_genai(model_action):
 def vertex_ai(rest):
     """Handle Vertex AI API requests (same response format as Google GenAI)."""
     if ":streamGenerateContent" in rest:
+        if request.args.get("alt") == "sse":
+            return Response(
+                _stream_google_genai_sse(), mimetype="text/event-stream"
+            )
         return Response(
             _stream_google_genai_json_array(), mimetype="application/json"
         )
+    if ":predict" in rest:
+        # Vertex AI embeddings use the predict endpoint
+        body = request.get_json(silent=True) or {}
+        instances = body.get("instances", [])
+        predictions = []
+        for _ in instances:
+            predictions.append({"embeddings": {"values": [0.001] * 256}})
+        return {
+            "predictions": predictions,
+            "metadata": {"billableCharacterCount": 13},
+        }
     return GOOGLE_GENAI_RESPONSE
 
 
@@ -429,24 +478,58 @@ BEDROCK_CONVERSE_RESPONSE = {
 }
 
 
+def _encode_event_stream_message(event_type, payload_bytes):
+    """Encode a single AWS event-stream binary message.
+
+    Format (all big-endian):
+      total_length (4) | headers_length (4) | prelude_crc (4)
+      headers (variable) | payload (variable) | message_crc (4)
+    """
+    import struct, binascii
+
+    def _crc32(data):
+        return binascii.crc32(data) & 0xFFFFFFFF
+
+    def _encode_header(name, value):
+        name_bytes = name.encode("utf-8")
+        value_bytes = value.encode("utf-8")
+        # 1 byte name len + name + 1 byte type (7=string) + 2 bytes value len + value
+        return (
+            struct.pack("!B", len(name_bytes))
+            + name_bytes
+            + struct.pack("!B", 7)
+            + struct.pack("!H", len(value_bytes))
+            + value_bytes
+        )
+
+    headers = b""
+    headers += _encode_header(":message-type", "event")
+    headers += _encode_header(":event-type", event_type)
+    headers += _encode_header(":content-type", "application/json")
+
+    total_length = 4 + 4 + 4 + len(headers) + len(payload_bytes) + 4
+    prelude = struct.pack("!II", total_length, len(headers))
+    prelude_crc = struct.pack("!I", _crc32(prelude))
+    message_no_crc = prelude + prelude_crc + headers + payload_bytes
+    message_crc = struct.pack("!I", _crc32(message_no_crc))
+    return message_no_crc + message_crc
+
+
 def _stream_bedrock_converse():
-    """Yield Bedrock ConverseStream event-stream chunks."""
+    """Yield Bedrock ConverseStream event-stream chunks in binary format."""
     events = []
-    events.append({"messageStart": {"role": "assistant"}})
+    events.append(("messageStart", {"role": "assistant"}))
     for word in ["This ", "is ", "a ", "mock ", "streamed ", "response."]:
-        events.append({"contentBlockDelta": {"delta": {"text": word}, "contentBlockIndex": 0}})
-    events.append({"contentBlockStop": {"contentBlockIndex": 0}})
-    events.append({
-        "messageStop": {"stopReason": "end_turn"},
-    })
-    events.append({
-        "metadata": {
-            "usage": {"inputTokens": 25, "outputTokens": 6, "totalTokens": 31},
-            "metrics": {"latencyMs": 100},
-        }
-    })
-    for event in events:
-        yield json.dumps(event) + "\n"
+        events.append(("contentBlockDelta", {"delta": {"text": word}, "contentBlockIndex": 0}))
+    events.append(("contentBlockStop", {"contentBlockIndex": 0}))
+    events.append(("messageStop", {"stopReason": "end_turn"}))
+    events.append(("metadata", {
+        "usage": {"inputTokens": 25, "outputTokens": 6, "totalTokens": 31},
+        "metrics": {"latencyMs": 100},
+    }))
+    for event_type, body in events:
+        payload = json.dumps(body).encode("utf-8")
+        yield _encode_event_stream_message(event_type, payload)
 
 
 @app.route("/model/<path:model_id>/converse", methods=["POST"])
@@ -457,6 +540,18 @@ def bedrock_converse(model_id):
 @app.route("/model/<path:model_id>/converse-stream", methods=["POST"])
 def bedrock_converse_stream(model_id):
     return Response(_stream_bedrock_converse(), mimetype="application/vnd.amazon.eventstream")
+
+
+@app.route("/model/<path:model_id>/invoke", methods=["POST"])
+def bedrock_invoke(model_id):
+    """Handle Bedrock InvokeModel — used for Titan Embeddings."""
+    body = request.get_json(silent=True) or {}
+    # Amazon Titan Embeddings response format
+    resp = {
+        "embedding": [0.001] * 256,
+        "inputTextTokenCount": 8,
+    }
+    return Response(json.dumps(resp), mimetype="application/json")
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +573,22 @@ def cohere_chat():
         "usage": {
             "billed_units": {"input_tokens": 25, "output_tokens": 12},
             "tokens": {"input_tokens": 25, "output_tokens": 12},
+        },
+    }
+
+
+@app.route("/v2/embed", methods=["POST"])
+def cohere_embed():
+    body = request.get_json(silent=True) or {}
+    texts = body.get("texts", ["Hello, world!"])
+    embeddings = [[0.001] * 256 for _ in texts]
+    return {
+        "id": "cohere-embed-mock-001",
+        "embeddings": {"float": embeddings},
+        "texts": texts,
+        "meta": {
+            "api_version": {"version": "2"},
+            "billed_units": {"input_tokens": 8},
         },
     }
 

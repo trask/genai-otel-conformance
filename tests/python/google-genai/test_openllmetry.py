@@ -59,6 +59,26 @@ def run_chat_streaming():
     print(f"    -> {text[:60]}")
 
 
+def run_embeddings():
+    """Scenario: embedding generation via Google GenAI."""
+    from google import genai
+    from google.genai import types
+
+    print("  [embeddings] embedding generation via Google GenAI")
+    client = genai.Client(
+        api_key="mock-key",
+        http_options=types.HttpOptions(
+            base_url=MOCK_BASE_URL,
+            api_version="v1beta",
+        ),
+    )
+    response = client.models.embed_content(
+        model="text-embedding-004",
+        contents="Hello, world!",
+    )
+    print(f"    -> embedding dim: {len(response.embeddings[0].values)}")
+
+
 def main():
     print("=== OpenLLMetry: Google GenAI Conformance Test ===")
 
@@ -67,6 +87,7 @@ def main():
 
     run_chat()
     run_chat_streaming()
+    run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)
 

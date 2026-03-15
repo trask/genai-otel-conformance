@@ -37,6 +37,21 @@ def run_converse(client):
     print(f"    -> {text[:60]}")
 
 
+def run_embeddings(client):
+    """Scenario: Bedrock Titan Embeddings via InvokeModel."""
+    import json as _json
+
+    print("  [embeddings] Bedrock Titan Embeddings")
+    response = client.invoke_model(
+        modelId="amazon.titan-embed-text-v2:0",
+        contentType="application/json",
+        accept="application/json",
+        body=_json.dumps({"inputText": "Hello, world!"}),
+    )
+    result = _json.loads(response["body"].read())
+    print(f"    -> embedding dim: {len(result['embedding'])}")
+
+
 def run(title, instrument_fn, scenarios):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")

@@ -45,6 +45,17 @@ async function runChat(llm: OpenAI) {
   console.log(`    -> ${resp.message.content.toString().slice(0, 60)}`);
 }
 
+async function runEmbeddings(OpenAIEmbedding: any) {
+  console.log("  [embeddings] embedding generation");
+  const embed = new OpenAIEmbedding({
+    model: "text-embedding-3-small",
+    apiKey: "mock-key",
+    additionalSessionOptions: { baseURL: MOCK_BASE_URL },
+  });
+  const result = await embed.getTextEmbedding("Hello, world!");
+  console.log(`    -> embedding dim: ${result.length}`);
+}
+
 async function main() {
   console.log("=== OpenLLMetry JS: LlamaIndex Conformance Test ===");
 
@@ -84,6 +95,9 @@ async function main() {
   });
 
   await runChat(llm);
+
+  const { OpenAIEmbedding } = llamaindexModule;
+  await runEmbeddings(OpenAIEmbedding);
 
   console.log("Flushing telemetry...");
   await provider.forceFlush();

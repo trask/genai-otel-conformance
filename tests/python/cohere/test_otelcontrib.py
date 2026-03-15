@@ -25,6 +25,17 @@ def run_chat(client):
     print(f"    -> {resp.message.content[0].text[:60]}")
 
 
+def run_embeddings(client):
+    print("  [embeddings] embedding generation")
+    resp = client.embed(
+        model="embed-v4.0",
+        texts=["Hello, world!"],
+        input_type="search_document",
+        embedding_types=["float"],
+    )
+    print(f"    -> embedding dim: {len(resp.embeddings.float_[0])}")
+
+
 def main():
     print("=== OTel Contrib: Cohere Conformance Test ===")
 
@@ -38,6 +49,7 @@ def main():
     )
 
     run_chat(client)
+    run_embeddings(client)
 
     flush_and_shutdown(tp, lp, mp)
 

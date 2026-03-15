@@ -2,7 +2,6 @@
 
 Exercises: chat
 against a mock OpenAI-compatible server, with the OpenInference Mistral AI instrumentation.
-Uses mistralai<1.0 (old API) which is compatible with openinference-instrumentation-mistralai.
 """
 
 import os
@@ -18,14 +17,21 @@ def instrument():
 
 
 def run_chat(client):
-    from mistralai.models.chat_completion import ChatMessage
-
     print("  [chat] basic chat completion")
-    resp = client.chat(
+    resp = client.chat.complete(
         model="mistral-large-latest",
-        messages=[ChatMessage(content="Say hello.", role="user")],
+        messages=[{"role": "user", "content": "Say hello."}],
     )
     print(f"    -> {resp.choices[0].message.content[:60]}")
+
+
+def run_embeddings(client):
+    print("  [embeddings] embedding generation")
+    resp = client.embeddings.create(
+        model="mistral-embed",
+        inputs=["Hello, world!"],
+    )
+    print(f"    -> embedding dim: {len(resp.data[0].embedding)}")
 
 
 def main():
@@ -34,10 +40,12 @@ def main():
     tp, lp, mp = setup_otel()
     instrument()
 
-    from mistralai.client import MistralClient
-    client = MistralClient(api_key="mock-key", endpoint=MOCK_BASE_URL)
+    from mistralai import Mistral
+    client = Mistral(api_key="mock-key", server_url=MOCK_BASE_URL)
 
     run_chat(client)
+
+    run_embeddings(client)
 
     import time
     time.sleep(2)

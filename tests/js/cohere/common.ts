@@ -42,6 +42,17 @@ export async function runChat(client: any) {
   console.log(`    -> ${resp.message.content[0].text.slice(0, 60)}`);
 }
 
+export async function runEmbeddings(client: any) {
+  console.log("  [embeddings] embedding generation");
+  const resp = await client.embed({
+    model: "embed-v4.0",
+    texts: ["Hello, world!"],
+    inputType: "search_document",
+    embeddingTypes: ["float"],
+  });
+  console.log(`    -> embedding dim: ${resp.embeddings.float[0].length}`);
+}
+
 export async function run(title: string, instrumentFn: (cohereModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -57,6 +68,7 @@ export async function run(title: string, instrumentFn: (cohereModule: any) => vo
   const client = new CohereClientV2({ token: "mock-key", baseUrl: MOCK_BASE_URL });
 
   await runChat(client);
+  await runEmbeddings(client);
 
   console.log("Flushing telemetry...");
   await provider.forceFlush();

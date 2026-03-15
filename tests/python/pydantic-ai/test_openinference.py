@@ -2,20 +2,21 @@
 
 Exercises: chat via Pydantic AI Agent
 against a mock OpenAI server, with the OpenInference Pydantic AI instrumentation.
+
+Pydantic AI emits spans via logfire. We configure logfire with send_to_logfire=False
+and add both an OTLP exporter (for Weaver) and the OpenInference span processor
+(for OI-specific attributes).
 """
 
 import os
 
-from otel_setup import setup_otel, flush_and_shutdown
+import logfire
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from openinference.instrumentation.pydantic_ai import OpenInferenceSpanProcessor
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
-
-
-def add_span_processor(tp):
-    """Add the OpenInference pydantic-ai span processor to the tracer provider."""
-    from openinference.instrumentation.pydantic_ai import OpenInferenceSpanProcessor
-
-    tp.add_span_processor(OpenInferenceSpanProcessor())
+OTLP_ENDPOINT = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
 
 
 def run_chat():
@@ -35,12 +36,25 @@ def run_chat():
 def main():
     print("=== OpenInference: Pydantic AI Conformance Test ===")
 
-    tp, lp, mp = setup_otel()
-    add_span_processor(tp)
+    otlp_processor = BatchSpanProcessor(
+        OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)
+    )
+    oi_processor = OpenInferenceSpanProcessor()
+
+    logfire.configure(
+        send_to_logfire=False,
+        additional_span_processors=[otlp_processor, oi_processor],
+    )
+
+    from pydantic_ai import Agent
+    Agent.instrument_all()
 
     run_chat()
 
-    flush_and_shutdown(tp, lp, mp)
+    print("Flushing telemetry...")
+    otlp_processor.force_flush()
+    otlp_processor.shutdown()
+    print("Done.")
 
 
 if __name__ == "__main__":

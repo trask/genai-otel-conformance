@@ -462,9 +462,20 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         types.add("inference")
     elif op_name == "generate_content":
         types.add("inference")
+    # js-vercel-ai-native: spans have gen_ai.response.* and gen_ai.usage.*
+    # but no gen_ai.operation.name
+    elif span_attrs.get("gen_ai.usage.output_tokens") is not None \
+            and span_attrs.get("gen_ai.response.finish_reasons") is not None:
+        types.add("inference")
+    # promptflow-native: openai_chat spans use llm.* attributes
+    elif span_attrs.get("llm.response.model") is not None \
+            and span_attrs.get("llm.usage.completion_tokens") is not None:
+        types.add("inference")
 
     # ── Invoke Agent ──────────────────────────────────────────────
     if oi_kind == "AGENT":
+        types.add("invoke_agent")
+    elif op_name in ("create_agent", "invoke_agent"):
         types.add("invoke_agent")
     elif span_attrs.get("gen_ai.agent.name") or span_attrs.get("gen_ai.agent.id"):
         types.add("invoke_agent")
@@ -472,7 +483,9 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         types.add("invoke_agent")
 
     # ── Execute Tool ──────────────────────────────────────────────
-    if oi_kind == "TOOL":
+    if op_name == "execute_tool":
+        types.add("execute_tool")
+    elif oi_kind == "TOOL":
         types.add("execute_tool")
     elif span_attrs.get("gen_ai.tool.name") or span_attrs.get("gen_ai.tool.call.id"):
         types.add("execute_tool")

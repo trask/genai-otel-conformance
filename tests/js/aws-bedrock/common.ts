@@ -73,6 +73,20 @@ export async function runChatStreaming(client: BedrockRuntimeClient, ConverseStr
   console.log(`    -> ${text.slice(0, 60)}`);
 }
 
+export async function runEmbeddings(client: BedrockRuntimeClient, InvokeModelCommand: any) {
+  console.log("  [embeddings] Bedrock Titan Embeddings");
+  const resp = await client.send(
+    new InvokeModelCommand({
+      modelId: "amazon.titan-embed-text-v2:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({ inputText: "Hello, world!" }),
+    })
+  );
+  const result = JSON.parse(new TextDecoder().decode(resp.body));
+  console.log(`    -> embedding dim: ${result.embedding.length}`);
+}
+
 export async function run(title: string, instrumentFn: (bedrockModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -84,7 +98,7 @@ export async function run(title: string, instrumentFn: (bedrockModule: any) => v
   const bedrockModule = await import("@aws-sdk/client-bedrock-runtime");
   instrumentFn(bedrockModule);
 
-  const { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand } = bedrockModule;
+  const { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand, InvokeModelCommand } = bedrockModule;
   const client = new BedrockRuntimeClient({
     endpoint: MOCK_BASE_URL,
     region: "us-east-1",
@@ -93,6 +107,7 @@ export async function run(title: string, instrumentFn: (bedrockModule: any) => v
 
   await runChat(client, ConverseCommand);
   await runChatStreaming(client, ConverseStreamCommand);
+  await runEmbeddings(client, InvokeModelCommand);
 
   console.log("Flushing telemetry...");
   await provider.forceFlush();

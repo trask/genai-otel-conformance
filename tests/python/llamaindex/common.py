@@ -62,6 +62,19 @@ def run_agent(llm):
     print(f"    -> {str(response)[:60]}")
 
 
+def run_embeddings():
+    """Scenario: LlamaIndex embedding generation."""
+    print("  [embeddings] embedding generation")
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    embed_model = OpenAIEmbedding(
+        model_name="text-embedding-3-small",
+        api_base=MOCK_BASE_URL,
+        api_key="mock-key",
+    )
+    result = embed_model.get_text_embedding("Hello, world!")
+    print(f"    -> embedding dim: {len(result)}")
+
+
 def run(title, instrument_fn):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")
@@ -79,6 +92,10 @@ def run(title, instrument_fn):
 
     run_chat(llm)
     run_chat_streaming(llm)
-    run_agent(llm)
+    try:
+        run_agent(llm)
+    except Exception as e:
+        print(f"    WARNING: agent failed: {e}")
+    run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)

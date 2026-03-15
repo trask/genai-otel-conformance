@@ -43,13 +43,15 @@ async function main() {
 
   // Dynamic import AFTER OTel setup so manuallyInstrument can patch prototypes.
   // tsx (ESM) does not support require-in-the-middle, so enable() does not work.
-  const runnablesModule = await import("@langchain/core/runnables");
+  // The OpenInference LangChain instrumentation patches CallbackManager from
+  // @langchain/core/dist/callbacks/manager.cjs, so we must import that module.
+  const callbacksModule = await import("@langchain/core/callbacks/manager");
   const { ChatOpenAI } = await import("@langchain/openai");
   const { StringOutputParser } = await import("@langchain/core/output_parsers");
   const { ChatPromptTemplate } = await import("@langchain/core/prompts");
 
   const instrumentation = new LangChainInstrumentation();
-  instrumentation.manuallyInstrument(runnablesModule);
+  instrumentation.manuallyInstrument(callbacksModule);
 
   const llm = new ChatOpenAI({
     model: "gpt-4o-mini",
@@ -72,6 +74,16 @@ async function main() {
     text += chunk;
   }
   console.log(`    -> ${text.slice(0, 60)}`);
+
+  console.log("  [embeddings] embedding generation");
+  const { OpenAIEmbeddings } = await import("@langchain/openai");
+  const embedModel = new OpenAIEmbeddings({
+    model: "text-embedding-3-small",
+    openAIApiKey: "mock-key",
+    configuration: { baseURL: MOCK_BASE_URL },
+  });
+  const embResult = await embedModel.embedQuery("Hello, world!");
+  console.log(`    -> embedding dim: ${embResult.length}`);
 
   console.log("Flushing telemetry...");
   await provider.forceFlush();

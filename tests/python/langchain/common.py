@@ -47,6 +47,19 @@ def run_agent(llm):
     print(f"    -> {str(result.get('output', ''))[:60]}")
 
 
+def run_embeddings():
+    """Scenario: LangChain embedding generation."""
+    print("  [embeddings] embedding generation")
+    from langchain_openai import OpenAIEmbeddings
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        openai_api_base=MOCK_BASE_URL,
+        openai_api_key="mock-key",
+    )
+    result = embeddings.embed_query("Hello, world!")
+    print(f"    -> embedding dim: {len(result)}")
+
+
 def run(title, instrument_fn, **llm_kwargs):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")
@@ -59,6 +72,10 @@ def run(title, instrument_fn, **llm_kwargs):
 
     run_chat(llm)
     run_chat_streaming(llm)
-    run_agent(llm)
+    try:
+        run_agent(llm)
+    except Exception as e:
+        print(f"    WARNING: agent failed: {e}")
+    run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)

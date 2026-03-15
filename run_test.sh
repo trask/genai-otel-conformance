@@ -110,10 +110,31 @@ TEST_CMD=$(discover_test_cmd "$TEST_NAME") || {
 echo "Test command: $TEST_CMD"
 
 RESULTS_DIR="${RESULTS_DIR:-results}"
-WEAVER_PORT="${WEAVER_PORT:-4317}"
-ADMIN_PORT="${ADMIN_PORT:-4320}"
-INACTIVITY_TIMEOUT="${INACTIVITY_TIMEOUT:-120}"
 MOCK_PORT="${MOCK_PORT:-8080}"
+
+# Use dynamic ports by default to avoid TIME_WAIT collisions between runs.
+# Pick a random base in the ephemeral range (10000-60000) and use two consecutive ports.
+if [[ -z "${WEAVER_PORT:-}" ]]; then
+    WEAVER_PORT=$(( (RANDOM % 50000) + 10000 ))
+    # Ensure even base so admin = base+1
+    WEAVER_PORT=$(( WEAVER_PORT & ~1 ))
+fi
+ADMIN_PORT="${ADMIN_PORT:-$((WEAVER_PORT + 1))}"
+INACTIVITY_TIMEOUT="${INACTIVITY_TIMEOUT:-10}"
+
+# ── Local registry cache (avoids git clone on every run) ────────────
+
+SEMCONV_CACHE="${SEMCONV_CACHE:-$HOME/.cache/otel-conformance/semconv}"
+if [[ -z "${REGISTRY:-}" ]]; then
+    if [[ -d "$SEMCONV_CACHE/model" ]]; then
+        REGISTRY="$SEMCONV_CACHE/model"
+    else
+        echo "=== Caching semantic conventions registry ==="
+        mkdir -p "$(dirname "$SEMCONV_CACHE")"
+        git clone --depth 1 -q https://github.com/open-telemetry/semantic-conventions.git "$SEMCONV_CACHE"
+        REGISTRY="$SEMCONV_CACHE/model"
+    fi
+fi
 
 # ── Default MOCK_LLM_URL ────────────────────────────────────────────
 
@@ -134,7 +155,10 @@ trap cleanup EXIT
 
 if ! curl -s "http://127.0.0.1:$MOCK_PORT/health" > /dev/null 2>&1; then
     echo "=== Starting mock server on port $MOCK_PORT ==="
-    pip install -q -e "$SCRIPT_DIR/mock-server/" 2>/dev/null || true
+    # Only install if the mock server module isn't importable yet
+    if ! python -c "import mock_server" 2>/dev/null; then
+        pip install -q -e "$SCRIPT_DIR/mock-server/" 2>/dev/null || true
+    fi
     python "$SCRIPT_DIR/mock-server/mock_server/server.py" &
     MOCK_PID=$!
     for i in $(seq 1 30); do
@@ -154,23 +178,13 @@ fi
 
 mkdir -p "$RESULTS_DIR/$TEST_NAME"
 
-# Wait for ports to be fully released (including TIME_WAIT)
-echo "=== Waiting for ports to be available ==="
-for i in $(seq 1 30); do
-    grpc_busy=$(netstat -ano 2>/dev/null | grep -c ":${WEAVER_PORT} " || true)
-    admin_busy=$(netstat -ano 2>/dev/null | grep -c ":${ADMIN_PORT} " || true)
-    if [[ "$grpc_busy" -eq 0 && "$admin_busy" -eq 0 ]]; then
-        echo "Ports $WEAVER_PORT/$ADMIN_PORT free after ${i}s"
-        break
-    fi
-    if [[ $i -eq 30 ]]; then
-        echo "WARNING: Ports still busy after 30s (gRPC=$grpc_busy, admin=$admin_busy), proceeding anyway"
-    fi
-    sleep 2
-done
-
-echo "=== Starting weaver live-check for: $TEST_NAME ==="
+echo "=== Starting weaver live-check for: $TEST_NAME (ports $WEAVER_PORT/$ADMIN_PORT) ==="
+REGISTRY_ARGS=()
+if [[ -n "${REGISTRY:-}" ]]; then
+    REGISTRY_ARGS=(-r "$REGISTRY")
+fi
 weaver registry live-check \
+    "${REGISTRY_ARGS[@]}" \
     --format json \
     --output "$RESULTS_DIR/$TEST_NAME" \
     --otlp-grpc-port "$WEAVER_PORT" \
@@ -204,8 +218,8 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:$WEAVER_PORT"
 # Run the test; capture exit code but don't fail the script yet
 eval "$TEST_CMD" || true
 
-# Give weaver a moment to process final telemetry
-sleep 2
+# Signal weaver to stop (tests call forceFlush before exiting, so no grace period needed)
+sleep 1
 
 # Signal weaver to stop
 if kill -0 "$WEAVER_PID" 2>/dev/null; then

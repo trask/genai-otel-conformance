@@ -38,6 +38,15 @@ def run_chat_streaming(client):
     print(f"    -> {text[:60]}")
 
 
+def run_embeddings(client):
+    print("  [embeddings] embedding generation")
+    resp = client.embeddings.create(
+        model="mistral-embed",
+        inputs=["Hello, world!"],
+    )
+    print(f"    -> embedding dim: {len(resp.data[0].embedding)}")
+
+
 def main():
     print("=== OpenLLMetry: Mistral AI Conformance Test ===")
 
@@ -55,6 +64,8 @@ def main():
         run_chat_streaming(client)
     except Exception as e:
         print(f"    WARNING: streaming failed: {e}")
+
+    run_embeddings(client)
 
     flush_and_shutdown(tp, lp, mp)
 

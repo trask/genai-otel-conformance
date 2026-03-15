@@ -98,20 +98,17 @@ export async function run(title: string, instrumentFn: (vertexaiModule: any) => 
   instrumentFn(vertexaiModule);
 
   const { VertexAI } = vertexaiModule;
+  // Use the SDK's built-in FakeGoogleAuth to avoid real OAuth token refresh
+  // (the auth library uses gaxios/node-fetch, not globalThis.fetch, so our
+  // fetch override cannot intercept it).
+  const { createFakeGoogleAuth } = await import("@google-cloud/vertexai/build/src/testing/fake_google_auth");
   const mockUrl = new URL(MOCK_LLM_URL);
   const vertexai = new VertexAI({
     project: "test-project",
     location: "us-central1",
     apiEndpoint: `${mockUrl.hostname}:${mockUrl.port}`,
-    googleAuthOptions: {
-      credentials: {
-        type: "authorized_user" as const,
-        client_id: "mock-client-id.apps.googleusercontent.com",
-        client_secret: "mock-secret",
-        refresh_token: "mock-refresh-token",
-      },
-    },
   });
+  (vertexai as any).googleAuth = createFakeGoogleAuth({ accessToken: "mock-token" });
 
   const model = vertexai.getGenerativeModel({ model: "gemini-2.0-flash" });
 

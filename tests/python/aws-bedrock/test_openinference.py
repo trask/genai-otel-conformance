@@ -6,7 +6,7 @@ against a mock Bedrock server, with the OpenInference Bedrock instrumentation.
 
 from opentelemetry import trace
 
-from common import run, run_converse
+from common import run, run_converse, run_embeddings
 
 
 def instrument():
@@ -18,5 +18,5 @@ if __name__ == "__main__":
     run(
         "OpenInference: AWS Bedrock Conformance Test",
         instrument,
-        [run_converse],
+        [run_converse, run_embeddings],
     )
