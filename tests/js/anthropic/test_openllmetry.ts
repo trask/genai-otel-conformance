@@ -7,7 +7,7 @@ import { run } from "./common";
 
 function instrument(anthropicModule: any) {
   const instrumentation = new AnthropicInstrumentation();
-  instrumentation.manuallyInstrument(anthropicModule.default);
+  instrumentation.manuallyInstrument(anthropicModule);
 }
 
 run("OpenLLMetry JS: Anthropic Conformance Test", instrument).catch((e) => { console.error(e); process.exit(1); });

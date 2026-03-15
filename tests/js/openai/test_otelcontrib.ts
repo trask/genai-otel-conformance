@@ -25,8 +25,7 @@ async function main() {
 
   // Set up OTel providers
   const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider();
-  provider.addSpanProcessor(new BatchSpanProcessor(traceExporter));
+  const provider = new NodeTracerProvider({ spanProcessors: [new BatchSpanProcessor(traceExporter)] });
   provider.register();
 
   const metricReader = new PeriodicExportingMetricReader({
@@ -36,8 +35,7 @@ async function main() {
   const meterProvider = new MeterProvider({ readers: [metricReader] });
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider();
-  loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
 
   // Create instrumentation and set providers so meter/tracer are available
   const instrumentation = new OpenAIInstrumentation();

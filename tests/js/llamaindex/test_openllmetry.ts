@@ -13,15 +13,14 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
 import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
 import { LlamaIndexInstrumentation } from "@traceloop/instrumentation-llamaindex";
-import type { OpenAI } from "llamaindex";
+import type { OpenAI } from "@llamaindex/openai";
 
 const MOCK_BASE_URL = process.env.MOCK_LLM_URL! + "/v1";
 const OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
 
 function setupOtel() {
   const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider();
-  provider.addSpanProcessor(new BatchSpanProcessor(traceExporter));
+  const provider = new NodeTracerProvider({ spanProcessors: [new BatchSpanProcessor(traceExporter)] });
   provider.register();
 
   const metricReader = new PeriodicExportingMetricReader({
@@ -31,8 +30,7 @@ function setupOtel() {
   const meterProvider = new MeterProvider({ readers: [metricReader] });
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider();
-  loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
 
   return { provider, meterProvider, loggerProvider };
 }
@@ -64,23 +62,14 @@ async function main() {
   // Dynamic import AFTER OTel setup so manuallyInstrument can patch prototypes.
   // tsx (ESM) does not support require-in-the-middle, so enable() does not work.
   const llamaindexModule = await import("llamaindex");
+  const openaiModule = await import("@llamaindex/openai");
 
   const instrumentation = new LlamaIndexInstrumentation();
-  // WORKAROUND: manuallyInstrument(fullModule) fails because OTel's _wrap first
-  // unwraps inherited methods – when it wraps a child class's prototype.chat
-  // (inherited from OpenAI), the unwrap targets the *parent* OpenAI.prototype,
-  // removing the wrap. Fix: pass a module with ONLY OpenAI so no child class
-  // iteration triggers the prototype-chain unwrap bug.
-  const minimalModule: Record<string, any> = {
-    OpenAI: llamaindexModule.OpenAI,
-    // Dummy stubs so patch() doesn't throw on missing classes
-    RetrieverQueryEngine: class { query() {} },
-    ContextChatEngine: class { chat() {} },
-    OpenAIAgent: class { chat() {} },
-  };
-  instrumentation.manuallyInstrument(minimalModule);
+  // manuallyInstrument patches the main llamaindex module (RetrieverQueryEngine, etc.)
+  instrumentation.manuallyInstrument(llamaindexModule as any);
 
-  const { OpenAI, Settings } = llamaindexModule;
+  const { Settings } = llamaindexModule;
+  const { OpenAI, OpenAIEmbedding } = openaiModule;
 
   Settings.llm = new OpenAI({
     model: "gpt-4o-mini",
@@ -95,8 +84,6 @@ async function main() {
   });
 
   await runChat(llm);
-
-  const { OpenAIEmbedding } = llamaindexModule;
   await runEmbeddings(OpenAIEmbedding);
 
   console.log("Flushing telemetry...");

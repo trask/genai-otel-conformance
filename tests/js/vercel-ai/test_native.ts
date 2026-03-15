@@ -22,8 +22,7 @@ const OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
 
 function setupOtel() {
   const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider();
-  provider.addSpanProcessor(new BatchSpanProcessor(traceExporter));
+  const provider = new NodeTracerProvider({ spanProcessors: [new BatchSpanProcessor(traceExporter)] });
   provider.register();
 
   const metricReader = new PeriodicExportingMetricReader({
@@ -33,8 +32,7 @@ function setupOtel() {
   const meterProvider = new MeterProvider({ readers: [metricReader] });
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider();
-  loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
 
   return { provider, meterProvider, loggerProvider };
 }
@@ -42,7 +40,7 @@ function setupOtel() {
 async function runChat(openai: ReturnType<typeof createOpenAI>) {
   console.log("  [chat] basic chat completion");
   const { text } = await generateText({
-    model: openai("gpt-4o-mini"),
+    model: openai.chat("gpt-4o-mini"),
     prompt: "Say hello.",
     experimental_telemetry: { isEnabled: true },
   });
@@ -52,7 +50,7 @@ async function runChat(openai: ReturnType<typeof createOpenAI>) {
 async function runChatStreaming(openai: ReturnType<typeof createOpenAI>) {
   console.log("  [chat_streaming] streaming chat completion");
   const result = await streamText({
-    model: openai("gpt-4o-mini"),
+    model: openai.chat("gpt-4o-mini"),
     prompt: "Tell me a joke.",
     experimental_telemetry: { isEnabled: true },
   });

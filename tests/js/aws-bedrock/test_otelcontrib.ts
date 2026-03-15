@@ -25,8 +25,7 @@ async function main() {
 
   // Set up OTel providers
   const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider();
-  provider.addSpanProcessor(new BatchSpanProcessor(traceExporter));
+  const provider = new NodeTracerProvider({ spanProcessors: [new BatchSpanProcessor(traceExporter)] });
   provider.register();
 
   const metricReader = new PeriodicExportingMetricReader({
@@ -36,8 +35,7 @@ async function main() {
   const meterProvider = new MeterProvider({ readers: [metricReader] });
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider();
-  loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
 
   // Register instrumentation BEFORE importing AWS SDK modules.
   // registerInstrumentations installs require-in-the-middle hooks.
@@ -56,10 +54,12 @@ async function main() {
     InvokeModelCommand,
   } = await import("@aws-sdk/client-bedrock-runtime");
 
+  const { NodeHttpHandler } = await import("@smithy/node-http-handler");
   const client = new BedrockRuntimeClient({
     endpoint: MOCK_BASE_URL,
     region: "us-east-1",
     credentials: { accessKeyId: "mock", secretAccessKey: "mock" },
+    requestHandler: new NodeHttpHandler(),
   });
 
   // Scenario: basic chat

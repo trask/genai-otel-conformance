@@ -21,9 +21,9 @@ application {
 }
 
 dependencies {
-    implementation("software.amazon.awssdk:bedrockruntime:2.31.1")
-    implementation("software.amazon.awssdk:apache-client:2.31.1")
-    implementation("io.opentelemetry.instrumentation:opentelemetry-aws-sdk-2.2:2.25.0-alpha")
-    implementation("io.opentelemetry:opentelemetry-sdk:1.59.0")
-    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.59.0")
+    implementation("software.amazon.awssdk:bedrockruntime:2.42.13")
+    implementation("software.amazon.awssdk:apache-client:2.42.13")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-aws-sdk-2.2:2.26.0-alpha")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.60.1")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.60.1")
 }
