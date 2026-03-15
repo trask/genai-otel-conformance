@@ -5,6 +5,11 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigestsToSemver"
   ],
+  // Override default ignorePaths to remove **/tests/** and **/test/** so that
+  // Renovate picks up dependency files under the tests/ directory.
+  "ignorePaths": [
+    "**/node_modules/**"
+  ],
   "packageRules": [
     {
       groupName: 'github actions',
