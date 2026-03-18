@@ -22,7 +22,7 @@ Test name format: {lang}-{lib}-{ecosystem}
     lang:      python | js | java | dotnet
     lib:       the library under test (may contain hyphens, e.g. spring-ai)
     ecosystem: the instrumentation source — otelcontrib, openllmetry,
-               openinference, or native
+               openinference, prototype, or native
 
 Requires:
     - Python 3.12+ (for mock server)

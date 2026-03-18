@@ -1,38 +1,21 @@
-"""Conformance test: prototype instrumentation for Google ADK."""
+"""Conformance test: Google ADK prototype memory instrumentation.
+
+Exercises: memory operations (add_session_to_memory, search_memory)
+against a mock Google GenAI server, with prototype span instrumentation.
+"""
 
 import asyncio
 import contextlib
 import json
 import os
-import time
 
 from opentelemetry import trace as _trace
-from opentelemetry.sdk.trace import SpanProcessor
 
-from otel_setup import flush_and_shutdown, setup_otel
+from common import run, run_memory_operations
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
 _prototype_tracer = _trace.get_tracer("gen_ai.prototype")
-
-
-class SpanCounter(SpanProcessor):
-    """Lightweight span counter for diagnosing whether instrumentation fires."""
-
-    def __init__(self):
-        self.count = 0
-
-    def on_start(self, span, parent_context=None):
-        pass
-
-    def on_end(self, span):
-        self.count += 1
-
-    def shutdown(self):
-        pass
-
-    def force_flush(self, timeout_millis=None):
-        return True
 
 
 @contextlib.contextmanager
@@ -165,22 +148,14 @@ def run_agent_prototype():
         asyncio.run(_run())
 
 
-def main():
-    print("=== Prototype: Google ADK Conformance Test ===")
-
-    tp, lp, mp = setup_otel()
-
-    span_counter = SpanCounter()
-    tp.add_span_processor(span_counter)
-
-    run_agent_prototype()
-
-    print(f"\n  [diagnostic] Spans generated: {span_counter.count}")
-
-    time.sleep(2)
-
-    flush_and_shutdown(tp, lp, mp)
+def instrument():
+    """No-op: prototype instrumentation only."""
+    pass
 
 
 if __name__ == "__main__":
-    main()
+    run(
+        "Prototype: Google ADK Conformance Test",
+        instrument,
+        [run_agent_prototype, run_memory_operations],
+    )

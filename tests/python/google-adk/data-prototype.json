@@ -9,6 +9,17 @@
       "gen_ai.tool.definitions",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
+    ],
+    "search_memory": [
+      "gen_ai.memory.query.text",
+      "gen_ai.memory.search.result.count",
+      "gen_ai.operation.name",
+      "gen_ai.provider.name"
+    ],
+    "update_memory": [
+      "gen_ai.memory.record.content",
+      "gen_ai.operation.name",
+      "gen_ai.provider.name"
     ]
   }
 }

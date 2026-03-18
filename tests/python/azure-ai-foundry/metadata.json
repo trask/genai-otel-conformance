@@ -1,5 +1,6 @@
 {
   "display_name": "Azure AI Foundry",
+  "repo": "Azure/azure-sdk-for-python",
   "version_packages": {
     "prototype": "azure-ai-projects"
   }

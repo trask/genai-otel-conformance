@@ -700,6 +700,110 @@ def bedrock_agent_invoke(agent_id, alias_id, session_id):
 
 
 # ---------------------------------------------------------------------------
+# AWS Bedrock AgentCore Memory endpoints
+# ---------------------------------------------------------------------------
+
+# In-memory store for Bedrock AgentCore memory operations.
+_AGENTCORE_MEMORY_RECORDS: dict[str, list[dict]] = {}  # memoryId -> records
+_AGENTCORE_RECORD_COUNTER = 0
+
+
+def _make_memory_record_id():
+    """Generate a mock memory record ID (min 40 chars per SDK validation)."""
+    global _AGENTCORE_RECORD_COUNTER
+    _AGENTCORE_RECORD_COUNTER += 1
+    return f"mr-mock-{_AGENTCORE_RECORD_COUNTER:03d}-{'0' * 28}"
+
+
+@app.route("/memories/<memory_id>/memoryRecords/batchCreate", methods=["POST"])
+def bedrock_batch_create_memory_records(memory_id):
+    """Mock Bedrock AgentCore BatchCreateMemoryRecords."""
+    body = request.get_json(silent=True) or {}
+    records = body.get("records", [])
+    if memory_id not in _AGENTCORE_MEMORY_RECORDS:
+        _AGENTCORE_MEMORY_RECORDS[memory_id] = []
+    successful = []
+    for rec in records:
+        record_id = _make_memory_record_id()
+        stored = {
+            "memoryRecordId": record_id,
+            "content": rec.get("content", {}),
+        }
+        _AGENTCORE_MEMORY_RECORDS[memory_id].append(stored)
+        successful.append({
+            "memoryRecordId": record_id,
+            "status": "COMPLETED",
+            "requestIdentifier": rec.get("requestIdentifier", ""),
+        })
+    return Response(
+        json.dumps({"successfulRecords": successful, "failedRecords": []}),
+        status=201, mimetype="application/json",
+    )
+
+
+@app.route("/memories/<memory_id>/retrieve", methods=["POST"])
+def bedrock_retrieve_memory_records(memory_id):
+    """Mock Bedrock AgentCore RetrieveMemoryRecords."""
+    recs = _AGENTCORE_MEMORY_RECORDS.get(memory_id, [])
+    summaries = []
+    for rec in recs[-5:]:
+        summaries.append({
+            "memoryRecordId": rec["memoryRecordId"],
+            "content": rec.get("content", {}),
+            "score": 0.95,
+        })
+    return {"memoryRecordSummaries": summaries}
+
+
+@app.route("/memories/<memory_id>/memoryRecords/batchDelete", methods=["POST"])
+def bedrock_batch_delete_memory_records(memory_id):
+    """Mock Bedrock AgentCore BatchDeleteMemoryRecords."""
+    body = request.get_json(silent=True) or {}
+    to_delete = {r["memoryRecordId"] for r in body.get("records", [])}
+    recs = _AGENTCORE_MEMORY_RECORDS.get(memory_id, [])
+    removed = [r for r in recs if r["memoryRecordId"] in to_delete]
+    _AGENTCORE_MEMORY_RECORDS[memory_id] = [r for r in recs if r["memoryRecordId"] not in to_delete]
+    return {
+        "successfulRecords": [{"memoryRecordId": r["memoryRecordId"], "status": "COMPLETED"} for r in removed],
+        "failedRecords": [],
+    }
+
+
+# Bedrock AgentCore Control Plane (CreateMemory / DeleteMemory)
+_AGENTCORE_MEMORIES: dict[str, dict] = {}  # memoryId -> memory details
+
+
+@app.route("/memories/create", methods=["POST"])
+def bedrock_create_memory():
+    """Mock Bedrock AgentCore Control Plane CreateMemory."""
+    body = request.get_json(silent=True) or {}
+    name = body.get("name", "unnamed-memory")
+    memory_id = f"mem-mock-{len(_AGENTCORE_MEMORIES) + 1:03d}"
+    memory = {
+        "id": memory_id,
+        "arn": f"arn:aws:bedrock:us-east-1:123456789012:memory/{memory_id}",
+        "name": name,
+        "description": body.get("description", ""),
+        "status": "ACTIVE",
+        "createdAt": 1735689600.0,
+        "updatedAt": 1735689600.0,
+        "strategies": [],
+    }
+    _AGENTCORE_MEMORIES[memory_id] = memory
+    return Response(
+        json.dumps({"memory": memory}),
+        status=201, mimetype="application/json",
+    )
+
+
+@app.route("/memories/<memory_id>/delete", methods=["DELETE"])
+def bedrock_delete_memory(memory_id):
+    """Mock Bedrock AgentCore Control Plane DeleteMemory."""
+    _AGENTCORE_MEMORIES.pop(memory_id, None)
+    return {"memoryId": memory_id, "status": "DELETING"}
+
+
+# ---------------------------------------------------------------------------
 # Cohere-compatible endpoints
 # ---------------------------------------------------------------------------
 
@@ -925,6 +1029,375 @@ def list_messages(thread_id):
         "last_id": "msg-mock-002",
         "has_more": False,
     }
+
+
+# ---------------------------------------------------------------------------
+# Mem0-compatible memory endpoints
+# ---------------------------------------------------------------------------
+
+# In-memory store for mock memory records.
+_MEMORY_RECORDS: list[dict] = []
+_MEMORY_COUNTER = 0
+
+
+@app.route("/v1/ping/", methods=["GET"])
+def mem0_ping():
+    """Mock Mem0 API key validation endpoint."""
+    return {"status": "ok"}, 200
+
+
+@app.route("/v1/memories/", methods=["POST"])
+def mem0_add_memory():
+    """Mock Mem0 add memory (POST /v1/memories/)."""
+    global _MEMORY_COUNTER
+    body = request.get_json(silent=True) or {}
+    _MEMORY_COUNTER += 1
+    record_id = f"mem_mock_{_MEMORY_COUNTER:03d}"
+    record = {
+        "id": record_id,
+        "memory": body.get("messages", [{}])[0].get("content", "") if body.get("messages") else "",
+        "user_id": body.get("user_id"),
+        "agent_id": body.get("agent_id"),
+        "run_id": body.get("run_id"),
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+    }
+    _MEMORY_RECORDS.append(record)
+    return {"results": [{"id": record_id, "event": "ADD", "memory": record["memory"]}]}
+
+
+@app.route("/v1/memories/search/", methods=["POST"])
+def mem0_search_memory():
+    """Mock Mem0 search memory (POST /v1/memories/search/)."""
+    body = request.get_json(silent=True) or {}
+    results = []
+    for rec in _MEMORY_RECORDS[-5:]:
+        results.append({
+            "id": rec["id"],
+            "memory": rec["memory"],
+            "score": 0.95,
+            "user_id": rec.get("user_id"),
+            "agent_id": rec.get("agent_id"),
+            "created_at": rec["created_at"],
+            "updated_at": rec["updated_at"],
+        })
+    return {"results": results}
+
+
+@app.route("/v1/memories/<memory_id>/", methods=["DELETE"])
+def mem0_delete_memory(memory_id):
+    """Mock Mem0 delete memory (DELETE /v1/memories/<id>/)."""
+    global _MEMORY_RECORDS
+    _MEMORY_RECORDS = [r for r in _MEMORY_RECORDS if r["id"] != memory_id]
+    return {"message": "Memory deleted successfully"}
+
+
+@app.route("/v1/memories/", methods=["GET"])
+def mem0_list_memories():
+    """Mock Mem0 list memories (GET /v1/memories/)."""
+    results = []
+    for rec in _MEMORY_RECORDS:
+        results.append({
+            "id": rec["id"],
+            "memory": rec["memory"],
+            "user_id": rec.get("user_id"),
+            "agent_id": rec.get("agent_id"),
+            "created_at": rec["created_at"],
+            "updated_at": rec["updated_at"],
+        })
+    return {"results": results}
+
+
+@app.route("/v1/memories/", methods=["DELETE"])
+def mem0_delete_all_memories():
+    """Mock Mem0 delete all memories (DELETE /v1/memories/)."""
+    global _MEMORY_RECORDS
+    _MEMORY_RECORDS.clear()
+    return {"message": "Memories deleted successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Azure AI Foundry Memory Store endpoints
+# ---------------------------------------------------------------------------
+
+_AZURE_MEMORY_STORES: dict[str, dict] = {}  # name -> store details
+_AZURE_MEMORY_ITEMS: dict[str, list[dict]] = {}  # "name/scope" -> items
+_AZURE_UPDATE_COUNTER = 0
+_AZURE_MEMORY_UPDATES: dict[str, dict] = {}  # update_id -> result payload
+
+
+@app.route("/memory_stores", methods=["POST"])
+def azure_create_memory_store():
+    """Mock Azure AI Foundry create memory store."""
+    body = request.get_json(silent=True) or {}
+    name = body.get("name", "unnamed-store")
+    store = {
+        "object": "memory_store",
+        "id": f"ms_{name}",
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+        "name": name,
+        "description": body.get("description", ""),
+        "metadata": body.get("metadata", {}),
+        "definition": body.get("definition", {"kind": "default"}),
+    }
+    _AZURE_MEMORY_STORES[name] = store
+    return Response(json.dumps(store), status=200, mimetype="application/json")
+
+
+@app.route("/memory_stores/<name>:update_memories", methods=["POST"])
+def azure_update_memories(name):
+    """Mock Azure AI Foundry update memories (LRO-style, returns completed immediately)."""
+    global _AZURE_UPDATE_COUNTER
+    _AZURE_UPDATE_COUNTER += 1
+    update_id = f"upd-mock-{_AZURE_UPDATE_COUNTER:03d}"
+
+    body = request.get_json(silent=True) or {}
+    scope = body.get("scope", "default")
+    items = body.get("items", [])
+    store_scope_key = f"{name}/{scope}"
+
+    if store_scope_key not in _AZURE_MEMORY_ITEMS:
+        _AZURE_MEMORY_ITEMS[store_scope_key] = []
+
+    # Create memory operations from conversation items
+    operations = []
+    for item in items if isinstance(items, list) else []:
+        content = item.get("content", "") if isinstance(item, dict) else str(item)
+        memory_id = f"mem-{name}-{len(_AZURE_MEMORY_ITEMS[store_scope_key]) + 1:03d}"
+        memory_item = {
+            "memory_id": memory_id,
+            "updated_at": "2025-01-01T00:00:00Z",
+            "scope": scope,
+            "content": content,
+            "kind": "user_profile",
+        }
+        _AZURE_MEMORY_ITEMS[store_scope_key].append(memory_item)
+        operations.append({
+            "kind": "create",
+            "memory_item": memory_item,
+        })
+
+    result = {
+        "memory_operations": operations,
+        "usage": {
+            "embedding_tokens": 10,
+            "input_tokens": 25,
+            "input_tokens_details": {"cached_tokens": 0},
+            "output_tokens": 5,
+            "output_tokens_details": {"reasoning_tokens": 0},
+            "total_tokens": 40,
+        },
+    }
+    _AZURE_MEMORY_UPDATES[update_id] = result
+
+    return Response(
+        json.dumps({
+            "update_id": update_id,
+            "status": "completed",
+            "result": result,
+        }),
+        status=202,
+        mimetype="application/json",
+    )
+
+
+@app.route("/memory_stores/<name>/updates/<update_id>", methods=["GET"])
+def azure_get_update_status(name, update_id):
+    """Mock Azure AI Foundry LRO poll for update_memories."""
+    result = _AZURE_MEMORY_UPDATES.get(update_id)
+    if result is None:
+        result = {
+            "memory_operations": [],
+            "usage": {
+                "embedding_tokens": 0,
+                "input_tokens": 0,
+                "input_tokens_details": {"cached_tokens": 0},
+                "output_tokens": 0,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 0,
+            },
+        }
+    return {
+        "update_id": update_id,
+        "status": "completed",
+        "result": result,
+    }
+
+
+@app.route("/memory_stores/<name>:search_memories", methods=["POST"])
+def azure_search_memories(name):
+    """Mock Azure AI Foundry search memories."""
+    body = request.get_json(silent=True) or {}
+    scope = body.get("scope", "default")
+    store_scope_key = f"{name}/{scope}"
+
+    memories = []
+    for item in _AZURE_MEMORY_ITEMS.get(store_scope_key, [])[-5:]:
+        memories.append({"memory_item": item})
+
+    return {
+        "search_id": "search-mock-001",
+        "memories": memories,
+        "usage": {
+            "embedding_tokens": 5,
+            "input_tokens": 10,
+            "output_tokens": 0,
+            "total_tokens": 15,
+        },
+    }
+
+
+@app.route("/memory_stores/<name>:delete_scope", methods=["POST"])
+def azure_delete_scope(name):
+    """Mock Azure AI Foundry delete scope."""
+    body = request.get_json(silent=True) or {}
+    scope = body.get("scope", "default")
+    store_scope_key = f"{name}/{scope}"
+    _AZURE_MEMORY_ITEMS.pop(store_scope_key, None)
+    return {
+        "object": "memory_store.scope.deleted",
+        "name": name,
+        "scope": scope,
+        "deleted": True,
+    }
+
+
+@app.route("/memory_stores/<name>", methods=["DELETE"])
+def azure_delete_memory_store(name):
+    """Mock Azure AI Foundry delete memory store."""
+    _AZURE_MEMORY_STORES.pop(name, None)
+    # Also clean up any scope data
+    keys_to_remove = [k for k in _AZURE_MEMORY_ITEMS if k.startswith(f"{name}/")]
+    for k in keys_to_remove:
+        del _AZURE_MEMORY_ITEMS[k]
+    return {
+        "object": "memory_store.deleted",
+        "name": name,
+        "deleted": True,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Letta (MemGPT) endpoints
+# ---------------------------------------------------------------------------
+
+_LETTA_AGENTS: dict[str, dict] = {}  # agent_id -> agent state
+_LETTA_PASSAGES: dict[str, list[dict]] = {}  # agent_id -> passages
+_LETTA_PASSAGE_COUNTER = 0
+_LETTA_BLOCK_COUNTER = 0
+
+
+@app.route("/v1/health/", methods=["GET"])
+def letta_health():
+    """Mock Letta health endpoint."""
+    return {"status": "ok"}
+
+
+@app.route("/v1/agents/", methods=["POST"])
+def letta_create_agent():
+    """Mock Letta create agent (POST /v1/agents/)."""
+    global _LETTA_BLOCK_COUNTER
+    body = request.get_json(silent=True) or {}
+    agent_id = f"agent-mock-{len(_LETTA_AGENTS) + 1:03d}"
+
+    blocks = []
+    for mb in body.get("memory_blocks", []):
+        _LETTA_BLOCK_COUNTER += 1
+        block_id = f"block-mock-{_LETTA_BLOCK_COUNTER:03d}"
+        blocks.append({
+            "id": block_id,
+            "label": mb.get("label", "default"),
+            "value": mb.get("value", ""),
+            "limit": 5000,
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z",
+        })
+
+    agent_state = {
+        "id": agent_id,
+        "name": body.get("name", f"test-agent-{len(_LETTA_AGENTS) + 1}"),
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+        "memory": {"blocks": blocks},
+        "agent_type": "memgpt_agent",
+        "model": body.get("model", "openai/gpt-4o-mini"),
+        "embedding": body.get("embedding", "openai/text-embedding-3-small"),
+        "tools": [],
+        "tags": [],
+    }
+    _LETTA_AGENTS[agent_id] = agent_state
+    _LETTA_PASSAGES[agent_id] = []
+    return Response(json.dumps(agent_state), status=200, mimetype="application/json")
+
+
+@app.route("/v1/agents/<agent_id>", methods=["DELETE"])
+def letta_delete_agent(agent_id):
+    """Mock Letta delete agent."""
+    _LETTA_AGENTS.pop(agent_id, None)
+    _LETTA_PASSAGES.pop(agent_id, None)
+    return Response(json.dumps({"id": agent_id, "deleted": True}),
+                    status=200, mimetype="application/json")
+
+
+@app.route("/v1/agents/<agent_id>/core-memory/blocks/<block_label>", methods=["PATCH"])
+def letta_update_block(agent_id, block_label):
+    """Mock Letta update core memory block."""
+    body = request.get_json(silent=True) or {}
+    agent = _LETTA_AGENTS.get(agent_id, {})
+    blocks = agent.get("memory", {}).get("blocks", [])
+
+    for block in blocks:
+        if block["label"] == block_label:
+            if "value" in body:
+                block["value"] = body["value"]
+            block["updated_at"] = "2025-01-01T00:00:01Z"
+            return Response(json.dumps(block), status=200, mimetype="application/json")
+
+    return Response(json.dumps({"error": f"Block '{block_label}' not found"}),
+                    status=404, mimetype="application/json")
+
+
+@app.route("/v1/agents/<agent_id>/archival-memory", methods=["POST"])
+def letta_create_passage(agent_id):
+    """Mock Letta create archival memory passage."""
+    global _LETTA_PASSAGE_COUNTER
+    body = request.get_json(silent=True) or {}
+    _LETTA_PASSAGE_COUNTER += 1
+    passage_id = f"passage-mock-{_LETTA_PASSAGE_COUNTER:03d}"
+
+    passage = {
+        "id": passage_id,
+        "text": body.get("text", ""),
+        "agent_id": agent_id,
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+    }
+    if agent_id not in _LETTA_PASSAGES:
+        _LETTA_PASSAGES[agent_id] = []
+    _LETTA_PASSAGES[agent_id].append(passage)
+    return Response(json.dumps(passage), status=200, mimetype="application/json")
+
+
+@app.route("/v1/agents/<agent_id>/archival-memory/search", methods=["GET"])
+def letta_search_passages(agent_id):
+    """Mock Letta search archival memory."""
+    passages = _LETTA_PASSAGES.get(agent_id, [])
+    results = [{"id": p["id"], "text": p["text"], "score": 0.95,
+                "agent_id": agent_id, "created_at": p["created_at"]}
+               for p in passages[-5:]]
+    return Response(json.dumps(results), status=200, mimetype="application/json")
+
+
+@app.route("/v1/agents/<agent_id>/archival-memory/<memory_id>", methods=["DELETE"])
+def letta_delete_passage(agent_id, memory_id):
+    """Mock Letta delete archival memory passage."""
+    if agent_id in _LETTA_PASSAGES:
+        _LETTA_PASSAGES[agent_id] = [
+            p for p in _LETTA_PASSAGES[agent_id] if p["id"] != memory_id
+        ]
+    return Response(json.dumps({"id": memory_id, "deleted": True}),
+                    status=200, mimetype="application/json")
 
 
 # ---------------------------------------------------------------------------
