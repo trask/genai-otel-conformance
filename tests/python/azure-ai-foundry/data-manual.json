@@ -1,0 +1,70 @@
+{
+  "span_types": {
+    "create_memory_store": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "gen_ai.memory.scope": "present",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "present",
+      "gen_ai.memory.expiration_date": "absent",
+      "server.address": "present",
+      "gen_ai.memory.store.name": "present"
+    },
+    "search_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.search.similarity.threshold": "absent",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "server.address": "present",
+      "gen_ai.memory.query.text": "present",
+      "gen_ai.memory.search.result.count": "present",
+      "gen_ai.memory.store.name": "present"
+    },
+    "update_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.record.id": "present",
+      "gen_ai.memory.expiration_date": "absent",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "gen_ai.memory.record.content": "present",
+      "gen_ai.memory.store.name": "present",
+      "server.address": "present"
+    },
+    "delete_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "gen_ai.memory.scope": "present",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.record.id": "absent",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "server.address": "present",
+      "gen_ai.memory.store.name": "present"
+    },
+    "delete_memory_store": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "server.address": "present",
+      "gen_ai.memory.store.name": "present"
+    }
+  }
+}

@@ -175,6 +175,10 @@ _INFERENCE_RECOMMENDED = [
     "gen_ai.usage.output_tokens",
 ]
 
+# Memory operation shared attribute lists.
+_MEMORY_COND_REQUIRED = ["server.port"]
+_MEMORY_RECOMMENDED = ["server.address"]
+
 SPAN_TYPE_SPECS = {
     "inference": {
         "label": "Inference",
@@ -266,6 +270,95 @@ SPAN_TYPE_SPECS = {
         "conditionally_required": _COMMON_COND_REQUIRED + ["gen_ai.workflow.name"],
         "recommended": [],
     },
+    "create_memory_store": {
+        "label": "Create Memory Store",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.memory.store.id", "gen_ai.memory.store.name",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED + [
+            "gen_ai.memory.scope",
+        ],
+        "conditionally_required": _COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.expiration_date",
+        ],
+        "recommended": _MEMORY_RECOMMENDED + [
+            "gen_ai.memory.store.name",
+        ],
+    },
+    "search_memory": {
+        "label": "Search Memory",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.memory.query.text", "gen_ai.memory.search.result.count",
+            "gen_ai.memory.search.similarity.threshold",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.search.similarity.threshold",
+            "gen_ai.agent.id",
+            "gen_ai.conversation.id",
+        ],
+        "recommended": _MEMORY_RECOMMENDED + [
+            "gen_ai.memory.query.text",
+            "gen_ai.memory.search.result.count",
+            "gen_ai.memory.store.name",
+        ],
+    },
+    "update_memory": {
+        "label": "Update Memory",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.memory.record.id", "gen_ai.memory.record.content",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.record.id",
+            "gen_ai.memory.expiration_date",
+            "gen_ai.agent.id",
+            "gen_ai.conversation.id",
+        ],
+        "recommended": [
+            "gen_ai.memory.record.content",
+            "gen_ai.memory.store.name",
+        ] + _MEMORY_RECOMMENDED,
+    },
+    "delete_memory": {
+        "label": "Delete Memory",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.memory.scope", "gen_ai.memory.store.id", "gen_ai.memory.record.id",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED + [
+            "gen_ai.memory.scope",
+        ],
+        "conditionally_required": _COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.record.id",
+            "gen_ai.agent.id",
+            "gen_ai.conversation.id",
+        ],
+        "recommended": _MEMORY_RECOMMENDED + [
+            "gen_ai.memory.store.name",
+        ],
+    },
+    "delete_memory_store": {
+        "label": "Delete Memory Store",
+        "expected_kind": "client",
+        "discriminator_attrs": {
+            "gen_ai.memory.store.id",
+        },
+        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
+        "conditionally_required": _COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+        ],
+        "recommended": _MEMORY_RECOMMENDED + [
+            "gen_ai.memory.store.name",
+        ],
+    },
 }
 
 SPAN_TYPE_ORDER = [
@@ -276,6 +369,11 @@ SPAN_TYPE_ORDER = [
     "embeddings",
     "retrieval",
     "execute_tool",
+    "create_memory_store",
+    "search_memory",
+    "update_memory",
+    "delete_memory",
+    "delete_memory_store",
 ]
 
 GENAI_EVENT_TYPES = [
@@ -386,6 +484,12 @@ def extract_version_from_deps(lang: str, library: str, ecosystem: str) -> str:
     return versions.get(package_name, "")
 
 
+_MEMORY_OP_NAMES = {
+    "create_memory_store", "search_memory", "update_memory",
+    "delete_memory", "delete_memory_store",
+}
+
+
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     """Classify a span into span types using heuristics on individual span data."""
     types: set[str] = set()
@@ -428,7 +532,7 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     elif op_name == "invoke_agent":
         types.add("invoke_agent")
     elif span_attrs.get("gen_ai.agent.name") or span_attrs.get("gen_ai.agent.id"):
-        if op_name != "create_agent":
+        if op_name != "create_agent" and op_name not in _MEMORY_OP_NAMES:
             types.add("invoke_agent")
     elif span_attrs.get("crewai.agent.id") or span_attrs.get("crewai.agent.role"):
         types.add("invoke_agent")
@@ -467,6 +571,29 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         types.add("retrieval")
     elif span_attrs.get("gen_ai.data_source.id"):
         types.add("retrieval")
+
+    # ── Memory Operations ─────────────────────────────────────────
+    if op_name in _MEMORY_OP_NAMES:
+        types.add(op_name)
+    elif any(k.startswith("gen_ai.memory.") for k in span_attrs):
+        # Fallback: if memory attributes are present but op_name is non-standard
+        if span_attrs.get("gen_ai.memory.query.text") is not None \
+                or span_attrs.get("gen_ai.memory.search.result.count") is not None:
+            types.add("search_memory")
+        elif span_attrs.get("gen_ai.memory.record.content") is not None:
+            types.add("update_memory")
+        elif span_attrs.get("gen_ai.memory.store.id") is not None:
+            # Could be any memory op; best-effort classify by span name
+            if "delete" in name_lower and "store" in name_lower:
+                types.add("delete_memory_store")
+            elif "delete" in name_lower:
+                types.add("delete_memory")
+            elif "create" in name_lower or "init" in name_lower:
+                types.add("create_memory_store")
+            elif "search" in name_lower or "query" in name_lower or "recall" in name_lower:
+                types.add("search_memory")
+            elif "update" in name_lower or "add" in name_lower or "remember" in name_lower:
+                types.add("update_memory")
 
     return types
 

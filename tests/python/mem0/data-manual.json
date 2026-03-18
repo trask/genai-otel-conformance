@@ -1,0 +1,48 @@
+{
+  "span_types": {
+    "search_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "absent",
+      "gen_ai.system": "present",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.search.similarity.threshold": "present",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "server.address": "present",
+      "gen_ai.memory.query.text": "present",
+      "gen_ai.memory.search.result.count": "present",
+      "gen_ai.memory.store.name": "absent"
+    },
+    "update_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "absent",
+      "gen_ai.system": "present",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.record.id": "present",
+      "gen_ai.memory.expiration_date": "present",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "gen_ai.memory.record.content": "present",
+      "gen_ai.memory.store.name": "absent",
+      "server.address": "present"
+    },
+    "delete_memory": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "absent",
+      "gen_ai.system": "present",
+      "gen_ai.memory.scope": "present",
+      "error.type": "absent",
+      "server.port": "present",
+      "gen_ai.memory.store.id": "absent",
+      "gen_ai.memory.record.id": "present",
+      "gen_ai.agent.id": "absent",
+      "gen_ai.conversation.id": "absent",
+      "server.address": "present",
+      "gen_ai.memory.store.name": "absent"
+    }
+  }
+}
