@@ -5,10 +5,13 @@
   "scripts": {
     "test:openllmetry": "npx tsx test_openllmetry.ts",
     "test:openinference": "npx tsx test_openinference.ts",
-    "test:otelcontrib": "npx tsx test_otelcontrib.ts"
+    "test:otelcontrib": "npx tsx test_otelcontrib.ts",
+    "test:manual": "npx tsx test_manual.ts"
   },
   "dependencies": {
     "@arizeai/openinference-instrumentation-bedrock": "0.4.8",
+    "@aws-sdk/client-bedrock-agentcore": "3.1012.0",
+    "@aws-sdk/client-bedrock-agentcore-control": "3.1012.0",
     "@aws-sdk/client-bedrock-runtime": "3.1009.0",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/api-logs": "0.213.0",

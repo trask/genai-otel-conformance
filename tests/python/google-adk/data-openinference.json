@@ -1,18 +1,5 @@
 {
   "span_types": {
-    "create_agent": {
-      "gen_ai.operation.name": "present",
-      "gen_ai.provider.name": "absent",
-      "gen_ai.system": "present",
-      "error.type": "absent",
-      "gen_ai.request.model": "present",
-      "server.port": "absent",
-      "gen_ai.agent.description": "present",
-      "gen_ai.agent.id": "absent",
-      "gen_ai.agent.name": "present",
-      "gen_ai.agent.version": "absent",
-      "server.address": "absent"
-    },
     "invoke_agent": {
       "gen_ai.operation.name": "present",
       "gen_ai.provider.name": "absent",
