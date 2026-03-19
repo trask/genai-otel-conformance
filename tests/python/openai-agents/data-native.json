@@ -18,7 +18,7 @@
       "gen_ai.provider.name": "absent",
       "gen_ai.system": "present",
       "error.type": "absent",
-      "gen_ai.request.model": "present",
+      "gen_ai.request.model": "absent",
       "server.port": "absent",
       "gen_ai.conversation.id": "absent",
       "gen_ai.output.type": "absent",

@@ -112,6 +112,7 @@ class TestResult:
     has_data: bool
     versions: dict[str, str]
     detected_span_types: set[str] = field(default_factory=set)
+    per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
     detected_events: set[str] = field(default_factory=set)
     detected_metrics: set[str] = field(default_factory=set)
 
@@ -564,9 +565,16 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     return types
 
 
-def _extract_span_types_from_samples(all_objects: list[dict]) -> set[str]:
-    """Scan Weaver sample spans and classify each one."""
+def _extract_span_types_from_samples(
+    all_objects: list[dict],
+) -> tuple[set[str], dict[str, set[str]]]:
+    """Scan Weaver sample spans, classify each one, and track per-type attrs.
+
+    Returns (detected_span_types, per_type_attrs) where per_type_attrs maps
+    each span-type key to the set of attribute names present on spans of that type.
+    """
     span_types: set[str] = set()
+    per_type_attrs: dict[str, set[str]] = {}
     for obj in all_objects:
         if not isinstance(obj, dict):
             continue
@@ -580,8 +588,14 @@ def _extract_span_types_from_samples(all_objects: list[dict]) -> set[str]:
             attrs: dict[str, object] = {}
             for attr in span.get("attributes", []):
                 attrs[attr.get("name", "")] = attr.get("value")
-            span_types |= _classify_span(span_name, attrs)
-    return span_types
+            classified = _classify_span(span_name, attrs)
+            span_types |= classified
+            attr_names = set(attrs.keys())
+            for st in classified:
+                if st not in per_type_attrs:
+                    per_type_attrs[st] = set()
+                per_type_attrs[st] |= attr_names
+    return span_types, per_type_attrs
 
 
 def _extract_events_from_samples(all_objects: list[dict]) -> set[str]:
@@ -697,7 +711,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
             pass
 
     # Classify individual spans from samples for span-type detection.
-    detected_span_types = _extract_span_types_from_samples(all_objects)
+    detected_span_types, per_type_attrs = _extract_span_types_from_samples(all_objects)
 
     # Extract GenAI events and metrics from log/metric samples.
     detected_events = _extract_events_from_samples(all_objects)
@@ -724,6 +738,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         has_data=has_data,
         versions=versions,
         detected_span_types=detected_span_types,
+        per_type_attrs=per_type_attrs,
         detected_events=detected_events,
         detected_metrics=detected_metrics,
     )
@@ -790,8 +805,12 @@ def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
         if not is_relevant:
             continue
 
+        # Use per-span-type attribute presence when available;
+        # fall back to global presence for span types not detected
+        # via sample classification (e.g. when only Weaver stats exist).
+        type_present = r.per_type_attrs.get(st_key, all_present)
         span_types[st_key] = {
-            attr: ("present" if attr in all_present else "absent")
+            attr: ("present" if attr in type_present else "absent")
             for attr in attr_names
         }
 

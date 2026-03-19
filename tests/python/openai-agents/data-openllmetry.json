@@ -14,7 +14,7 @@
       "server.address": "absent"
     },
     "invoke_agent": {
-      "gen_ai.operation.name": "present",
+      "gen_ai.operation.name": "absent",
       "gen_ai.provider.name": "absent",
       "gen_ai.system": "present",
       "error.type": "absent",
@@ -45,7 +45,7 @@
       "server.address": "absent"
     },
     "invoke_workflow": {
-      "gen_ai.operation.name": "present",
+      "gen_ai.operation.name": "absent",
       "error.type": "absent",
       "gen_ai.workflow.name": "absent"
     },
@@ -77,7 +77,7 @@
       "server.address": "absent"
     },
     "execute_tool": {
-      "gen_ai.operation.name": "present",
+      "gen_ai.operation.name": "absent",
       "error.type": "absent",
       "gen_ai.tool.call.id": "absent",
       "gen_ai.tool.description": "absent",

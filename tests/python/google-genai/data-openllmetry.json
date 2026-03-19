@@ -2,7 +2,7 @@
   "span_types": {
     "inference": {
       "gen_ai.operation.name": "absent",
-      "gen_ai.provider.name": "present",
+      "gen_ai.provider.name": "absent",
       "gen_ai.system": "present",
       "error.type": "absent",
       "gen_ai.request.model": "present",

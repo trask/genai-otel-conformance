@@ -19,7 +19,7 @@
       "gen_ai.request.top_p": "absent",
       "gen_ai.response.finish_reasons": "absent",
       "gen_ai.response.id": "absent",
-      "gen_ai.response.model": "present",
+      "gen_ai.response.model": "absent",
       "gen_ai.usage.cache_creation.input_tokens": "absent",
       "gen_ai.usage.cache_read.input_tokens": "absent",
       "gen_ai.usage.input_tokens": "present",
