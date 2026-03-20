@@ -286,8 +286,9 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
         eco_display = ECOSYSTEM_DISPLAY.get(r.ecosystem, r.ecosystem)
         label = f"{lib_display} ({r.language}) \u2014 {eco_display}"
 
+        lang_slug = _LANG_SLUG.get(r.language, r.language.lower())
         instrumentation_version = extract_version_from_deps(
-            r.language, r.library, r.ecosystem,
+            lang_slug, r.library, r.ecosystem,
         )
 
         if r.ecosystem == "native":
