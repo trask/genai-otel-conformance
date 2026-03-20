@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -119,18 +118,6 @@ GENAI_METRIC_TYPES = [
 # ── Data structures ──────────────────────────────────────────────────
 
 
-@dataclass
-class HeatmapRow:
-    test_name: str
-    lib_display: str
-    eco_display: str
-    present_attrs: set[str]
-    library: str
-    language: str
-    repo: str
-    instrumentation_version: str
-
-
 def parse_results():
     """Parse all Weaver output directories under tests/.
 
@@ -157,46 +144,6 @@ def parse_results():
 # ── HTML generation ──────────────────────────────────────────────────
 
 
-def _build_heatmap_rows(results: dict[str, TestResult]) -> list[HeatmapRow]:
-    """Build one HeatmapRow per test that has gen_ai.* attribute data
-    or spans detected via heuristics (e.g. non-conforming embeddings)."""
-    rows = []
-    for test_name, r in results.items():
-        if not r.has_data:
-            continue
-        all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
-        has_genai = any(a.startswith("gen_ai.") for a in all_present)
-        if not has_genai and not r.detected_span_types:
-            continue
-
-        lib_display = _library_display_name(r.library)
-        eco_display = ECOSYSTEM_DISPLAY.get(r.ecosystem, r.ecosystem)
-        if r.ecosystem == "native":
-            repo = NATIVE_REPOS.get(r.library, r.ecosystem)
-        else:
-            repo = ECOSYSTEM_REPOS.get(
-                (r.ecosystem, r.language),
-                ECOSYSTEM_DISPLAY.get(r.ecosystem, r.ecosystem),
-            )
-
-        lang_slug = _LANG_SLUG.get(r.language, r.language.lower())
-        rows.append(HeatmapRow(
-            test_name=test_name,
-            lib_display=lib_display,
-            eco_display=eco_display,
-            present_attrs=all_present,
-            library=r.library,
-            language=r.language,
-            repo=repo,
-            instrumentation_version=extract_version_from_deps(
-                lang_slug, r.library, r.ecosystem,
-            ),
-        ))
-
-    rows.sort(key=lambda x: (x.language.lower(), x.lib_display.lower(), x.eco_display.lower()))
-    return rows
-
-
 def _compute_rowspans(rows: list[dict]) -> None:
     """Compute lib_rowspan / lang_rowspan for Library → Language hierarchy."""
     for r in rows:
@@ -218,63 +165,6 @@ def _compute_rowspans(rows: list[dict]) -> None:
             while j < i and rows[j]["language"] == lang:
                 j += 1
             rows[lang_start]["lang_rowspan"] = j - lang_start
-
-
-def _prepare_simple_heatmap(
-    label: str,
-    type_names: list[str],
-    heatmap_rows: list[HeatmapRow],
-    results: dict[str, TestResult],
-    detected_field: str,
-) -> dict | None:
-    """Prepare a simple heatmap (events or metrics) where columns are type names.
-
-    detected_field is the TestResult attribute name holding a set[str] of
-    detected type names (e.g. "detected_events" or "detected_metrics").
-    """
-    # Filter to rows that have at least one detected type
-    relevant = [
-        r for r in heatmap_rows
-        if getattr(results[r.test_name], detected_field, set()) & set(type_names)
-    ]
-    if not relevant:
-        return None
-
-    # Discover additional types seen in the data but not in the standard list
-    all_detected: set[str] = set()
-    for r in relevant:
-        all_detected |= getattr(results[r.test_name], detected_field, set())
-    extra_types = sorted(all_detected - set(type_names))
-    all_types = type_names + extra_types
-
-    columns = [{"header_text": t, "is_group_start": False} for t in all_types]
-
-    rows = []
-    for row in relevant:
-        detected = getattr(results[row.test_name], detected_field, set())
-        cells = []
-        for t in all_types:
-            present = t in detected
-            cls = "present" if present else "absent"
-            symbol = "\u2713" if present else ""
-            cells.append({"cls": cls, "symbol": symbol})
-
-        short_version = ""
-        if row.instrumentation_version:
-            parts = row.instrumentation_version.rsplit(" ", 1)
-            short_version = parts[-1] if len(parts) == 2 else row.instrumentation_version
-
-        rows.append({
-            "test_name": row.test_name,
-            "lib_display": row.lib_display,
-            "language": row.language,
-            "eco_display": row.eco_display,
-            "instrumentation_version": short_version,
-            "cells": cells,
-        })
-
-    _compute_rowspans(rows)
-    return {"label": label, "columns": columns, "rows": rows}
 
 
 def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
