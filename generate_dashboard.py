@@ -40,6 +40,9 @@ _LANG_SLUG = {v: k for k, v in _LANG_DIRS.items()}
 def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     """Build an anchor ID in library-language-ecosystem order.
 
+    This matches the dashboard's visual hierarchy: group by library,
+    then by language, then by ecosystem.
+
     Args:
         language: Display language name (e.g. "Python", "JS").
         library: Library slug (e.g. "openai").
