@@ -27,7 +27,7 @@ Mock LLM Server (no API keys needed)
 
 - [Weaver CLI](https://github.com/open-telemetry/weaver) (validates telemetry against semantic conventions)
 - Python 3.12+ (test runner and mock server)
-- Node.js 24+ (for JS/TS tests), Java 21+ (for Java tests), .NET 8+ (for .NET tests)
+- Node.js 24+ (for JS/TS tests), Java 17+ (for Java tests), .NET 8+ (for .NET tests)
 
 ### Running a Test
 
