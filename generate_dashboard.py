@@ -370,6 +370,11 @@ def _prepare_heatmaps_from_data(test_data_entries: list[dict]) -> list[dict]:
     return heatmaps
 
 
+def _has_details_results() -> bool:
+    """Return whether any local Weaver result directories exist."""
+    return any(d.is_dir() for d in TESTS_DIR.glob("*/*/results/*"))
+
+
 def generate_dashboard_html() -> str:
     """Generate the dashboard HTML with span heatmap tables.
 
@@ -381,6 +386,7 @@ def generate_dashboard_html() -> str:
 
     test_data_entries = _load_test_data_files()
     heatmaps = _prepare_heatmaps_from_data(test_data_entries)
+    details_available = _has_details_results()
 
     # Events and metrics are not yet in data files, pass empty for now.
     event_heatmap = None
@@ -395,6 +401,7 @@ def generate_dashboard_html() -> str:
     template = env.get_template("dashboard.html")
     return template.render(
         css=css, now=now, heatmaps=heatmaps,
+        details_available=details_available,
         event_heatmap=event_heatmap, metric_heatmap=metric_heatmap,
     )
 
