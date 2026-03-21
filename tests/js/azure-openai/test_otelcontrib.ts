@@ -14,6 +14,7 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
 import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
 import * as api from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
 
 const MOCK_BASE_URL = process.env.MOCK_LLM_URL!;
 const OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
@@ -31,9 +32,11 @@ async function main() {
     exportIntervalMillis: 5000,
   });
   const meterProvider = new MeterProvider({ readers: [metricReader] });
+  api.metrics.setGlobalMeterProvider(meterProvider);
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
   const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
+  logs.setGlobalLoggerProvider(loggerProvider);
 
   // Create instrumentation and set providers
   const instrumentation = new OpenAIInstrumentation();

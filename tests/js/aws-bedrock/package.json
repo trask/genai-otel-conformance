@@ -11,6 +11,7 @@
     "@arizeai/openinference-instrumentation-bedrock": "0.4.8",
     "@aws-sdk/client-bedrock-runtime": "3.1009.0",
     "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/api-logs": "0.213.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "0.213.0",
     "@opentelemetry/exporter-metrics-otlp-grpc": "0.213.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "0.213.0",

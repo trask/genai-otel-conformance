@@ -10,6 +10,8 @@
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
+import { metrics } from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
 import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
@@ -33,9 +35,11 @@ async function main() {
     exportIntervalMillis: 5000,
   });
   const meterProvider = new MeterProvider({ readers: [metricReader] });
+  metrics.setGlobalMeterProvider(meterProvider);
 
   const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
   const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
+  logs.setGlobalLoggerProvider(loggerProvider);
 
   // Register instrumentation BEFORE importing AWS SDK modules.
   // registerInstrumentations installs require-in-the-middle hooks.
