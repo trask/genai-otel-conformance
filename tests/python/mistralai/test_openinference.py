@@ -53,7 +53,7 @@ def main():
     tp, lp, mp = setup_otel()
     instrument()
 
-    from mistralai import Mistral
+    from mistralai.client import Mistral
     client = Mistral(
         api_key="mock-key",
         server_url=MOCK_BASE_URL,
