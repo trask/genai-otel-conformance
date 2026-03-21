@@ -52,18 +52,22 @@ def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     return f"{library}-{lang_slug}-{ecosystem}"
 
 
-def _discover_library_metadata() -> tuple[dict[str, str], dict[str, str]]:
+def _discover_library_metadata() -> tuple[
+    dict[str, str],
+    dict[tuple[str, str], str],
+]:
     """Scan tests/<language>/<library>/metadata.json for display_name and repo entries.
 
     Returns (display_names, native_repos) where:
     - display_names maps library directory slug → display name.
-    - native_repos maps library directory slug → GitHub repo slug (for native ecosystem).
+    - native_repos maps (language slug, library slug) → GitHub repo slug
+      for native ecosystem tests.
     Libraries that appear under multiple languages only need one metadata.json
     with a display_name (the first one found wins, they should all agree).
     Falls back to the slug itself when no metadata is found.
     """
     names: dict[str, str] = {}
-    repos: dict[str, str] = {}
+    repos: dict[tuple[str, str], str] = {}
     if not TESTS_DIR.is_dir():
         return names, repos
     for lang_dir in sorted(TESTS_DIR.iterdir()):
@@ -80,8 +84,8 @@ def _discover_library_metadata() -> tuple[dict[str, str], dict[str, str]]:
                 data = json.loads(meta.read_text(encoding="utf-8"))
                 if slug not in names and "display_name" in data:
                     names[slug] = data["display_name"]
-                if slug not in repos and "repo" in data:
-                    repos[slug] = data["repo"]
+                if "repo" in data:
+                    repos[(lang_dir.name, slug)] = data["repo"]
             except (OSError, json.JSONDecodeError):
                 pass
     return names, repos
@@ -186,7 +190,7 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
         )
 
         if r.ecosystem == "native":
-            repo = NATIVE_REPOS.get(r.library, "")
+            repo = NATIVE_REPOS.get((lang_slug, r.library), "")
         else:
             repo = ECOSYSTEM_REPOS.get((r.ecosystem, r.language), "")
 
