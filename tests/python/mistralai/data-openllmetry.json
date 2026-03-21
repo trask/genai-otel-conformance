@@ -25,7 +25,7 @@
       "gen_ai.usage.input_tokens": "present",
       "gen_ai.usage.output_tokens": "present",
       "gen_ai.request.top_k": "absent",
-      "server.address": "present"
+      "server.address": "absent"
     },
     "embeddings": {
       "gen_ai.operation.name": "absent",
