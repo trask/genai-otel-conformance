@@ -461,13 +461,15 @@ def _extract_instrumentation_version(
 
     # For native tests, try to match the library name against package names.
     if ecosystem == "native":
-        lib_norm = library.lower().replace("-", "")
+        lib_norm = re.sub(r"[-_.]", "", library.lower())
+        lib_tokens = [token for token in re.split(r"[-_.]+", library.lower()) if token]
         best = None
         for pkg, ver in versions.items():
-            pkg_lower = pkg.lower().replace("-", "").replace("_", "")
+            pkg_lower = re.sub(r"[-_.]", "", pkg.lower())
             if any(pkg_lower.startswith(ip) for ip in _INFRA_PREFIXES):
                 continue
-            if lib_norm in pkg_lower or pkg_lower in lib_norm:
+            token_match = lib_tokens and all(token in pkg_lower for token in lib_tokens)
+            if lib_norm in pkg_lower or pkg_lower in lib_norm or token_match:
                 if best is None or len(pkg) > len(best[0]):
                     best = (pkg, ver)
         if best:
