@@ -1,4 +1,8 @@
 {
   "display_name": "Pydantic AI",
-  "repo": "pydantic/pydantic-ai"
+  "repo": "pydantic/pydantic-ai",
+  "version_packages": {
+    "native": "pydantic-ai-slim[openai]",
+    "openinference": "openinference-instrumentation-pydantic-ai"
+  }
 }

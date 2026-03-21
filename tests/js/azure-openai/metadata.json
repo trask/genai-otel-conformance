@@ -1,3 +1,8 @@
 {
-  "display_name": "Azure OpenAI"
+  "display_name": "Azure OpenAI",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-openai",
+    "openinference": "@arizeai/openinference-instrumentation-openai",
+    "otelcontrib": "@opentelemetry/instrumentation-openai"
+  }
 }

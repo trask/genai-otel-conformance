@@ -1,3 +1,8 @@
 {
-  "display_name": "LangChain"
+  "display_name": "LangChain",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-langchain",
+    "openllmetry": "opentelemetry-instrumentation-langchain",
+    "openinference": "openinference-instrumentation-langchain"
+  }
 }

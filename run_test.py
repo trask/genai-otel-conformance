@@ -36,11 +36,13 @@ import json
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import time
 import urllib.request
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -95,6 +97,11 @@ class TestName(NamedTuple):
     language: str
     library: str
     ecosystem: str
+
+
+class TestCommandResult(NamedTuple):
+    found: bool
+    exit_code: int
 
 
 @dataclass
@@ -342,27 +349,26 @@ SPAN_TYPE_ORDER = ["create_agent", "invoke_agent", "invoke_workflow", "inference
 
 # ── Results parsing ──────────────────────────────────────────────────
 
-# Prefix patterns used to identify the instrumentation package per ecosystem.
-_INSTRUMENTATION_PREFIXES = {
-    "otelcontrib": [
-        "opentelemetry-instrumentation-",       # Python
-        "@opentelemetry/instrumentation-",       # JS
-    ],
-    "openllmetry": [
-        "@traceloop/instrumentation-",           # JS
-        "opentelemetry-instrumentation-",        # Python (traceloop's packages)
-    ],
-    "openinference": [
-        "openinference-instrumentation-",        # Python
-        "@arizeai/openinference-instrumentation-",  # JS
-    ],
-}
+@lru_cache(maxsize=None)
+def _load_test_metadata(lang: str, library: str) -> dict:
+    """Load metadata.json for a test directory."""
+    meta_file = TESTS_DIR / lang / library / "metadata.json"
+    if not meta_file.is_file():
+        return {}
+    try:
+        return json.loads(meta_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
 
-# Packages to skip when searching for the "main" library in native tests.
-_INFRA_PREFIXES = (
-    "opentelemetry", "@opentelemetry/", "otel", "tsx", "typescript",
-    "grpc", "protobuf", "@grpc/",
-)
+
+def _version_package_from_metadata(lang: str, library: str, ecosystem: str) -> str:
+    """Return the exact manifest package key used for version display."""
+    metadata = _load_test_metadata(lang, library)
+    version_packages = metadata.get("version_packages", {})
+    if not isinstance(version_packages, dict):
+        return ""
+    package_name = version_packages.get(ecosystem, "")
+    return package_name if isinstance(package_name, str) else ""
 
 
 def _read_deps_from_test_dir(
@@ -415,67 +421,17 @@ def _read_deps_from_test_dir(
 def extract_version_from_deps(
     lang: str, library: str, ecosystem: str,
 ) -> str:
-    """Extract the instrumentation version from checked-in dependency files.
+    """Extract the display version from checked-in dependency files.
 
     Reads requirements-*.txt (Python), package.json (JS), build.gradle.kts
-    (Java), or *.csproj (.NET) and returns the version of the instrumentation
-    package, or ``""`` when not found.
+    (Java), or *.csproj (.NET) and returns the version of the exact package
+    named in metadata.json for this ecosystem, or ``""`` when not found.
     """
     versions = _read_deps_from_test_dir(lang, library, ecosystem)
-    instr_version = _extract_instrumentation_version(ecosystem, library, versions)
-    if instr_version:
-        parts = instr_version.rsplit(" ", 1)
-        return parts[-1] if len(parts) == 2 else instr_version
-    return ""
-
-
-def _extract_instrumentation_version(
-    ecosystem: str, library: str, versions: dict[str, str],
-) -> str:
-    """Pick the most relevant instrumentation library version string.
-
-    Returns a display string like ``"opentelemetry-instrumentation-openai-v2 2.0.0"``
-    or ``""`` when no match is found.
-    """
-    if not versions:
+    package_name = _version_package_from_metadata(lang, library, ecosystem)
+    if not package_name:
         return ""
-
-    # For instrumentation ecosystems, look for the instrumentation package.
-    prefixes = _INSTRUMENTATION_PREFIXES.get(ecosystem)
-    if prefixes:
-        for prefix in prefixes:
-            candidates = [
-                (pkg, ver) for pkg, ver in versions.items()
-                if pkg.lower().startswith(prefix.lower())
-            ]
-            if candidates:
-                # Prefer the most specific (longest) package name.
-                candidates.sort(key=lambda x: len(x[0]), reverse=True)
-                return f"{candidates[0][0]} {candidates[0][1]}"
-
-    # For Java otelcontrib, the maven coordinate contains "instrumentation".
-    if ecosystem == "otelcontrib":
-        for pkg, ver in versions.items():
-            if "instrumentation" in pkg.lower() and ":" in pkg:
-                return f"{pkg} {ver}"
-
-    # For native tests, try to match the library name against package names.
-    if ecosystem == "native":
-        lib_norm = re.sub(r"[-_.]", "", library.lower())
-        lib_tokens = [token for token in re.split(r"[-_.]+", library.lower()) if token]
-        best = None
-        for pkg, ver in versions.items():
-            pkg_lower = re.sub(r"[-_.]", "", pkg.lower())
-            if any(pkg_lower.startswith(ip) for ip in _INFRA_PREFIXES):
-                continue
-            token_match = lib_tokens and all(token in pkg_lower for token in lib_tokens)
-            if lib_norm in pkg_lower or pkg_lower in lib_norm or token_match:
-                if best is None or len(pkg) > len(best[0]):
-                    best = (pkg, ver)
-        if best:
-            return f"{best[0]} {best[1]}"
-
-    return ""
+    return versions.get(package_name, "")
 
 
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
@@ -770,6 +726,21 @@ def _results_dir_from_test_name(test_name: str) -> Path:
     return TESTS_DIR / lang / lib / "results" / eco
 
 
+def _prepare_results_dir(result_dir: Path) -> None:
+    """Ensure the result directory starts empty for a fresh Weaver run."""
+    if result_dir.exists():
+        shutil.rmtree(result_dir)
+    result_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _has_weaver_output(result_dir: Path) -> bool:
+    """Return whether Weaver wrote any JSON output files for this run."""
+    return any(
+        json_file.name != "versions.json"
+        for json_file in result_dir.glob("**/*.json")
+    )
+
+
 def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
     """Generate data for a single test from its results directory.
 
@@ -838,41 +809,47 @@ def _gradle_cmd(test_dir: Path) -> list[str]:
     return ["./gradlew"]
 
 
-def run_test_cmd(name: str, env: dict[str, str]) -> bool:
-    """Run the test command. Returns True if the test was found, False otherwise.
+def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
+    """Run the test command.
 
-    Exit code is ignored — weaver is the arbiter of pass/fail.
+    Returns whether the test was found and the test command's exit code.
+    Weaver violations are handled separately from test-process failures.
     """
     lang, lib, eco = _parse_test_name(name)
 
     if lang == "python":
         test_file = Path(f"tests/python/{lib}/test_{eco}.py")
         if not test_file.is_file():
-            return False
-        subprocess.run([sys.executable, str(test_file)], env=env)
+            return TestCommandResult(False, 0)
+        proc = subprocess.run([sys.executable, str(test_file)], env=env)
+        return TestCommandResult(True, proc.returncode)
     elif lang == "js":
         test_dir = Path(f"tests/js/{lib}")
         if not test_dir.is_dir():
-            return False
+            return TestCommandResult(False, 0)
         npm = "npm.cmd" if sys.platform == "win32" else "npm"
-        subprocess.run([npm, "install", "--silent"], cwd=test_dir, env=env)
-        subprocess.run([npm, "run", f"test:{eco}"], cwd=test_dir, env=env)
+        install_proc = subprocess.run([npm, "install", "--silent"], cwd=test_dir, env=env)
+        if install_proc.returncode != 0:
+            return TestCommandResult(True, install_proc.returncode)
+        test_proc = subprocess.run([npm, "run", f"test:{eco}"], cwd=test_dir, env=env)
+        return TestCommandResult(True, test_proc.returncode)
     elif lang == "java":
         test_dir = Path(f"tests/java/{lib}")
         if not test_dir.is_dir():
-            return False
+            return TestCommandResult(False, 0)
         gradle = _gradle_cmd(test_dir)
         build_file = test_dir / "build.gradle.kts"
         gradle_task = "bootRun" if "spring-boot" in build_file.read_text() else "run"
-        subprocess.run([*gradle, gradle_task], cwd=test_dir, env=env)
+        proc = subprocess.run([*gradle, gradle_task], cwd=test_dir, env=env)
+        return TestCommandResult(True, proc.returncode)
     elif lang == "dotnet":
         test_dir = Path(f"tests/dotnet/{lib}")
         if not test_dir.is_dir():
-            return False
-        subprocess.run(["dotnet", "run"], cwd=test_dir, env=env)
+            return TestCommandResult(False, 0)
+        proc = subprocess.run(["dotnet", "run"], cwd=test_dir, env=env)
+        return TestCommandResult(True, proc.returncode)
     else:
-        return False
-    return True
+        return TestCommandResult(False, 0)
 
 
 def list_available_tests() -> list[str]:
@@ -969,6 +946,7 @@ def main() -> None:
 
     mock_url = f"http://127.0.0.1:{mock_port}"
     mock_proc: subprocess.Popen | None = None
+    weaver_proc: subprocess.Popen | None = None
 
     try:
         if not is_healthy(f"http://127.0.0.1:{mock_port}/health"):
@@ -1002,7 +980,7 @@ def main() -> None:
         # ── Start weaver ────────────────────────────────────────────
 
         test_results_dir = Path(f"tests/{lang}/{lib}/results/{eco}").resolve()
-        test_results_dir.mkdir(parents=True, exist_ok=True)
+        _prepare_results_dir(test_results_dir)
 
         print(f"=== Starting weaver live-check for: {test_name} (ports {weaver_port}/{admin_port}) ===")
         weaver_cmd = ["weaver", "registry", "live-check"]
@@ -1030,7 +1008,8 @@ def main() -> None:
         }
 
         print(f"=== Running test: {test_name} ===")
-        if not run_test_cmd(test_name, test_env):
+        test_run = run_test_cmd(test_name, test_env)
+        if not test_run.found:
             print(f"ERROR: Could not find test '{test_name}'", file=sys.stderr)
             print("Available tests:", file=sys.stderr)
             for t in list_available_tests():
@@ -1053,6 +1032,42 @@ def main() -> None:
         print(f"=== Weaver exit code: {weaver_exit} ===")
         print(f"=== Results in: {test_results_dir} ===")
 
+        fresh_result = parse_result_dir(test_results_dir, test_name)
+        has_weaver_output = _has_weaver_output(test_results_dir)
+        has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
+        has_usable_data = fresh_result is not None and fresh_result.has_data
+
+        if test_run.exit_code != 0 and not has_usable_data:
+            print(
+                f"ERROR: Test command exited with code {test_run.exit_code} and produced no usable Weaver data.",
+                file=sys.stderr,
+            )
+            sys.exit(test_run.exit_code or 1)
+        if test_run.exit_code != 0:
+            print(
+                f"Warning: Test command exited with code {test_run.exit_code}, but usable Weaver data was captured.",
+                file=sys.stderr,
+            )
+
+        if not has_weaver_output:
+            print(
+                f"ERROR: Weaver produced no JSON output for test: {test_name}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if weaver_exit != 0 and not has_weaver_stats:
+            print(
+                "ERROR: Weaver exited non-zero before writing statistics.",
+                file=sys.stderr,
+            )
+            sys.exit(weaver_exit or 1)
+        if weaver_exit != 0:
+            print(
+                "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
+                file=sys.stderr,
+            )
+
         # ── Update the per-test data file ───────────────────────────
 
         print("=== Updating test data file ===")
@@ -1063,9 +1078,14 @@ def main() -> None:
             path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
             print(f"Updated {path}")
         else:
-            print(f"No relevant data for test: {test_name}", file=sys.stderr)
+            print(f"ERROR: No relevant data for test: {test_name}", file=sys.stderr)
+            sys.exit(1)
 
     finally:
+        if weaver_proc and weaver_proc.poll() is None:
+            print(f"Stopping weaver (PID {weaver_proc.pid})...")
+            weaver_proc.terminate()
+            weaver_proc.wait()
         if mock_proc and mock_proc.poll() is None:
             print(f"Stopping mock server (PID {mock_proc.pid})...")
             mock_proc.terminate()

@@ -1,4 +1,8 @@
 {
   "display_name": "LiteLLM",
-  "repo": "BerriAI/litellm"
+  "repo": "BerriAI/litellm",
+  "version_packages": {
+    "native": "litellm",
+    "openinference": "openinference-instrumentation-litellm"
+  }
 }

@@ -1,4 +1,8 @@
 {
   "display_name": "Vercel AI SDK",
-  "repo": "vercel/ai"
+  "repo": "vercel/ai",
+  "version_packages": {
+    "native": "ai",
+    "openinference": "@arizeai/openinference-vercel"
+  }
 }

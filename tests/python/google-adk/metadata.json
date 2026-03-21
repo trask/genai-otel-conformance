@@ -1,4 +1,8 @@
 {
   "display_name": "Google ADK",
-  "repo": "google/adk-python"
+  "repo": "google/adk-python",
+  "version_packages": {
+    "native": "google-adk",
+    "openinference": "openinference-instrumentation-google-adk"
+  }
 }

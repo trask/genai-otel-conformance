@@ -1,3 +1,7 @@
 {
-  "display_name": "LangChain"
+  "display_name": "LangChain",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-langchain",
+    "openinference": "@arizeai/openinference-instrumentation-langchain"
+  }
 }

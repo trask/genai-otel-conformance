@@ -1,3 +1,7 @@
 {
-  "display_name": "LlamaIndex"
+  "display_name": "LlamaIndex",
+  "version_packages": {
+    "openllmetry": "opentelemetry-instrumentation-llamaindex",
+    "openinference": "openinference-instrumentation-llama-index"
+  }
 }

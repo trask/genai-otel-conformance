@@ -1,3 +1,7 @@
 {
-  "display_name": "CrewAI"
+  "display_name": "CrewAI",
+  "version_packages": {
+    "openllmetry": "opentelemetry-instrumentation-crewai",
+    "openinference": "openinference-instrumentation-crewai"
+  }
 }

@@ -34,7 +34,12 @@
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">{% if details_available %}<a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a>{% else %}{{ row.eco_display }}{% endif %}</td>
+<td class="lib">
+  {% if details_available %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
+  {{ row.eco_display }}
+  {% if row.instrumentation_version %}<span class="version">{{ row.instrumentation_version }}</span>{% endif %}
+  {% if details_available %}</a>{% endif %}
+</td>
 {% for cell in row.cells -%}
 <td class="{{ cell.cls }}">{{ cell.symbol }}</td>
 {% endfor -%}
@@ -64,7 +69,12 @@
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">{% if details_available %}<a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a>{% else %}{{ row.eco_display }}{% endif %}</td>
+<td class="lib">
+  {% if details_available %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
+  {{ row.eco_display }}
+  {% if row.instrumentation_version %}<span class="version">{{ row.instrumentation_version }}</span>{% endif %}
+  {% if details_available %}</a>{% endif %}
+</td>
 {% for cell in row.cells -%}
 <td class="{{ cell.cls }}">{{ cell.symbol }}</td>
 {% endfor -%}
@@ -94,7 +104,12 @@
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">{% if details_available %}<a href="details.html#{{ row.test_name }}">{{ row.eco_display }}</a>{% else %}{{ row.eco_display }}{% endif %}</td>
+<td class="lib">
+  {% if details_available %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
+  {{ row.eco_display }}
+  {% if row.instrumentation_version %}<span class="version">{{ row.instrumentation_version }}</span>{% endif %}
+  {% if details_available %}</a>{% endif %}
+</td>
 {% for cell in row.cells -%}
 <td class="{{ cell.cls }}">{{ cell.symbol }}</td>
 {% endfor -%}

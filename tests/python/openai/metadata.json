@@ -1,3 +1,8 @@
 {
-  "display_name": "OpenAI"
+  "display_name": "OpenAI",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-openai-v2",
+    "openllmetry": "opentelemetry-instrumentation-openai",
+    "openinference": "openinference-instrumentation-openai"
+  }
 }

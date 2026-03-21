@@ -1,4 +1,7 @@
 {
   "display_name": "Azure AI Inference",
-  "repo": "azure/azure-sdk-for-python"
+  "repo": "azure/azure-sdk-for-python",
+  "version_packages": {
+    "otelcontrib": "azure-core-tracing-opentelemetry"
+  }
 }

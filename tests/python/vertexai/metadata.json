@@ -1,3 +1,8 @@
 {
-  "display_name": "Vertex AI"
+  "display_name": "Vertex AI",
+  "version_packages": {
+    "otelcontrib": "opentelemetry-instrumentation-vertexai",
+    "openllmetry": "opentelemetry-instrumentation-vertexai",
+    "openinference": "openinference-instrumentation-vertexai"
+  }
 }

@@ -1,3 +1,7 @@
 {
-  "display_name": "Groq"
+  "display_name": "Groq",
+  "version_packages": {
+    "openllmetry": "opentelemetry-instrumentation-groq",
+    "openinference": "openinference-instrumentation-groq"
+  }
 }

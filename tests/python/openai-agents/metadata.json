@@ -1,4 +1,10 @@
 {
   "display_name": "OpenAI Agents",
-  "repo": "openai/openai-agents-python"
+  "repo": "openai/openai-agents-python",
+  "version_packages": {
+    "native": "openai-agents",
+    "otelcontrib": "opentelemetry-instrumentation-openai-v2",
+    "openllmetry": "opentelemetry-instrumentation-openai-agents",
+    "openinference": "openinference-instrumentation-openai-agents"
+  }
 }

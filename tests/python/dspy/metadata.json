@@ -1,4 +1,8 @@
 {
   "display_name": "DSPy",
-  "repo": "stanfordnlp/dspy"
+  "repo": "stanfordnlp/dspy",
+  "version_packages": {
+    "native": "dspy",
+    "openinference": "openinference-instrumentation-dspy"
+  }
 }

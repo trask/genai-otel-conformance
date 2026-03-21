@@ -1,3 +1,6 @@
 {
-  "display_name": "Cohere"
+  "display_name": "Cohere",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-cohere"
+  }
 }

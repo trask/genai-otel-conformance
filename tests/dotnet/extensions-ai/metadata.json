@@ -1,4 +1,7 @@
 {
   "display_name": "Microsoft.Extensions.AI",
-  "repo": "dotnet/extensions"
+  "repo": "dotnet/extensions",
+  "version_packages": {
+    "native": "Microsoft.Extensions.AI"
+  }
 }

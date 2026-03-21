@@ -1,4 +1,7 @@
 {
   "display_name": "Semantic Kernel",
-  "repo": "microsoft/semantic-kernel"
+  "repo": "microsoft/semantic-kernel",
+  "version_packages": {
+    "native": "Microsoft.SemanticKernel"
+  }
 }

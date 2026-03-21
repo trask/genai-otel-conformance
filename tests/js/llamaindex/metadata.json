@@ -1,3 +1,6 @@
 {
-  "display_name": "LlamaIndex"
+  "display_name": "LlamaIndex",
+  "version_packages": {
+    "openllmetry": "@traceloop/instrumentation-llamaindex"
+  }
 }
