@@ -234,6 +234,7 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                 elif not (all_present & all_spec_attrs):
                     continue
 
+                type_present = r.per_type_attrs.get(st_key, all_present)
                 groups = []
                 for level, level_label in [("required", "Required"),
                                            ("conditionally_required", "Conditionally Required"),
@@ -243,7 +244,7 @@ def _prepare_details(results: dict[str, TestResult]) -> list[dict]:
                         continue
                     attrs = []
                     for attr in expected:
-                        if attr in all_present:
+                        if attr in type_present:
                             count = r.seen_attrs.get(attr, r.seen_non_registry_attrs.get(attr, 0))
                             attrs.append({"name": attr, "present": True, "count": count})
                         else:
