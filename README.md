@@ -35,7 +35,7 @@ Mock LLM Server (no API keys needed)
 # Format: python run_test.py <lang>-<library>-<ecosystem>
 python run_test.py python-openai-otelcontrib
 python run_test.py js-anthropic-openllmetry
-python run_test.py java-spring-ai-native
+python run_test.py java-openai-otelcontrib
 python run_test.py dotnet-extensions-ai-native
 ```
 
