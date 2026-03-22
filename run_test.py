@@ -417,38 +417,47 @@ def _dotnet_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestComm
     return TestCommandResult(True, proc.returncode)
 
 
-def _python_list_tests() -> list[str]:
+def _list_tests_from_matches(
+    language: str,
+    pattern: str,
+    ecosystem_for_path: Callable[[Path], str],
+    library_for_path: Callable[[Path], str] | None = None,
+) -> list[str]:
     tests: list[str] = []
-    for test_file in sorted(Path("tests/python").glob("*/test_*.py")):
-        lib = test_file.parent.name
-        ecosystem = test_file.stem.removeprefix("test_")
-        tests.append(f"python-{lib}-{ecosystem}")
+    for path in sorted((TESTS_DIR / language).glob(pattern)):
+        library = library_for_path(path) if library_for_path is not None else path.parent.name
+        ecosystem = ecosystem_for_path(path)
+        tests.append(f"{language}-{library}-{ecosystem}")
     return tests
+
+
+def _python_list_tests() -> list[str]:
+    return _list_tests_from_matches(
+        "python",
+        "*/test_*.py",
+        lambda path: path.stem.removeprefix("test_"),
+    )
 
 
 def _js_list_tests() -> list[str]:
-    tests: list[str] = []
-    for test_file in sorted(Path("tests/js").glob("*/test_*.ts")):
-        lib = test_file.parent.name
-        ecosystem = test_file.stem.removeprefix("test_")
-        tests.append(f"js-{lib}-{ecosystem}")
-    return tests
+    return _list_tests_from_matches(
+        "js",
+        "*/test_*.ts",
+        lambda path: path.stem.removeprefix("test_"),
+    )
 
 
 def _java_list_tests() -> list[str]:
-    tests: list[str] = []
-    for build_file in sorted(Path("tests/java").glob("*/build.gradle.kts")):
-        lib = build_file.parent.name
-        tests.append(f"java-{lib}-otelcontrib")
-    return tests
+    return _list_tests_from_matches("java", "*/build.gradle.kts", lambda _path: "otelcontrib")
 
 
 def _dotnet_list_tests() -> list[str]:
-    tests: list[str] = []
-    for csproj in sorted(Path("tests/dotnet").glob("*/*.csproj")):
-        lib = csproj.parent.name
-        tests.append(f"dotnet-{lib}-native")
-    return tests
+    return _list_tests_from_matches(
+        "dotnet",
+        "*/*.csproj",
+        lambda _path: "native",
+        lambda path: path.parent.name,
+    )
 
 
 LANGUAGE_ADAPTERS: dict[str, LanguageAdapter] = {
@@ -619,7 +628,7 @@ def main() -> None:
 
         # ── Start weaver ────────────────────────────────────────────
 
-        test_results_dir = Path(f"tests/{lang}/{lib}/results/{eco}").resolve()
+        test_results_dir = _results_dir_from_test_name(test_name).resolve()
         _prepare_results_dir(test_results_dir)
 
         print(f"=== Starting weaver live-check for: {test_name} (ports {weaver_port}/{admin_port}) ===")
