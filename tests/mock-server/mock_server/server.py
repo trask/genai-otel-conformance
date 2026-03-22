@@ -602,6 +602,34 @@ def bedrock_invoke(model_id):
 
 
 # ---------------------------------------------------------------------------
+# AWS Bedrock Agent Runtime-compatible endpoints
+# ---------------------------------------------------------------------------
+
+def _stream_bedrock_agent_invoke():
+    """Yield Bedrock Agent invoke_agent event-stream chunks in binary format."""
+    events = []
+    # The agent response is delivered as chunk events with bytes
+    text = "This is a mock response from the conformance test server."
+    events.append(("chunk", {"bytes": text.encode("utf-8").decode("utf-8")}))
+    for event_type, body in events:
+        payload = json.dumps(body).encode("utf-8")
+        yield _encode_event_stream_message(event_type, payload)
+
+
+@app.route("/agents/<agent_id>/agentAliases/<alias_id>/sessions/<session_id>/text", methods=["POST"])
+def bedrock_agent_invoke(agent_id, alias_id, session_id):
+    """Handle Bedrock Agent Runtime InvokeAgent."""
+    return Response(
+        _stream_bedrock_agent_invoke(),
+        mimetype="application/vnd.amazon.eventstream",
+        headers={
+            "x-amzn-bedrock-agent-session-id": session_id,
+            "x-amz-bedrock-agent-content-type": "application/json",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cohere-compatible endpoints
 # ---------------------------------------------------------------------------
 

@@ -432,6 +432,18 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
             types.add("invoke_agent")
     elif span_attrs.get("crewai.agent.id") or span_attrs.get("crewai.agent.role"):
         types.add("invoke_agent")
+    # AWS SDK instrumentation: BedrockAgentRuntime.InvokeAgent
+    elif str(span_attrs.get("rpc.service", "")).lower() == "bedrockagentruntime" \
+            and str(span_attrs.get("rpc.method", "")).lower() == "invokeagent":
+        types.add("invoke_agent")
+    # Azure AI Foundry Agent: azure-core-tracing-opentelemetry spans
+    # e.g. "AgentsClient.CreateAndProcessRun"
+    elif "agentsclient" in name_lower and ("run" in name_lower or "process" in name_lower):
+        types.add("invoke_agent")
+    # OpenAI Assistants: threads.runs spans from opentelemetry-instrumentation-openai-v2
+    elif "threads" in name_lower and "run" in name_lower \
+            and "thread.run" not in name_lower:
+        types.add("invoke_agent")
 
     if op_name == "execute_tool":
         types.add("execute_tool")
