@@ -18,13 +18,14 @@
 {% if detail.instrumentation_version or detail.repo %}<div class="instrumentation-version">{% if detail.repo %}Instrumentation: <a href="https://github.com/{{ detail.repo }}">{{ detail.repo }}</a>{% if detail.instrumentation_version %} &mdash; <code>{{ detail.instrumentation_version }}</code>{% endif %}{% elif detail.instrumentation_version %}Instrumentation: <code>{{ detail.instrumentation_version }}</code>{% endif %}</div>{% endif %}
 <div class="body">
 
-{% if detail.has_data %}
+{% if detail.has_local_run %}
 {% if detail.entity_summary %}
 <div class="stat-grid">
 <div class="stat-item">Entities: <span class="val">{{ detail.entity_summary }}</span></div>
 </div>
 {% endif %}
 
+{% if detail.has_data %}
 {% for section in detail.span_sections %}
 <div class="span-detail">
 <div class="span-header">{{ section.label }} Attributes</div>
@@ -71,6 +72,10 @@
 {% endfor -%}
 </div>
 {% endif %}
+
+{% elif detail.has_empty_run %}
+<p>Local Weaver run completed, but it produced no telemetry.</p>
+{% endif %}
 {% endif %}
 
 {% if detail.violation_messages %}
@@ -80,7 +85,7 @@
 {% endfor -%}
 {% endif %}
 
-{% if not detail.has_data and not detail.violation_messages %}
+{% if not detail.has_local_run and not detail.violation_messages %}
 <p>Results not yet available.</p>
 {% endif %}
 

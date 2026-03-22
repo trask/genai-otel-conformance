@@ -226,7 +226,9 @@ def _prepare_details(
         detail: dict = {
             "test_name": anchor_id,
             "label": label,
+            "has_local_run": bool(r),
             "has_data": bool(r and r.has_data),
+            "has_empty_run": bool(r and r.statistics is not None and not r.has_data),
             "violation_count": r.violation_count if r else 0,
             "instrumentation_version": instrumentation_version,
             "repo": repo,
@@ -238,14 +240,19 @@ def _prepare_details(
             "violation_messages": [],
         }
 
-        if r and r.has_data:
+        if r:
             # Entity summary
             entity_parts = []
             for etype in ("span", "log", "resource", "attribute"):
                 count = r.entity_counts.get(etype, 0)
                 if count > 0:
                     entity_parts.append(f"{count} {etype}{'s' if count != 1 else ''}")
-            detail["entity_summary"] = ", ".join(entity_parts)
+            if entity_parts:
+                detail["entity_summary"] = ", ".join(entity_parts)
+            elif r.statistics is not None and r.statistics.get("total_entities") == 0:
+                detail["entity_summary"] = "0 entities"
+
+        if r and r.has_data:
 
             # Span-type attribute checklists
             all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
