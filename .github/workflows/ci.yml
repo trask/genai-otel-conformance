@@ -274,7 +274,6 @@ jobs:
   # ── Dashboard ──────────────────────────────────────────────────────
   dashboard:
     runs-on: ubuntu-latest
-    if: always()
     needs: [python, java, dotnet, js]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -290,7 +289,6 @@ jobs:
         run: python generate_dashboard.py --output-dir docs
 
       - name: Download all result artifacts
-        if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: tests
@@ -298,7 +296,6 @@ jobs:
           merge-multiple: true
 
       - name: Generate details page
-        if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         run: python generate_dashboard.py --output-dir docs
 
       - name: Upload dashboard artifact
