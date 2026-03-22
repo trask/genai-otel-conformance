@@ -174,6 +174,47 @@ def _compute_rowspans(rows: list[dict]) -> None:
             rows[lang_start]["lang_rowspan"] = j - lang_start
 
 
+_HEATMAP_LANGUAGE_ORDER = {"Python": 0, "JS": 1, "Java": 2, "C#": 3}
+
+
+def _heatmap_sort_key(entry: dict) -> tuple[str, int, str]:
+    return (
+        entry.get("library", "").lower(),
+        _HEATMAP_LANGUAGE_ORDER.get(entry.get("language", ""), 99),
+        entry.get("ecosystem", "").lower(),
+    )
+
+
+def _build_heatmap(
+    label: str,
+    columns: list[dict],
+    entries: list[dict],
+    details_available: bool,
+    cell_builder,
+) -> dict | None:
+    if not entries or not columns:
+        return None
+
+    rows = []
+    for entry in sorted(entries, key=_heatmap_sort_key):
+        rows.append({
+            "test_name": entry.get("test_name", ""),
+            "has_details": details_available,
+            "lib_display": entry.get("library", ""),
+            "language": entry.get("language", ""),
+            "eco_display": entry.get("ecosystem", ""),
+            "instrumentation_version": extract_version_from_deps(
+                entry["_lang"],
+                entry["_lib"],
+                entry["_eco"],
+            ),
+            "cells": cell_builder(entry),
+        })
+
+    _compute_rowspans(rows)
+    return {"label": label, "columns": columns, "rows": rows}
+
+
 def _prepare_details(
     results: dict[str, TestResult],
     test_data_entries: list[dict],
@@ -380,19 +421,10 @@ def _prepare_heatmaps_from_data(
         if not columns:
             continue
 
-        # Sort by library, then language (custom order), then ecosystem.
-        _LANG_ORDER = {"python": 0, "js": 1, "java": 2, "c#": 3}
-        relevant.sort(key=lambda e: (
-            e.get("library", "").lower(),
-            _LANG_ORDER.get(e.get("language", "").lower(), 99),
-            e.get("ecosystem", "").lower(),
-        ))
-
-        rows = []
-        for entry in relevant:
-            attr_statuses = entry["span_types"][st_key]
+        def _build_cells(entry: dict, span_type_key: str = st_key, definitions: list[tuple[str, bool]] = col_defs) -> list[dict]:
+            attr_statuses = entry["span_types"][span_type_key]
             cells = []
-            for attr, is_group_start in col_defs:
+            for attr, is_group_start in definitions:
                 status = attr_statuses.get(attr, "absent")
                 if status == "present":
                     if attr in DEPRECATED_ATTRS:
@@ -403,21 +435,11 @@ def _prepare_heatmaps_from_data(
                     cls, symbol = "absent", ""
                 group_cls = " group-start" if is_group_start else ""
                 cells.append({"cls": f"{cls}{group_cls}", "symbol": symbol})
+            return cells
 
-            rows.append({
-                "test_name": entry.get("test_name", ""),
-                "has_details": details_available,
-                "lib_display": entry.get("library", ""),
-                "language": entry.get("language", ""),
-                "eco_display": entry.get("ecosystem", ""),
-                "instrumentation_version": extract_version_from_deps(
-                    entry["_lang"], entry["_lib"], entry["_eco"],
-                ),
-                "cells": cells,
-            })
-
-        _compute_rowspans(rows)
-        heatmaps.append({"label": st_label, "columns": columns, "rows": rows})
+        heatmap = _build_heatmap(st_label, columns, relevant, details_available, _build_cells)
+        if heatmap is not None:
+            heatmaps.append(heatmap)
 
     return heatmaps
 
@@ -432,23 +454,12 @@ def _prepare_signal_heatmap(
     """Build an event or metric heatmap from committed data-*.json entries."""
     relevant = [entry for entry in test_data_entries if data_key in entry]
 
-    if not relevant:
-        return None
-
     columns = [
         {"header_text": signal_name, "is_group_start": index == 0}
         for index, signal_name in enumerate(signal_names)
     ]
 
-    language_order = {"Python": 0, "JS": 1, "Java": 2, "C#": 3}
-    relevant.sort(key=lambda entry: (
-        entry.get("library", "").lower(),
-        language_order.get(entry.get("language", ""), 99),
-        entry.get("ecosystem", "").lower(),
-    ))
-
-    rows = []
-    for entry in relevant:
+    def _build_cells(entry: dict) -> list[dict]:
         signal_statuses = entry.get(data_key, {})
         cells = []
         for index, signal_name in enumerate(signal_names):
@@ -457,23 +468,9 @@ def _prepare_signal_heatmap(
                 cells.append({"cls": f"present{group_cls}", "symbol": "\u2713"})
             else:
                 cells.append({"cls": f"absent{group_cls}", "symbol": ""})
+        return cells
 
-        rows.append({
-            "test_name": entry.get("test_name", ""),
-            "has_details": details_available,
-            "lib_display": entry.get("library", ""),
-            "language": entry.get("language", ""),
-            "eco_display": entry.get("ecosystem", ""),
-            "instrumentation_version": extract_version_from_deps(
-                entry["_lang"],
-                entry["_lib"],
-                entry["_eco"],
-            ),
-            "cells": cells,
-        })
-
-    _compute_rowspans(rows)
-    return {"label": label, "columns": columns, "rows": rows}
+    return _build_heatmap(label, columns, relevant, details_available, _build_cells)
 
 
 def _has_result_directories() -> bool:
