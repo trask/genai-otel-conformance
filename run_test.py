@@ -46,7 +46,6 @@ import tempfile
 import time
 import urllib.request
 import zipfile
-from importlib import util as importlib_util
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -929,27 +928,6 @@ def _gradle_cmd(test_dir: Path) -> list[str]:
     return ["./gradlew"]
 
 
-def _ensure_python_test_support() -> None:
-    """Ensure the shared Python test support package is importable."""
-    if importlib_util.find_spec("otel_setup") is not None:
-        return
-
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-q", "-e", str(TESTS_DIR / "python")],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        print("ERROR: Failed to install shared Python test support.", file=sys.stderr)
-        if exc.stdout:
-            print(exc.stdout, file=sys.stderr, end="")
-        if exc.stderr:
-            print(exc.stderr, file=sys.stderr, end="")
-        sys.exit(exc.returncode or 1)
-
-
 def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     """Run the test command.
 
@@ -959,7 +937,6 @@ def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     lang, lib, eco = _parse_test_name(name)
 
     if lang == "python":
-        _ensure_python_test_support()
         test_file = Path(f"tests/python/{lib}/test_{eco}.py")
         if not test_file.is_file():
             return TestCommandResult(False, 0)
@@ -1106,21 +1083,6 @@ def main() -> None:
     try:
         if not is_healthy(f"http://127.0.0.1:{MOCK_SERVER_PORT}/health"):
             print(f"=== Starting mock server on port {MOCK_SERVER_PORT} ===")
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "-q", "-e",
-                     str(SCRIPT_DIR / "tests" / "mock-server")],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-            except subprocess.CalledProcessError as exc:
-                print("ERROR: Failed to install mock server package.", file=sys.stderr)
-                if exc.stdout:
-                    print(exc.stdout, file=sys.stderr, end="")
-                if exc.stderr:
-                    print(exc.stderr, file=sys.stderr, end="")
-                sys.exit(exc.returncode or 1)
             mock_proc = subprocess.Popen(
                 [
                     sys.executable,
