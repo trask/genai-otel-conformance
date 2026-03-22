@@ -29,21 +29,6 @@ Mock LLM Server (no API keys needed)
 - uv (for Python dependency installation)
 - Node.js 24+ (for JS/TS tests), Java 17+ (for Java tests), .NET 8+ (for .NET tests)
 
-Install shared Python dependencies used by the test runner and mock server in your virtual environment:
-
-```bash
-uv pip install -e tests/mock-server
-```
-
-If you are running a Python instrumentation test under `tests/python`, also install the Python test support package and that test's requirements in your virtual environment:
-
-```bash
-uv pip install -e tests/python
-uv pip install -r tests/python/openai/requirements-otelcontrib.txt
-```
-
-Replace the requirements file with the Python test you plan to run.
-
 ### Running a Test
 
 ```bash
@@ -56,10 +41,11 @@ python run_test.py dotnet-extensions-ai-native
 
 The test runner automatically:
 1. Starts the mock LLM server
-2. Downloads the pinned Weaver release on first use if needed, then starts Weaver for OTLP ingestion and validation
-3. Discovers and runs the test command
-4. Writes results to `tests/<lang>/<lib>/results/<eco>/`
-5. Updates `tests/<lang>/<lib>/data-<eco>.json` with coverage data
+2. Installs shared Python dependencies for the mock server, and for Python tests also installs the shared test support package plus the selected test's requirements via `uv`
+3. Downloads the pinned Weaver release on first use if needed, then starts Weaver for OTLP ingestion and validation
+4. Discovers and runs the test command
+5. Writes results to `tests/<lang>/<lib>/results/<eco>/`
+6. Updates `tests/<lang>/<lib>/data-<eco>.json` with coverage data
 
 The `data-<eco>.json` files are checked into the repository and CI verifies they are up
 to date. Run the relevant test locally before pushing to keep them in sync.

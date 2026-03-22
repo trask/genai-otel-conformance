@@ -933,6 +933,27 @@ def _npm_cmd() -> str:
     return "npm.cmd" if sys.platform == "win32" else "npm"
 
 
+def _uv_cmd() -> str:
+    """Return the platform-specific uv executable name or exit with guidance."""
+    uv = shutil.which("uv.exe" if sys.platform == "win32" else "uv")
+    if uv:
+        return uv
+
+    print("ERROR: uv is required to install Python test dependencies.", file=sys.stderr)
+    print("Install it and retry: https://docs.astral.sh/uv/getting-started/installation/", file=sys.stderr)
+    sys.exit(1)
+
+
+def _install_with_uv(*install_args: str, label: str) -> None:
+    """Install Python dependencies into the current interpreter using uv."""
+    print(f"=== Installing {label} ===")
+    subprocess.run(
+        [_uv_cmd(), "pip", "install", "--python", sys.executable, *install_args],
+        cwd=SCRIPT_DIR,
+        check=True,
+    )
+
+
 def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     """Run the test command.
 
@@ -1050,6 +1071,14 @@ def main() -> None:
         _print_available_tests()
         sys.exit(1)
 
+    if lang == "python":
+        _install_with_uv("-e", "tests/python", label="shared Python test support")
+        _install_with_uv(
+            "-r",
+            f"tests/python/{lib}/requirements-{eco}.txt",
+            label=f"Python test dependencies for {lib}/{eco}",
+        )
+
     weaver_port = random.randint(10000, 60000) & ~1  # even base
     admin_port = weaver_port + 1
 
@@ -1084,6 +1113,7 @@ def main() -> None:
 
     try:
         if not is_healthy(f"http://127.0.0.1:{MOCK_SERVER_PORT}/health"):
+            _install_with_uv("-e", "tests/mock-server", label="shared mock server dependencies")
             print(f"=== Starting mock server on port {MOCK_SERVER_PORT} ===")
             mock_proc = subprocess.Popen(
                 [
