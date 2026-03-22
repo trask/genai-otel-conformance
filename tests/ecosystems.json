@@ -27,5 +27,8 @@
   },
   "prototype": {
     "display_name": "Prototype"
+  },
+  "manual": {
+    "display_name": "Manual"
   }
 }
