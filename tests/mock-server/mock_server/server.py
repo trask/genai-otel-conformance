@@ -700,6 +700,153 @@ def cohere_embed_v1():
 
 
 # ---------------------------------------------------------------------------
+# OpenAI Assistants / Azure AI Foundry Agents -compatible endpoints
+# ---------------------------------------------------------------------------
+
+# Shared state to track which run has been polled (for completing on second poll)
+_run_poll_count: dict[str, int] = {}
+
+
+@app.route("/v1/assistants", methods=["POST"])
+@app.route("/openai/assistants", methods=["POST"])
+@app.route("/assistants", methods=["POST"])
+def create_assistant():
+    body = request.get_json(silent=True) or {}
+    return {
+        "id": "asst-mock-001",
+        "object": "assistant",
+        "created_at": 1700000000,
+        "name": body.get("name", "mock-assistant"),
+        "description": body.get("description"),
+        "model": body.get("model", "gpt-4o-mini"),
+        "instructions": body.get("instructions", ""),
+        "tools": body.get("tools", []),
+        "metadata": body.get("metadata", {}),
+    }
+
+
+@app.route("/v1/assistants/<assistant_id>", methods=["DELETE"])
+@app.route("/openai/assistants/<assistant_id>", methods=["DELETE"])
+@app.route("/assistants/<assistant_id>", methods=["DELETE"])
+def delete_assistant(assistant_id):
+    return {
+        "id": assistant_id,
+        "object": "assistant.deleted",
+        "deleted": True,
+    }
+
+
+@app.route("/v1/threads", methods=["POST"])
+@app.route("/openai/threads", methods=["POST"])
+@app.route("/threads", methods=["POST"])
+def create_thread():
+    return {
+        "id": "thread-mock-001",
+        "object": "thread",
+        "created_at": 1700000000,
+        "metadata": {},
+    }
+
+
+@app.route("/v1/threads/<thread_id>/messages", methods=["POST"])
+@app.route("/openai/threads/<thread_id>/messages", methods=["POST"])
+@app.route("/threads/<thread_id>/messages", methods=["POST"])
+def create_message(thread_id):
+    body = request.get_json(silent=True) or {}
+    return {
+        "id": "msg-mock-001",
+        "object": "thread.message",
+        "created_at": 1700000000,
+        "thread_id": thread_id,
+        "role": body.get("role", "user"),
+        "content": [
+            {
+                "type": "text",
+                "text": {"value": body.get("content", ""), "annotations": []},
+            }
+        ],
+        "metadata": {},
+    }
+
+
+@app.route("/v1/threads/<thread_id>/runs", methods=["POST"])
+@app.route("/openai/threads/<thread_id>/runs", methods=["POST"])
+@app.route("/threads/<thread_id>/runs", methods=["POST"])
+def create_run(thread_id):
+    body = request.get_json(silent=True) or {}
+    run_id = "run-mock-001"
+    return {
+        "id": run_id,
+        "object": "thread.run",
+        "created_at": 1700000000,
+        "thread_id": thread_id,
+        "assistant_id": body.get("assistant_id", "asst-mock-001"),
+        "status": "completed",
+        "model": body.get("model", "gpt-4o-mini"),
+        "instructions": body.get("instructions"),
+        "tools": body.get("tools", []),
+        "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 12,
+            "total_tokens": 37,
+        },
+        "metadata": {},
+    }
+
+
+@app.route("/v1/threads/<thread_id>/runs/<run_id>", methods=["GET"])
+@app.route("/openai/threads/<thread_id>/runs/<run_id>", methods=["GET"])
+@app.route("/threads/<thread_id>/runs/<run_id>", methods=["GET"])
+def get_run(thread_id, run_id):
+    return {
+        "id": run_id,
+        "object": "thread.run",
+        "created_at": 1700000000,
+        "thread_id": thread_id,
+        "assistant_id": "asst-mock-001",
+        "status": "completed",
+        "model": "gpt-4o-mini",
+        "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 12,
+            "total_tokens": 37,
+        },
+        "metadata": {},
+    }
+
+
+@app.route("/v1/threads/<thread_id>/messages", methods=["GET"])
+@app.route("/openai/threads/<thread_id>/messages", methods=["GET"])
+@app.route("/threads/<thread_id>/messages", methods=["GET"])
+def list_messages(thread_id):
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "msg-mock-002",
+                "object": "thread.message",
+                "created_at": 1700000001,
+                "thread_id": thread_id,
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "value": "This is a mock response from the conformance test server.",
+                            "annotations": [],
+                        },
+                    }
+                ],
+                "metadata": {},
+            }
+        ],
+        "first_id": "msg-mock-002",
+        "last_id": "msg-mock-002",
+        "has_more": False,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
