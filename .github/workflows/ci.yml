@@ -248,9 +248,6 @@ jobs:
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
-      - name: Install JS dependencies
-        run: cd ${{ matrix.test.dir }} && npm install
-
       - name: Run conformance test
         run: python run_test.py "js-${{ matrix.test.name }}"
 

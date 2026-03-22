@@ -274,8 +274,6 @@ def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
     if r is None or not r.has_data:
         return None
 
-    all_present = present_attributes(r)
-    has_genai = any(a.startswith("gen_ai.") for a in all_present)
     event_statuses = build_signal_statuses(GENAI_EVENT_TYPES, r.seen_events, r.detected_events)
     metric_statuses = build_signal_statuses(GENAI_METRIC_TYPES, r.seen_metrics, r.detected_metrics)
     has_genai_signals = any(status == "present" for status in event_statuses.values()) or any(
@@ -351,8 +349,14 @@ def _noop_prebuild(_lib: str) -> None:
     return None
 
 
+def _js_workspace_dir() -> Path | None:
+    workspace_dir = Path("tests/js")
+    return workspace_dir if (workspace_dir / "package.json").is_file() else None
+
+
 def _js_prebuild_test(lib: str) -> None:
-    test_dir = Path("tests/js")
+    workspace_dir = _js_workspace_dir()
+    test_dir = workspace_dir if workspace_dir is not None else Path(f"tests/js/{lib}")
     npm = _npm_cmd()
     print(f"=== Installing JS dependencies in {test_dir} ===")
     subprocess.run([npm, "install", "--silent"], cwd=test_dir, check=True)
@@ -380,16 +384,19 @@ def _python_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestComma
 
 
 def _js_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
-    workspace_dir = Path("tests/js")
-    test_dir = workspace_dir / lib
+    workspace_dir = _js_workspace_dir()
+    test_dir = Path(f"tests/js/{lib}")
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
     npm = _npm_cmd()
-    test_proc = subprocess.run(
-        [npm, "--workspace", f"./{lib}", "run", f"test:{ecosystem}"],
-        cwd=workspace_dir,
-        env=env,
-    )
+    if workspace_dir is not None:
+        test_proc = subprocess.run(
+            [npm, "--workspace", f"./{lib}", "run", f"test:{ecosystem}"],
+            cwd=workspace_dir,
+            env=env,
+        )
+    else:
+        test_proc = subprocess.run([npm, "run", f"test:{ecosystem}"], cwd=test_dir, env=env)
     return TestCommandResult(True, test_proc.returncode)
 
 
