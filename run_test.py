@@ -46,6 +46,7 @@ import tempfile
 import time
 import urllib.request
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -244,6 +245,15 @@ class TestName(NamedTuple):
 class TestCommandResult(NamedTuple):
     found: bool
     exit_code: int
+
+
+@dataclass(frozen=True)
+class LanguageAdapter:
+    read_dependency_versions: Callable[[Path, str], dict[str, str]]
+    install_dependencies: Callable[[str, str], None]
+    prebuild_test: Callable[[str], None]
+    run_test: Callable[[str, str, dict[str, str]], TestCommandResult]
+    list_tests: Callable[[], list[str]]
 
 
 @dataclass
@@ -499,43 +509,11 @@ def _read_deps_from_test_dir(
     Returns a dict of {package_name: version}.
     """
     test_dir = TESTS_DIR / lang / library
-    versions: dict[str, str] = {}
+    adapter = LANGUAGE_ADAPTERS.get(lang)
+    if adapter is None:
+        return {}
 
-    if lang == "python":
-        req_file = test_dir / f"requirements-{ecosystem}.txt"
-        if req_file.exists():
-            for line in req_file.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if "==" in line:
-                    pkg, ver = line.split("==", 1)
-                    versions[pkg.strip()] = ver.strip()
-    elif lang == "js":
-        pkg_file = test_dir / "package.json"
-        if pkg_file.exists():
-            try:
-                data = json.loads(pkg_file.read_text(encoding="utf-8"))
-                versions = dict(data.get("dependencies", {}))
-            except (OSError, json.JSONDecodeError):
-                pass
-    elif lang == "java":
-        gradle_file = test_dir / "build.gradle.kts"
-        if gradle_file.exists():
-            content = gradle_file.read_text(encoding="utf-8")
-            for m in re.finditer(r'implementation\("([^"]+)"\)', content):
-                coord = m.group(1)
-                parts = coord.rsplit(":", 1)
-                if len(parts) == 2:
-                    versions[parts[0]] = parts[1]
-    elif lang == "dotnet":
-        for csproj in test_dir.glob("*.csproj"):
-            content = csproj.read_text(encoding="utf-8")
-            for m in re.finditer(
-                r'PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"',
-                content,
-            ):
-                versions[m.group(1)] = m.group(2)
-
-    return versions
+    return adapter.read_dependency_versions(test_dir, ecosystem)
 
 
 def extract_version_from_deps(
@@ -994,6 +972,200 @@ def _install_with_uv(*install_args: str, label: str) -> None:
     )
 
 
+def _python_read_dependency_versions(test_dir: Path, ecosystem: str) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    req_file = test_dir / f"requirements-{ecosystem}.txt"
+    if not req_file.exists():
+        return versions
+
+    for line in req_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if "==" not in line:
+            continue
+        pkg, ver = line.split("==", 1)
+        versions[pkg.strip()] = ver.strip()
+    return versions
+
+
+def _js_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
+    pkg_file = test_dir / "package.json"
+    if not pkg_file.exists():
+        return {}
+
+    try:
+        data = json.loads(pkg_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return dict(data.get("dependencies", {}))
+
+
+def _java_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    gradle_file = test_dir / "build.gradle.kts"
+    if not gradle_file.exists():
+        return versions
+
+    content = gradle_file.read_text(encoding="utf-8")
+    for match in re.finditer(r'implementation\("([^"]+)"\)', content):
+        coord = match.group(1)
+        parts = coord.rsplit(":", 1)
+        if len(parts) == 2:
+            versions[parts[0]] = parts[1]
+    return versions
+
+
+def _dotnet_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for csproj in test_dir.glob("*.csproj"):
+        content = csproj.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r'PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"',
+            content,
+        ):
+            versions[match.group(1)] = match.group(2)
+    return versions
+
+
+def _python_install_dependencies(lib: str, ecosystem: str) -> None:
+    _install_with_uv("-e", "tests/python", label="shared Python test support")
+    _install_with_uv(
+        "-r",
+        f"tests/python/{lib}/requirements-{ecosystem}.txt",
+        label=f"Python test dependencies for {lib}/{ecosystem}",
+    )
+
+
+def _noop_install_dependencies(_lib: str, _ecosystem: str) -> None:
+    return None
+
+
+def _noop_prebuild(_lib: str) -> None:
+    return None
+
+
+def _js_prebuild_test(lib: str) -> None:
+    test_dir = Path(f"tests/js/{lib}")
+    npm = _npm_cmd()
+    print(f"=== Installing JS dependencies in {test_dir} ===")
+    subprocess.run([npm, "install", "--silent"], cwd=test_dir, check=True)
+
+
+def _java_prebuild_test(lib: str) -> None:
+    test_dir = Path(f"tests/java/{lib}")
+    gradle = _gradle_cmd(test_dir)
+    print(f"=== Pre-building Java project in {test_dir} ===")
+    subprocess.run([*gradle, "classes"], cwd=test_dir, check=True)
+
+
+def _dotnet_prebuild_test(lib: str) -> None:
+    test_dir = Path(f"tests/dotnet/{lib}")
+    print(f"=== Pre-building .NET project in {test_dir} ===")
+    subprocess.run(["dotnet", "build"], cwd=test_dir, check=True)
+
+
+def _python_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+    test_file = Path(f"tests/python/{lib}/test_{ecosystem}.py")
+    if not test_file.is_file():
+        return TestCommandResult(False, 0)
+    proc = subprocess.run([sys.executable, str(test_file)], env=env)
+    return TestCommandResult(True, proc.returncode)
+
+
+def _js_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+    test_dir = Path(f"tests/js/{lib}")
+    if not test_dir.is_dir():
+        return TestCommandResult(False, 0)
+    npm = _npm_cmd()
+    test_proc = subprocess.run([npm, "run", f"test:{ecosystem}"], cwd=test_dir, env=env)
+    return TestCommandResult(True, test_proc.returncode)
+
+
+def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+    test_dir = Path(f"tests/java/{lib}")
+    if not test_dir.is_dir():
+        return TestCommandResult(False, 0)
+    gradle = _gradle_cmd(test_dir)
+    build_file = test_dir / "build.gradle.kts"
+    gradle_task = "bootRun" if "spring-boot" in build_file.read_text() else "run"
+    proc = subprocess.run([*gradle, gradle_task], cwd=test_dir, env=env)
+    return TestCommandResult(True, proc.returncode)
+
+
+def _dotnet_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+    test_dir = Path(f"tests/dotnet/{lib}")
+    if not test_dir.is_dir():
+        return TestCommandResult(False, 0)
+    proc = subprocess.run(["dotnet", "run"], cwd=test_dir, env=env)
+    return TestCommandResult(True, proc.returncode)
+
+
+def _python_list_tests() -> list[str]:
+    tests: list[str] = []
+    for test_file in sorted(Path("tests/python").glob("*/test_*.py")):
+        lib = test_file.parent.name
+        ecosystem = test_file.stem.removeprefix("test_")
+        tests.append(f"python-{lib}-{ecosystem}")
+    return tests
+
+
+def _js_list_tests() -> list[str]:
+    tests: list[str] = []
+    for test_file in sorted(Path("tests/js").glob("*/test_*.ts")):
+        lib = test_file.parent.name
+        ecosystem = test_file.stem.removeprefix("test_")
+        tests.append(f"js-{lib}-{ecosystem}")
+    return tests
+
+
+def _java_list_tests() -> list[str]:
+    tests: list[str] = []
+    for build_file in sorted(Path("tests/java").glob("*/build.gradle.kts")):
+        lib = build_file.parent.name
+        ecosystem = "native" if "spring-boot" in build_file.read_text() else "otelcontrib"
+        tests.append(f"java-{lib}-{ecosystem}")
+    return tests
+
+
+def _dotnet_list_tests() -> list[str]:
+    tests: list[str] = []
+    for csproj in sorted(Path("tests/dotnet").glob("*/*.csproj")):
+        lib = csproj.parent.name
+        tests.append(f"dotnet-{lib}-native")
+    return tests
+
+
+LANGUAGE_ADAPTERS: dict[str, LanguageAdapter] = {
+    "python": LanguageAdapter(
+        read_dependency_versions=_python_read_dependency_versions,
+        install_dependencies=_python_install_dependencies,
+        prebuild_test=_noop_prebuild,
+        run_test=_python_run_test,
+        list_tests=_python_list_tests,
+    ),
+    "js": LanguageAdapter(
+        read_dependency_versions=_js_read_dependency_versions,
+        install_dependencies=_noop_install_dependencies,
+        prebuild_test=_js_prebuild_test,
+        run_test=_js_run_test,
+        list_tests=_js_list_tests,
+    ),
+    "java": LanguageAdapter(
+        read_dependency_versions=_java_read_dependency_versions,
+        install_dependencies=_noop_install_dependencies,
+        prebuild_test=_java_prebuild_test,
+        run_test=_java_run_test,
+        list_tests=_java_list_tests,
+    ),
+    "dotnet": LanguageAdapter(
+        read_dependency_versions=_dotnet_read_dependency_versions,
+        install_dependencies=_noop_install_dependencies,
+        prebuild_test=_dotnet_prebuild_test,
+        run_test=_dotnet_run_test,
+        list_tests=_dotnet_list_tests,
+    ),
+}
+
+
 def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     """Run the test command.
 
@@ -1001,59 +1173,17 @@ def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     Weaver violations are handled separately from test-process failures.
     """
     lang, lib, eco = _parse_test_name(name)
-
-    if lang == "python":
-        test_file = Path(f"tests/python/{lib}/test_{eco}.py")
-        if not test_file.is_file():
-            return TestCommandResult(False, 0)
-        proc = subprocess.run([sys.executable, str(test_file)], env=env)
-        return TestCommandResult(True, proc.returncode)
-    elif lang == "js":
-        test_dir = Path(f"tests/js/{lib}")
-        if not test_dir.is_dir():
-            return TestCommandResult(False, 0)
-        npm = _npm_cmd()
-        test_proc = subprocess.run([npm, "run", f"test:{eco}"], cwd=test_dir, env=env)
-        return TestCommandResult(True, test_proc.returncode)
-    elif lang == "java":
-        test_dir = Path(f"tests/java/{lib}")
-        if not test_dir.is_dir():
-            return TestCommandResult(False, 0)
-        gradle = _gradle_cmd(test_dir)
-        build_file = test_dir / "build.gradle.kts"
-        gradle_task = "bootRun" if "spring-boot" in build_file.read_text() else "run"
-        proc = subprocess.run([*gradle, gradle_task], cwd=test_dir, env=env)
-        return TestCommandResult(True, proc.returncode)
-    elif lang == "dotnet":
-        test_dir = Path(f"tests/dotnet/{lib}")
-        if not test_dir.is_dir():
-            return TestCommandResult(False, 0)
-        proc = subprocess.run(["dotnet", "run"], cwd=test_dir, env=env)
-        return TestCommandResult(True, proc.returncode)
-    else:
+    adapter = LANGUAGE_ADAPTERS.get(lang)
+    if adapter is None:
         return TestCommandResult(False, 0)
+    return adapter.run_test(lib, eco, env)
 
 
 def list_available_tests() -> list[str]:
     """Discover all available test names."""
     tests: list[str] = []
-    for f in sorted(Path("tests/python").glob("*/test_*.py")):
-        lib = f.parent.name
-        eco = f.stem.removeprefix("test_")
-        tests.append(f"python-{lib}-{eco}")
-    for f in sorted(Path("tests/js").glob("*/test_*.ts")):
-        lib = f.parent.name
-        eco = f.stem.removeprefix("test_")
-        tests.append(f"js-{lib}-{eco}")
-    for f in sorted(Path("tests/java").glob("*/build.gradle.kts")):
-        lib = f.parent.name
-        if "spring-boot" in f.read_text():
-            tests.append(f"java-{lib}-native")
-        else:
-            tests.append(f"java-{lib}-otelcontrib")
-    for f in sorted(Path("tests/dotnet").glob("*/*.csproj")):
-        lib = f.parent.name
-        tests.append(f"dotnet-{lib}-native")
+    for lang in _LANG_DIRS:
+        tests.extend(LANGUAGE_ADAPTERS[lang].list_tests())
     return tests
 
 
@@ -1111,13 +1241,7 @@ def main() -> None:
         _print_available_tests()
         sys.exit(1)
 
-    if lang == "python":
-        _install_with_uv("-e", "tests/python", label="shared Python test support")
-        _install_with_uv(
-            "-r",
-            f"tests/python/{lib}/requirements-{eco}.txt",
-            label=f"Python test dependencies for {lib}/{eco}",
-        )
+    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, eco)
 
     weaver_port = random.randint(10000, 60000) & ~1  # even base
     admin_port = weaver_port + 1
@@ -1178,20 +1302,7 @@ def main() -> None:
         # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
         # can cause it to shut down before the test sends any data.
 
-        if lang == "js":
-            test_dir = Path(f"tests/js/{lib}")
-            npm = _npm_cmd()
-            print(f"=== Installing JS dependencies in {test_dir} ===")
-            subprocess.run([npm, "install", "--silent"], cwd=test_dir, check=True)
-        elif lang == "java":
-            test_dir = Path(f"tests/java/{lib}")
-            gradle = _gradle_cmd(test_dir)
-            print(f"=== Pre-building Java project in {test_dir} ===")
-            subprocess.run([*gradle, "classes"], cwd=test_dir, check=True)
-        elif lang == "dotnet":
-            test_dir = Path(f"tests/dotnet/{lib}")
-            print(f"=== Pre-building .NET project in {test_dir} ===")
-            subprocess.run(["dotnet", "build"], cwd=test_dir, check=True)
+        LANGUAGE_ADAPTERS[lang].prebuild_test(lib)
 
         # ── Start weaver ────────────────────────────────────────────
 
