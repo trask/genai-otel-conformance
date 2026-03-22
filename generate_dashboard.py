@@ -133,13 +133,17 @@ def _compute_rowspans(rows: list[dict]) -> None:
             rows[lang_start]["lang_rowspan"] = j - lang_start
 
 
-_HEATMAP_LANGUAGE_ORDER = {"Python": 0, "JS": 1, "Java": 2, "C#": 3}
+_LANGUAGE_ORDER = {"python": 0, "js": 1, "java": 2, "c#": 3}
+
+
+def _language_order(language: str) -> int:
+    return _LANGUAGE_ORDER.get(language.lower(), 99)
 
 
 def _heatmap_sort_key(entry: dict) -> tuple[str, int, str]:
     return (
         entry.get("library", "").lower(),
-        _HEATMAP_LANGUAGE_ORDER.get(entry.get("language", ""), 99),
+        _language_order(entry.get("language", "")),
         entry.get("ecosystem", "").lower(),
     )
 
@@ -188,10 +192,9 @@ def _prepare_details(
         for r in results.values()
     }
 
-    _LANG_ORDER = {"python": 0, "js": 1, "java": 2, "c#": 3}
     sorted_entries = sorted(test_data_entries, key=lambda e: (
         e.get("library", "").lower(),
-        _LANG_ORDER.get(e.get("language", "").lower(), 99),
+        _language_order(e.get("language", "")),
         e.get("ecosystem", "").lower(),
     ))
 
