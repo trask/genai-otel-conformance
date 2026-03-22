@@ -1,6 +1,0 @@
-{
-  "display_name": "OpenAI Assistants",
-  "version_packages": {
-    "otelcontrib": "opentelemetry-instrumentation-openai-v2"
-  }
-}

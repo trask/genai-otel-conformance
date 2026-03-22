@@ -607,10 +607,11 @@ def bedrock_invoke(model_id):
 
 def _stream_bedrock_agent_invoke():
     """Yield Bedrock Agent invoke_agent event-stream chunks in binary format."""
+    import base64
     events = []
-    # The agent response is delivered as chunk events with bytes
+    # The agent response is delivered as chunk events with base64-encoded bytes
     text = "This is a mock response from the conformance test server."
-    events.append(("chunk", {"bytes": text.encode("utf-8").decode("utf-8")}))
+    events.append(("chunk", {"bytes": base64.b64encode(text.encode("utf-8")).decode("ascii")}))
     for event_type, body in events:
         payload = json.dumps(body).encode("utf-8")
         yield _encode_event_stream_message(event_type, payload)

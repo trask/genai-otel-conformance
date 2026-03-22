@@ -1,6 +1,0 @@
-{
-  "display_name": "AWS Bedrock Agent",
-  "version_packages": {
-    "otelcontrib": "io.opentelemetry.instrumentation:opentelemetry-aws-sdk-2.2"
-  }
-}

@@ -1,7 +1,0 @@
-{
-  "display_name": "AWS Bedrock Agent",
-  "version_packages": {
-    "openllmetry": "opentelemetry-instrumentation-bedrock",
-    "openinference": "openinference-instrumentation-bedrock"
-  }
-}

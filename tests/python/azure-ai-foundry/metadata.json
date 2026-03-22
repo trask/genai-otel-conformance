@@ -1,7 +1,0 @@
-{
-  "display_name": "Azure AI Foundry Agent",
-  "repo": "azure/azure-sdk-for-python",
-  "version_packages": {
-    "otelcontrib": "azure-core-tracing-opentelemetry"
-  }
-}
