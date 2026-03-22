@@ -5,37 +5,12 @@ against a mock OpenAI server, with Promptflow's built-in tracing.
 """
 
 import os
-import sys
 
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk._logs import LoggerProvider
-from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-from opentelemetry._logs import set_logger_provider
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+
+from otel_setup import flush_and_shutdown, setup_otel
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
-OTLP_ENDPOINT = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
-
-
-def setup_otel():
-    tp = TracerProvider()
-    tp.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
-    trace.set_tracer_provider(tp)
-    lp = LoggerProvider()
-    lp.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
-    set_logger_provider(lp)
-    reader = PeriodicExportingMetricReader(
-        OTLPMetricExporter(endpoint=OTLP_ENDPOINT, insecure=True),
-        export_interval_millis=5000,
-    )
-    mp = MeterProvider(metric_readers=[reader])
-    return tp, lp, mp
 
 
 def run_chat():
@@ -68,29 +43,12 @@ def main():
     from promptflow.tracing import start_trace
     start_trace()
 
-    # Now get the active TracerProvider and add the OTLP exporter
-    tp = trace.get_tracer_provider()
-    tp.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
-
-    lp = LoggerProvider()
-    lp.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=OTLP_ENDPOINT, insecure=True)))
-    set_logger_provider(lp)
-    reader = PeriodicExportingMetricReader(
-        OTLPMetricExporter(endpoint=OTLP_ENDPOINT, insecure=True),
-        export_interval_millis=5000,
-    )
-    mp = MeterProvider(metric_readers=[reader])
+    # Reuse the shared provider setup while preserving Promptflow's tracer provider.
+    tp, lp, mp = setup_otel(trace.get_tracer_provider())
 
     run_chat()
 
-    print("Flushing telemetry...")
-    tp.force_flush()
-    lp.force_flush()
-    mp.force_flush()
-    tp.shutdown()
-    lp.shutdown()
-    mp.shutdown()
-    print("Done.")
+    flush_and_shutdown(tp, lp, mp)
 
 
 if __name__ == "__main__":

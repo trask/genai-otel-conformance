@@ -15,16 +15,17 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 
 
-def setup_otel():
+def setup_otel(tracer_provider=None):
     """Configure OTel SDK with OTLP exporters.
 
     Returns (TracerProvider, LoggerProvider, MeterProvider).
     """
     endpoint = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
 
-    tp = TracerProvider()
+    tp = tracer_provider or TracerProvider()
     tp.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True)))
-    trace.set_tracer_provider(tp)
+    if tracer_provider is None:
+        trace.set_tracer_provider(tp)
 
     lp = LoggerProvider()
     lp.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True)))
