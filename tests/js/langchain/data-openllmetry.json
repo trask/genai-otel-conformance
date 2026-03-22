@@ -1,4 +1,15 @@
 {
+  "events": {
+    "gen_ai.system.message": "absent",
+    "gen_ai.user.message": "absent",
+    "gen_ai.assistant.message": "absent",
+    "gen_ai.tool.message": "absent",
+    "gen_ai.choice": "absent"
+  },
+  "metrics": {
+    "gen_ai.client.token.usage": "absent",
+    "gen_ai.client.operation.duration": "absent"
+  },
   "span_types": {
     "invoke_workflow": {
       "gen_ai.operation.name": "absent",
