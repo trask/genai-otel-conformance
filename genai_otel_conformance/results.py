@@ -471,60 +471,42 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     return types
 
 
-def _extract_span_types_from_samples(
+def _summarize_samples(
     all_objects: list[dict],
-) -> tuple[set[str], dict[str, set[str]]]:
-    """Scan sample spans, classify them, and track per-type attrs."""
+) -> tuple[set[str], dict[str, set[str]], dict[str, int], dict[str, int]]:
+    """Scan sample payloads once and collect detected spans, events, and metrics."""
     span_types: set[str] = set()
     per_type_attrs: dict[str, set[str]] = {}
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        for sample in obj.get("samples", []):
-            span = sample.get("span")
-            if not span:
-                continue
-            attrs: dict[str, object] = {}
-            for attr in span.get("attributes", []):
-                attrs[attr.get("name", "")] = attr.get("value")
-            classified = _classify_span(span.get("name", ""), attrs)
-            span_types |= classified
-            attr_names = set(attrs.keys())
-            for span_type in classified:
-                if span_type not in per_type_attrs:
-                    per_type_attrs[span_type] = set()
-                per_type_attrs[span_type] |= attr_names
-    return span_types, per_type_attrs
-
-
-def _extract_events_from_samples(all_objects: list[dict]) -> dict[str, int]:
     events: dict[str, int] = {}
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        for sample in obj.get("samples", []):
-            log = sample.get("log")
-            if not log:
-                continue
-            event_name = log.get("event_name", "")
-            if event_name.startswith("gen_ai."):
-                events[event_name] = events.get(event_name, 0) + 1
-    return events
-
-
-def _extract_metrics_from_samples(all_objects: list[dict]) -> dict[str, int]:
     metrics: dict[str, int] = {}
     for obj in all_objects:
         if not isinstance(obj, dict):
             continue
         for sample in obj.get("samples", []):
+            span = sample.get("span")
+            if span:
+                attrs: dict[str, object] = {}
+                for attr in span.get("attributes", []):
+                    attrs[attr.get("name", "")] = attr.get("value")
+                classified = _classify_span(span.get("name", ""), attrs)
+                span_types |= classified
+                attr_names = set(attrs.keys())
+                for span_type in classified:
+                    per_type_attrs.setdefault(span_type, set()).update(attr_names)
+
+            log = sample.get("log")
+            if log:
+                event_name = log.get("event_name", "")
+                if event_name.startswith("gen_ai."):
+                    events[event_name] = events.get(event_name, 0) + 1
+
             metric = sample.get("metric")
-            if not metric:
-                continue
-            metric_name = metric.get("name", "")
-            if metric_name.startswith("gen_ai."):
-                metrics[metric_name] = metrics.get(metric_name, 0) + 1
-    return metrics
+            if metric:
+                metric_name = metric.get("name", "")
+                if metric_name.startswith("gen_ai."):
+                    metrics[metric_name] = metrics.get(metric_name, 0) + 1
+
+    return span_types, per_type_attrs, events, metrics
 
 
 def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
@@ -588,9 +570,9 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         return None
 
     has_data = bool(statistics and statistics.get("total_entities", 0) > 0)
-    detected_span_types, per_type_attrs = _extract_span_types_from_samples(all_objects)
-    detected_events = _extract_events_from_samples(all_objects)
-    detected_metrics = _extract_metrics_from_samples(all_objects)
+    detected_span_types, per_type_attrs, detected_events, detected_metrics = _summarize_samples(
+        all_objects
+    )
 
     if statistics:
         for ev_name, count in statistics.get("seen_non_registry_events", {}).items():
