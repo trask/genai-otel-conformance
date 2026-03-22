@@ -45,7 +45,7 @@ The test runner automatically:
 3. Downloads the pinned Weaver release on first use if needed, then starts Weaver for OTLP ingestion and validation
 4. Discovers and runs the test command
 5. Writes results to `tests/<lang>/<lib>/results/<eco>/`
-6. Updates `tests/<lang>/<lib>/data-<eco>.json` with coverage data
+6. Updates `tests/<lang>/<lib>/data-<eco>.json` with committed span, event, and metric coverage data
 
 The `data-<eco>.json` files are checked into the repository and CI verifies they are up
 to date. Run the relevant test locally before pushing to keep them in sync.
@@ -63,6 +63,7 @@ Generate locally:
 python generate_dashboard.py
 ```
 
+The main dashboard is generated from checked-in `data-<eco>.json` files.
 The details page (`details.html`) is always generated so dashboard links resolve for
 every known test. When local Weaver results are available, it includes detailed
 coverage and violation data. Otherwise, it shows placeholder sections with checked-in

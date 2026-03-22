@@ -21,6 +21,8 @@ from run_test import (
     _LANG_DIRS,
     ECOSYSTEM_DISPLAY,
     ECOSYSTEM_REPOS,
+    GENAI_EVENT_TYPES,
+    GENAI_METRIC_TYPES,
     SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
     TestResult,
@@ -103,25 +105,6 @@ def _library_display_name(slug: str) -> str:
 DEPRECATED_ATTRS = {
     "gen_ai.system",
 }
-
-# ── GenAI event types (from gen-ai-events.md) ────────────────────────
-# Events are emitted as OTel log records with an event_name field.
-
-GENAI_EVENT_TYPES = [
-    "gen_ai.system.message",
-    "gen_ai.user.message",
-    "gen_ai.assistant.message",
-    "gen_ai.tool.message",
-    "gen_ai.choice",
-]
-
-# ── GenAI metric types (from gen-ai-metrics.md) ─────────────────────
-
-GENAI_METRIC_TYPES = [
-    "gen_ai.client.token.usage",
-    "gen_ai.client.operation.duration",
-]
-
 
 # ── Data structures ──────────────────────────────────────────────────
 
@@ -459,21 +442,14 @@ def _merge_signal_counts(
 
 
 def _prepare_signal_heatmap(
-    results: dict[str, TestResult],
+    test_data_entries: list[dict],
     signal_names: list[str],
     label: str,
-    statistics_attr: str,
-    detected_attr: str,
+    data_key: str,
     details_available: bool = True,
 ) -> dict | None:
-    """Build an event or metric heatmap from local Weaver results."""
-    relevant: list[TestResult] = []
-    expected_signals = set(signal_names)
-
-    for result in results.values():
-        observed = set(getattr(result, statistics_attr)) | set(getattr(result, detected_attr))
-        if observed & expected_signals:
-            relevant.append(result)
+    """Build an event or metric heatmap from committed data-*.json entries."""
+    relevant = [entry for entry in test_data_entries if data_key in entry]
 
     if not relevant:
         return None
@@ -484,36 +460,33 @@ def _prepare_signal_heatmap(
     ]
 
     language_order = {"Python": 0, "JS": 1, "Java": 2, "C#": 3}
-    relevant.sort(key=lambda result: (
-        _library_display_name(result.library).lower(),
-        language_order.get(result.language, 99),
-        ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem).lower(),
+    relevant.sort(key=lambda entry: (
+        entry.get("library", "").lower(),
+        language_order.get(entry.get("language", ""), 99),
+        entry.get("ecosystem", "").lower(),
     ))
 
     rows = []
-    for result in relevant:
-        merged_counts = _merge_signal_counts(
-            getattr(result, statistics_attr),
-            getattr(result, detected_attr),
-        )
+    for entry in relevant:
+        signal_statuses = entry.get(data_key, {})
         cells = []
         for index, signal_name in enumerate(signal_names):
             group_cls = " group-start" if index == 0 else ""
-            if merged_counts.get(signal_name, 0) > 0:
+            if signal_statuses.get(signal_name) == "present":
                 cells.append({"cls": f"present{group_cls}", "symbol": "\u2713"})
             else:
                 cells.append({"cls": f"absent{group_cls}", "symbol": ""})
 
         rows.append({
-            "test_name": _make_anchor_id(result.language, result.library, result.ecosystem),
+            "test_name": entry.get("test_name", ""),
             "has_details": details_available,
-            "lib_display": _library_display_name(result.library),
-            "language": result.language,
-            "eco_display": ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem),
+            "lib_display": entry.get("library", ""),
+            "language": entry.get("language", ""),
+            "eco_display": entry.get("ecosystem", ""),
             "instrumentation_version": extract_version_from_deps(
-                _LANG_SLUG.get(result.language, result.language.lower()),
-                result.library,
-                result.ecosystem,
+                entry["_lang"],
+                entry["_lib"],
+                entry["_eco"],
             ),
             "cells": cells,
         })
@@ -530,30 +503,26 @@ def _has_result_directories() -> bool:
 def generate_dashboard_html(details_available: bool) -> str:
     """Generate the dashboard HTML with span heatmap tables.
 
-    Span heatmaps come from committed data-*.json files.
-    Event and metric heatmaps are added only when local Weaver results exist.
+    All dashboard heatmaps come from committed data-*.json files.
     """
     import jinja2
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     test_data_entries = _load_test_data_files()
-    results = parse_results() if details_available else {}
     heatmaps = _prepare_heatmaps_from_data(test_data_entries, details_available)
     event_heatmap = _prepare_signal_heatmap(
-        results,
+        test_data_entries,
         GENAI_EVENT_TYPES,
         "GenAI Events",
-        "seen_events",
-        "detected_events",
+        "events",
         details_available,
     )
     metric_heatmap = _prepare_signal_heatmap(
-        results,
+        test_data_entries,
         GENAI_METRIC_TYPES,
         "GenAI Metrics",
-        "seen_metrics",
-        "detected_metrics",
+        "metrics",
         details_available,
     )
 

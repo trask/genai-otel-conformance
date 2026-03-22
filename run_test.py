@@ -453,6 +453,19 @@ SPAN_TYPE_SPECS = {
 
 SPAN_TYPE_ORDER = ["create_agent", "invoke_agent", "invoke_workflow", "inference", "embeddings", "retrieval", "execute_tool"]
 
+GENAI_EVENT_TYPES = [
+    "gen_ai.system.message",
+    "gen_ai.user.message",
+    "gen_ai.assistant.message",
+    "gen_ai.tool.message",
+    "gen_ai.choice",
+]
+
+GENAI_METRIC_TYPES = [
+    "gen_ai.client.token.usage",
+    "gen_ai.client.operation.duration",
+]
+
 
 # ── Results parsing ──────────────────────────────────────────────────
 
@@ -816,6 +829,17 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     )
 
 
+def _merge_signal_counts(
+    statistics_counts: dict[str, int],
+    detected_counts: dict[str, int],
+) -> dict[str, int]:
+    """Merge statistic-derived and sample-derived signal counts."""
+    merged = dict(statistics_counts)
+    for name, count in detected_counts.items():
+        merged[name] = max(merged.get(name, 0), count)
+    return merged
+
+
 # ── Test name parsing (internal three-part split) ───────────────────
 
 
@@ -872,7 +896,20 @@ def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
 
     all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
     has_genai = any(a.startswith("gen_ai.") for a in all_present)
-    if not has_genai and not r.detected_span_types:
+    merged_events = _merge_signal_counts(r.seen_events, r.detected_events)
+    merged_metrics = _merge_signal_counts(r.seen_metrics, r.detected_metrics)
+    event_statuses = {
+        name: ("present" if merged_events.get(name, 0) > 0 else "absent")
+        for name in GENAI_EVENT_TYPES
+    }
+    metric_statuses = {
+        name: ("present" if merged_metrics.get(name, 0) > 0 else "absent")
+        for name in GENAI_METRIC_TYPES
+    }
+    has_genai_signals = any(status == "present" for status in event_statuses.values()) or any(
+        status == "present" for status in metric_statuses.values()
+    )
+    if not has_genai and not r.detected_span_types and not has_genai_signals:
         return None
 
     # Compute span-type attribute statuses.
@@ -906,14 +943,17 @@ def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
             for attr in attr_names
         }
 
-    if not span_types:
+    if not span_types and not has_genai_signals:
         return None
 
     path = _data_path_from_test_name(test_name)
 
-    data = {
-        "span_types": span_types,
+    data: dict[str, dict[str, str] | dict[str, dict[str, str]]] = {
+        "events": event_statuses,
+        "metrics": metric_statuses,
     }
+    if span_types:
+        data["span_types"] = span_types
 
     return path, data
 
