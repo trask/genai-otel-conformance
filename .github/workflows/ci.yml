@@ -104,6 +104,7 @@ jobs:
 
       - name: Install test dependencies
         run: |
+          pip install -e tests/mock-server
           pip install -e tests/python
           pip install -r ${{ matrix.test.reqs }}
 
@@ -154,6 +155,9 @@ jobs:
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
+      - name: Install mock server dependencies
+        run: pip install -e tests/mock-server
+
       - name: Run conformance test
         run: python run_test.py "java-${{ matrix.test.name }}"
 
@@ -197,6 +201,9 @@ jobs:
 
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
+
+      - name: Install mock server dependencies
+        run: pip install -e tests/mock-server
 
       - name: Build .NET test
         run: dotnet build ${{ matrix.test.dir }}/
@@ -244,6 +251,9 @@ jobs:
 
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
+
+      - name: Install mock server dependencies
+        run: pip install -e tests/mock-server
 
       - name: Install JS dependencies
         run: cd ${{ matrix.test.dir }} && npm install
