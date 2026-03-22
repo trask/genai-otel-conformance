@@ -3,21 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:openllmetry": "npx tsx test_openllmetry.ts"
+    "test:openllmetry": "tsx test_openllmetry.ts"
   },
   "dependencies": {
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/api-logs": "0.213.0",
-    "@opentelemetry/exporter-logs-otlp-grpc": "0.213.0",
-    "@opentelemetry/exporter-metrics-otlp-grpc": "0.213.0",
-    "@opentelemetry/exporter-trace-otlp-grpc": "0.213.0",
-    "@opentelemetry/sdk-logs": "0.213.0",
-    "@opentelemetry/sdk-metrics": "2.6.0",
-    "@opentelemetry/sdk-trace-base": "2.6.0",
-    "@opentelemetry/sdk-trace-node": "2.6.0",
     "@llamaindex/openai": "0.4.23",
     "@traceloop/instrumentation-llamaindex": "0.22.6",
-    "llamaindex": "0.12.1",
-    "tsx": "4.21.0"
+    "llamaindex": "0.12.1"
   }
 }

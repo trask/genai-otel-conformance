@@ -352,7 +352,7 @@ def _noop_prebuild(_lib: str) -> None:
 
 
 def _js_prebuild_test(lib: str) -> None:
-    test_dir = Path(f"tests/js/{lib}")
+    test_dir = Path("tests/js")
     npm = _npm_cmd()
     print(f"=== Installing JS dependencies in {test_dir} ===")
     subprocess.run([npm, "install", "--silent"], cwd=test_dir, check=True)
@@ -380,11 +380,16 @@ def _python_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestComma
 
 
 def _js_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
-    test_dir = Path(f"tests/js/{lib}")
+    workspace_dir = Path("tests/js")
+    test_dir = workspace_dir / lib
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
     npm = _npm_cmd()
-    test_proc = subprocess.run([npm, "run", f"test:{ecosystem}"], cwd=test_dir, env=env)
+    test_proc = subprocess.run(
+        [npm, "--workspace", f"./{lib}", "run", f"test:{ecosystem}"],
+        cwd=workspace_dir,
+        env=env,
+    )
     return TestCommandResult(True, test_proc.returncode)
 
 

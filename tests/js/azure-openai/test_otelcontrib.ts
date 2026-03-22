@@ -6,37 +6,17 @@
  */
 
 import { OpenAIInstrumentation } from "@opentelemetry/instrumentation-openai";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
-import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
-import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
-import * as api from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
+
+import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const MOCK_BASE_URL = process.env.MOCK_LLM_URL!;
-const OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
 
 async function main() {
   console.log("=== OTel Contrib JS: Azure OpenAI Conformance Test ===");
 
   // Set up OTel providers
-  const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider({ spanProcessors: [new BatchSpanProcessor(traceExporter)] });
-  provider.register();
-
-  const metricReader = new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({ url: OTLP_ENDPOINT }),
-    exportIntervalMillis: 5000,
-  });
-  const meterProvider = new MeterProvider({ readers: [metricReader] });
-  api.metrics.setGlobalMeterProvider(meterProvider);
-
-  const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
-  logs.setGlobalLoggerProvider(loggerProvider);
+  const otel = setupOtel();
+  const { provider, meterProvider } = otel;
 
   // Create instrumentation and set providers
   const instrumentation = new OpenAIInstrumentation();
@@ -89,14 +69,7 @@ async function main() {
   });
   console.log(`    -> embedding dim: ${embResp.data[0].embedding.length}`);
 
-  console.log("Flushing telemetry...");
-  await provider.forceFlush();
-  await meterProvider.forceFlush();
-  await loggerProvider.forceFlush();
-  await provider.shutdown();
-  await meterProvider.shutdown();
-  await loggerProvider.shutdown();
-  console.log("Done.");
+  await flushAndShutdownOtel(otel);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

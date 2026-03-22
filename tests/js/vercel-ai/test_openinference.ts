@@ -10,45 +10,18 @@
  * OpenInference-compatible spans before export.
  */
 
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
-import { metrics } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
-import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
-import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
 import { OpenInferenceSimpleSpanProcessor } from "@arizeai/openinference-vercel";
 import { generateText, streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
-const MOCK_BASE_URL = process.env.MOCK_LLM_URL! + "/v1";
-const OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
+import { flushAndShutdownOtel, setupOtel } from "../otel";
 
-function setupOtel() {
-  const traceExporter = new OTLPTraceExporter({ url: OTLP_ENDPOINT });
-  const provider = new NodeTracerProvider({
-    spanProcessors: [
-      new OpenInferenceSimpleSpanProcessor({
-        exporter: traceExporter,
-      }),
-    ],
-  });
-  provider.register();
+const nodeProcess = globalThis.process as NodeJS.Process & {
+  env: Record<string, string | undefined>;
+  exit(code?: number): never;
+};
 
-  const metricReader = new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({ url: OTLP_ENDPOINT }),
-    exportIntervalMillis: 5000,
-  });
-  const meterProvider = new MeterProvider({ readers: [metricReader] });
-  metrics.setGlobalMeterProvider(meterProvider);
-
-  const logExporter = new OTLPLogExporter({ url: OTLP_ENDPOINT });
-  const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor(logExporter)] });
-  logs.setGlobalLoggerProvider(loggerProvider);
-
-  return { provider, meterProvider, loggerProvider };
-}
+const MOCK_BASE_URL = nodeProcess.env.MOCK_LLM_URL! + "/v1";
 
 async function runChat(openai: ReturnType<typeof createOpenAI>) {
   console.log("  [chat] basic chat completion");
@@ -78,7 +51,11 @@ async function runChatStreaming(openai: ReturnType<typeof createOpenAI>) {
 async function main() {
   console.log("=== OpenInference: Vercel AI SDK Conformance Test ===");
 
-  const { provider, meterProvider, loggerProvider } = setupOtel();
+  const otel = setupOtel({
+    createSpanProcessors: (traceExporter) => [
+      new OpenInferenceSimpleSpanProcessor({ exporter: traceExporter }),
+    ],
+  });
 
   const openai = createOpenAI({
     baseURL: MOCK_BASE_URL,
@@ -88,14 +65,7 @@ async function main() {
   await runChat(openai);
   await runChatStreaming(openai);
 
-  console.log("Flushing telemetry...");
-  await provider.forceFlush();
-  await meterProvider.forceFlush();
-  await loggerProvider.forceFlush();
-  await provider.shutdown();
-  await meterProvider.shutdown();
-  await loggerProvider.shutdown();
-  console.log("Done.");
+  await flushAndShutdownOtel(otel);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(e); nodeProcess.exit(1); });
