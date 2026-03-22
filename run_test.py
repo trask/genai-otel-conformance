@@ -47,15 +47,23 @@ import time
 import urllib.request
 import zipfile
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from functools import lru_cache
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from result_helpers import (
+from genai_otel_conformance.result_helpers import (
     build_signal_statuses,
     build_span_type_statuses,
     present_attributes,
+)
+from genai_otel_conformance.results import (
+    GENAI_EVENT_TYPES,
+    GENAI_METRIC_TYPES,
+    LANGUAGE_DISPLAY_NAMES,
+    SPAN_TYPE_ORDER,
+    SPAN_TYPE_SPECS,
+    parse_result_dir,
+    split_test_name,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -210,42 +218,10 @@ def ensure_weaver() -> Path:
 
 # ── Language / ecosystem configuration ──────────────────────────────
 
-# Language directory names → display language names.
-_LANG_DIRS = {"python": "Python", "java": "Java", "js": "JS", "dotnet": "C#"}
-
-
-def _load_ecosystems() -> tuple[
-    dict[str, str],
-    dict[tuple[str, str], str],
-]:
-    """Load ecosystem definitions from tests/ecosystems.json.
-
-    Returns (ecosystem_display, ecosystem_repos).
-    """
-    eco_file = TESTS_DIR / "ecosystems.json"
-    if not eco_file.is_file():
-        return {}, {}
-    data = json.loads(eco_file.read_text(encoding="utf-8"))
-    display: dict[str, str] = {}
-    repos: dict[tuple[str, str], str] = {}
-    for eco, info in data.items():
-        display[eco] = info.get("display_name", eco)
-        for lang_slug, repo in info.get("repos", {}).items():
-            lang_display = _LANG_DIRS.get(lang_slug, lang_slug)
-            repos[(eco, lang_display)] = repo
-    return display, repos
-
-
-ECOSYSTEM_DISPLAY, ECOSYSTEM_REPOS = _load_ecosystems()
+_LANG_DIRS = LANGUAGE_DISPLAY_NAMES
 
 
 # ── Data structures ──────────────────────────────────────────────────
-
-
-class TestName(NamedTuple):
-    language: str
-    library: str
-    ecosystem: str
 
 
 class TestCommandResult(NamedTuple):
@@ -255,579 +231,10 @@ class TestCommandResult(NamedTuple):
 
 @dataclass(frozen=True)
 class LanguageAdapter:
-    read_dependency_versions: Callable[[Path, str], dict[str, str]]
     install_dependencies: Callable[[str, str], None]
     prebuild_test: Callable[[str], None]
     run_test: Callable[[str, str, dict[str, str]], TestCommandResult]
     list_tests: Callable[[], list[str]]
-
-
-@dataclass
-class TestResult:
-    language: str
-    library: str
-    ecosystem: str
-    statistics: dict | None
-    violation_count: int
-    violation_messages: list[str]
-    entity_counts: dict[str, int]
-    seen_attrs: dict[str, int]
-    seen_non_registry_attrs: dict[str, int]
-    seen_events: dict[str, int]
-    seen_metrics: dict[str, int]
-    has_data: bool
-    detected_span_types: set[str] = field(default_factory=set)
-    per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
-    detected_events: dict[str, int] = field(default_factory=dict)
-    detected_metrics: dict[str, int] = field(default_factory=dict)
-
-
-def parse_test_name(test_name: str) -> TestName:
-    """Parse a supported test name into display values.
-
-    Supported test names use the canonical format:
-        <lang>-<library>-<ecosystem>
-
-    Example:
-        python-openai-openllmetry
-    """
-    lang, library, ecosystem = _parse_test_name(test_name)
-    return TestName(_LANG_DIRS[lang], library, ecosystem)
-
-
-# ── JSON parsing ─────────────────────────────────────────────────────
-
-
-def try_parse_json(content):
-    """Parse JSON content — handles single object, array, or JSONL."""
-    objects = []
-
-    # Single JSON object or array
-    try:
-        data = json.loads(content)
-        if isinstance(data, list):
-            objects.extend(data)
-        elif isinstance(data, dict):
-            objects.append(data)
-        return objects
-    except json.JSONDecodeError:
-        pass
-
-    # JSONL
-    for line in content.strip().split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            objects.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-
-    return objects
-
-
-# ── Span type specifications (from gen-ai-spans.md and gen-ai-agent-spans.md) ─
-
-# Expected attributes per span type, grouped by requirement level.
-# Source: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-spans.md
-# Source: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-agent-spans.md
-
-# Shared attribute lists to avoid repetition across span type specs.
-_COMMON_REQUIRED = ["gen_ai.operation.name"]
-_PROVIDER_REQUIRED = ["gen_ai.provider.name", "gen_ai.system"]
-_COMMON_COND_REQUIRED = ["error.type"]
-_CLIENT_COND_REQUIRED = ["gen_ai.request.model", "server.port"]
-_CLIENT_RECOMMENDED = ["server.address"]
-_INFERENCE_COND_REQUIRED = [
-    "gen_ai.conversation.id",
-    "gen_ai.output.type",
-    "gen_ai.request.choice.count",
-    "gen_ai.request.seed",
-]
-_INFERENCE_RECOMMENDED = [
-    "gen_ai.request.frequency_penalty",
-    "gen_ai.request.max_tokens",
-    "gen_ai.request.presence_penalty",
-    "gen_ai.request.stop_sequences",
-    "gen_ai.request.temperature",
-    "gen_ai.request.top_p",
-    "gen_ai.response.finish_reasons",
-    "gen_ai.response.id",
-    "gen_ai.response.model",
-    "gen_ai.usage.cache_creation.input_tokens",
-    "gen_ai.usage.cache_read.input_tokens",
-    "gen_ai.usage.input_tokens",
-    "gen_ai.usage.output_tokens",
-]
-
-SPAN_TYPE_SPECS = {
-    "inference": {
-        "label": "Inference",
-        "expected_kind": "client",
-        "discriminator_attrs": {
-            "gen_ai.response.finish_reasons", "gen_ai.response.id",
-            "gen_ai.usage.output_tokens", "gen_ai.request.max_tokens",
-            "gen_ai.request.temperature", "gen_ai.output.type",
-            "gen_ai.usage.input_tokens",
-        },
-        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED,
-        "recommended": _INFERENCE_RECOMMENDED + [
-            "gen_ai.request.top_k",
-        ] + _CLIENT_RECOMMENDED,
-    },
-    "embeddings": {
-        "label": "Embeddings",
-        "expected_kind": "client",
-        "discriminator_attrs": {
-            "gen_ai.embeddings.dimension.count", "gen_ai.request.encoding_formats",
-        },
-        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED,
-        "recommended": [
-            "gen_ai.embeddings.dimension.count",
-            "gen_ai.request.encoding_formats",
-            "gen_ai.response.model",
-            "gen_ai.usage.input_tokens",
-        ] + _CLIENT_RECOMMENDED,
-    },
-    "retrieval": {
-        "label": "Retrieval",
-        "expected_kind": "client",
-        "discriminator_attrs": {
-            "gen_ai.data_source.id",
-        },
-        "required": _COMMON_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + [
-            "gen_ai.data_source.id",
-            "gen_ai.provider.name",
-            "gen_ai.system",
-        ] + _CLIENT_COND_REQUIRED,
-        "recommended": [
-            "gen_ai.request.top_k",
-        ] + _CLIENT_RECOMMENDED,
-    },
-    "execute_tool": {
-        "label": "Execute Tool",
-        "expected_kind": "internal",
-        "discriminator_attrs": {
-            "gen_ai.tool.call.id", "gen_ai.tool.name", "gen_ai.tool.type",
-        },
-        "required": _COMMON_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED,
-        "recommended": [
-            "gen_ai.tool.call.id",
-            "gen_ai.tool.description",
-            "gen_ai.tool.name",
-            "gen_ai.tool.type",
-        ],
-    },
-    "create_agent": {
-        "label": "Create Agent",
-        "expected_kind": "client",
-        "discriminator_attrs": {
-            "gen_ai.agent.id", "gen_ai.agent.name",
-        },
-        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + [
-            "gen_ai.agent.description",
-            "gen_ai.agent.id",
-            "gen_ai.agent.name",
-            "gen_ai.agent.version",
-        ],
-        "recommended": _CLIENT_RECOMMENDED,
-    },
-    "invoke_agent": {
-        "label": "Invoke Agent",
-        "expected_kind": "client",
-        "discriminator_attrs": {
-            "gen_ai.agent.id", "gen_ai.agent.name",
-        },
-        "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED + [
-            "gen_ai.agent.description",
-            "gen_ai.agent.id",
-            "gen_ai.agent.name",
-            "gen_ai.agent.version",
-            "gen_ai.data_source.id",
-        ],
-        "recommended": _INFERENCE_RECOMMENDED + _CLIENT_RECOMMENDED,
-    },
-    "invoke_workflow": {
-        "label": "Invoke Workflow",
-        "expected_kind": "internal",
-        "discriminator_attrs": {
-            "gen_ai.workflow.name",
-        },
-        "required": _COMMON_REQUIRED,
-        "conditionally_required": _COMMON_COND_REQUIRED + [
-            "gen_ai.workflow.name",
-        ],
-        "recommended": [],
-    },
-}
-
-SPAN_TYPE_ORDER = ["create_agent", "invoke_agent", "invoke_workflow", "inference", "embeddings", "retrieval", "execute_tool"]
-
-GENAI_EVENT_TYPES = [
-    "gen_ai.system.message",
-    "gen_ai.user.message",
-    "gen_ai.assistant.message",
-    "gen_ai.tool.message",
-    "gen_ai.choice",
-]
-
-GENAI_METRIC_TYPES = [
-    "gen_ai.client.token.usage",
-    "gen_ai.client.operation.duration",
-]
-
-
-# ── Results parsing ──────────────────────────────────────────────────
-
-@lru_cache(maxsize=None)
-def _load_test_metadata(lang: str, library: str) -> dict:
-    """Load metadata.json for a test directory."""
-    meta_file = TESTS_DIR / lang / library / "metadata.json"
-    if not meta_file.is_file():
-        return {}
-    try:
-        return json.loads(meta_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _version_package_from_metadata(lang: str, library: str, ecosystem: str) -> str:
-    """Return the exact manifest package key used for version display."""
-    metadata = _load_test_metadata(lang, library)
-    version_packages = metadata.get("version_packages", {})
-    if not isinstance(version_packages, dict):
-        return ""
-    package_name = version_packages.get(ecosystem, "")
-    return package_name if isinstance(package_name, str) else ""
-
-
-def _read_deps_from_test_dir(
-    lang: str, library: str, ecosystem: str,
-) -> dict[str, str]:
-    """Read dependency versions from the test's dependency file.
-
-    Returns a dict of {package_name: version}.
-    """
-    test_dir = TESTS_DIR / lang / library
-    adapter = LANGUAGE_ADAPTERS.get(lang)
-    if adapter is None:
-        return {}
-
-    return adapter.read_dependency_versions(test_dir, ecosystem)
-
-
-def extract_version_from_deps(
-    lang: str, library: str, ecosystem: str,
-) -> str:
-    """Extract the display version from checked-in dependency files.
-
-    Reads requirements-*.txt (Python), package.json (JS), build.gradle.kts
-    (Java), or *.csproj (.NET) and returns the version of the exact package
-    named in metadata.json for this ecosystem, or ``""`` when not found.
-    """
-    versions = _read_deps_from_test_dir(lang, library, ecosystem)
-    package_name = _version_package_from_metadata(lang, library, ecosystem)
-    if not package_name:
-        return ""
-    return versions.get(package_name, "")
-
-
-def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
-    """Classify a span into span types using heuristics on individual span data.
-
-    Returns a set of matching span type keys (e.g. {"embeddings", "inference"}).
-    This enables detection of non-conforming spans that lack standard
-    discriminator attributes.
-    """
-    types: set[str] = set()
-    name_lower = span_name.lower()
-    op_name = str(span_attrs.get("gen_ai.operation.name", "")).lower()
-    oi_kind = str(span_attrs.get("openinference.span.kind", "")).upper()
-    llm_type = str(span_attrs.get("llm.request.type", "")).lower()
-    tl_kind = str(span_attrs.get("traceloop.span.kind", "")).lower()
-
-    # ── Embeddings ────────────────────────────────────────────────
-    if "embed" in name_lower:
-        types.add("embeddings")
-    elif span_attrs.get("embedding.model_name"):
-        types.add("embeddings")
-    elif oi_kind == "EMBEDDING":
-        types.add("embeddings")
-    elif llm_type in ("embedding", "embeddings"):
-        types.add("embeddings")
-    elif op_name in ("embedding", "embeddings"):
-        types.add("embeddings")
-
-    # ── Inference (chat / completion) ─────────────────────────────
-    if op_name == "chat":
-        types.add("inference")
-    elif oi_kind == "LLM":
-        types.add("inference")
-    elif llm_type in ("chat", "completion"):
-        types.add("inference")
-    elif op_name == "generate_content":
-        types.add("inference")
-    # js-vercel-ai-native: spans have gen_ai.response.* and gen_ai.usage.*
-    # but no gen_ai.operation.name
-    elif span_attrs.get("gen_ai.usage.output_tokens") is not None \
-            and span_attrs.get("gen_ai.response.finish_reasons") is not None:
-        types.add("inference")
-    # promptflow-native: openai_chat spans use llm.* attributes
-    elif span_attrs.get("llm.response.model") is not None \
-            and span_attrs.get("llm.usage.completion_tokens") is not None:
-        types.add("inference")
-
-    # ── Create Agent ──────────────────────────────────────────────
-    if op_name == "create_agent":
-        types.add("create_agent")
-
-    # ── Invoke Agent ──────────────────────────────────────────────
-    if oi_kind == "AGENT":
-        types.add("invoke_agent")
-    elif op_name == "invoke_agent":
-        types.add("invoke_agent")
-    elif span_attrs.get("gen_ai.agent.name") or span_attrs.get("gen_ai.agent.id"):
-        if op_name != "create_agent":
-            types.add("invoke_agent")
-    elif span_attrs.get("crewai.agent.id") or span_attrs.get("crewai.agent.role"):
-        types.add("invoke_agent")
-
-    # ── Execute Tool ──────────────────────────────────────────────
-    if op_name == "execute_tool":
-        types.add("execute_tool")
-    elif oi_kind == "TOOL":
-        types.add("execute_tool")
-    elif span_attrs.get("gen_ai.tool.name") or span_attrs.get("gen_ai.tool.call.id"):
-        types.add("execute_tool")
-
-    # ── Invoke Workflow ───────────────────────────────────────────
-    if op_name == "invoke_workflow":
-        types.add("invoke_workflow")
-    elif span_attrs.get("traceloop.workflow.name"):
-        types.add("invoke_workflow")
-    elif name_lower == "crewai.workflow":
-        types.add("invoke_workflow")
-    elif span_attrs.get("crewai.crew.id"):
-        types.add("invoke_workflow")
-
-    # ── Retrieval ─────────────────────────────────────────────────
-    if op_name == "retrieval":
-        types.add("retrieval")
-    elif oi_kind == "RETRIEVER":
-        types.add("retrieval")
-    elif span_attrs.get("gen_ai.data_source.id"):
-        types.add("retrieval")
-
-    return types
-
-
-def _extract_span_types_from_samples(
-    all_objects: list[dict],
-) -> tuple[set[str], dict[str, set[str]]]:
-    """Scan Weaver sample spans, classify each one, and track per-type attrs.
-
-    Returns (detected_span_types, per_type_attrs) where per_type_attrs maps
-    each span-type key to the set of attribute names present on spans of that type.
-    """
-    span_types: set[str] = set()
-    per_type_attrs: dict[str, set[str]] = {}
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        samples = obj.get("samples", [])
-        for sample in samples:
-            span = sample.get("span")
-            if not span:
-                continue
-            span_name = span.get("name", "")
-            # Build a simple attr-name -> value dict from the span's attributes.
-            attrs: dict[str, object] = {}
-            for attr in span.get("attributes", []):
-                attrs[attr.get("name", "")] = attr.get("value")
-            classified = _classify_span(span_name, attrs)
-            span_types |= classified
-            attr_names = set(attrs.keys())
-            for st in classified:
-                if st not in per_type_attrs:
-                    per_type_attrs[st] = set()
-                per_type_attrs[st] |= attr_names
-    return span_types, per_type_attrs
-
-
-def _extract_events_from_samples(all_objects: list[dict]) -> dict[str, int]:
-    """Extract GenAI event names from log records in samples."""
-    events: dict[str, int] = {}
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        for sample in obj.get("samples", []):
-            log = sample.get("log")
-            if not log:
-                continue
-            event_name = log.get("event_name", "")
-            if event_name.startswith("gen_ai."):
-                events[event_name] = events.get(event_name, 0) + 1
-    return events
-
-
-def _extract_metrics_from_samples(all_objects: list[dict]) -> dict[str, int]:
-    """Extract GenAI metric names from metric records in samples."""
-    metrics: dict[str, int] = {}
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        for sample in obj.get("samples", []):
-            metric = sample.get("metric")
-            if not metric:
-                continue
-            metric_name = metric.get("name", "")
-            if metric_name.startswith("gen_ai."):
-                metrics[metric_name] = metrics.get(metric_name, 0) + 1
-    return metrics
-
-
-def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
-    """Parse a single test's Weaver output directory into a TestResult."""
-    if not result_dir.is_dir():
-        return None
-
-    all_objects = []
-
-    for json_file in sorted(result_dir.glob("**/*.json")):
-        try:
-            content = json_file.read_text(encoding="utf-8")
-            all_objects.extend(try_parse_json(content))
-        except (OSError, ValueError) as e:
-            print(f"Warning: Could not parse {json_file}: {e}", file=sys.stderr)
-
-    statistics = None
-    for obj in all_objects:
-        if not isinstance(obj, dict):
-            continue
-        if "statistics" in obj and isinstance(obj["statistics"], dict):
-            statistics = obj["statistics"]
-        elif "registry_coverage" in obj or "advice_level_counts" in obj:
-            statistics = obj
-
-    # Extract seen_registry_attributes with non-zero counts
-    seen_attrs = {}
-    if statistics:
-        for attr, count in statistics.get("seen_registry_attributes", {}).items():
-            if count > 0:
-                seen_attrs[attr] = count
-
-    # Extract seen non-registry attributes with non-zero counts
-    seen_non_registry_attrs = {}
-    if statistics:
-        for attr, count in statistics.get("seen_non_registry_attributes", {}).items():
-            if count > 0:
-                seen_non_registry_attrs[attr] = count
-
-    # Extract seen events (registry and non-registry)
-    seen_events = {}
-    if statistics:
-        for attr, count in statistics.get("seen_registry_events", {}).items():
-            if count > 0:
-                seen_events[attr] = count
-        for attr, count in statistics.get("seen_non_registry_events", {}).items():
-            if count > 0:
-                seen_events[attr] = count
-
-    # Extract seen metrics (registry and non-registry)
-    seen_metrics = {}
-    if statistics:
-        for attr, count in statistics.get("seen_registry_metrics", {}).items():
-            if count > 0:
-                seen_metrics[attr] = count
-        for attr, count in statistics.get("seen_non_registry_metrics", {}).items():
-            if count > 0:
-                seen_metrics[attr] = count
-
-    # Violation count from weaver's authoritative advice_level_counts
-    violation_count = 0
-    if statistics:
-        violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
-
-    # Collect distinct advisory messages (filtered: skip "not stable").
-    # Uses advice_message_counts from statistics for completeness.
-    violation_messages: set[str] = set()
-    if statistics:
-        for msg in statistics.get("advice_message_counts", {}):
-            if "not stable" not in msg.lower():
-                violation_messages.add(msg)
-
-    # Entity counts from statistics
-    entity_counts = {}
-    if statistics:
-        entity_counts = statistics.get("total_entities_by_type", {})
-
-    try:
-        language, library, ecosystem = parse_test_name(test_name)
-    except ValueError:
-        print(f"Warning: Could not parse test name: {test_name}", file=sys.stderr)
-        return None
-
-    has_data = bool(statistics and statistics.get("total_entities", 0) > 0)
-
-    # Classify individual spans from samples for span-type detection.
-    detected_span_types, per_type_attrs = _extract_span_types_from_samples(all_objects)
-
-    # Extract GenAI events and metrics from log/metric samples.
-    detected_events = _extract_events_from_samples(all_objects)
-    detected_metrics = _extract_metrics_from_samples(all_objects)
-
-    # Also pick up gen_ai events from non-registry event statistics
-    # (Weaver may not include them in the registry yet).
-    if statistics:
-        for ev_name, count in statistics.get("seen_non_registry_events", {}).items():
-            if count > 0 and ev_name.startswith("gen_ai."):
-                detected_events[ev_name] = max(detected_events.get(ev_name, 0), count)
-
-        for metric_name, count in statistics.get("seen_non_registry_metrics", {}).items():
-            if count > 0 and metric_name.startswith("gen_ai."):
-                detected_metrics[metric_name] = max(detected_metrics.get(metric_name, 0), count)
-
-    return TestResult(
-        language=language,
-        library=library,
-        ecosystem=ecosystem,
-        statistics=statistics,
-        violation_count=violation_count,
-        violation_messages=sorted(violation_messages),
-        entity_counts=entity_counts,
-        seen_attrs=seen_attrs,
-        seen_non_registry_attrs=seen_non_registry_attrs,
-        seen_events=seen_events,
-        seen_metrics=seen_metrics,
-        has_data=has_data,
-        detected_span_types=detected_span_types,
-        per_type_attrs=per_type_attrs,
-        detected_events=detected_events,
-        detected_metrics=detected_metrics,
-    )
-
-
-# ── Test name parsing (internal three-part split) ───────────────────
-
-
-def _parse_test_name(name: str) -> tuple[str, str, str]:
-    """Parse a test name into language/library/ecosystem slugs."""
-    try:
-        lang, rest = name.split("-", 1)
-        lib, eco = rest.rsplit("-", 1)
-    except ValueError as exc:
-        raise ValueError(f"Invalid test name: {name}") from exc
-
-    if lang not in _LANG_DIRS or not lib or not eco:
-        raise ValueError(f"Invalid test name: {name}")
-
-    return lang, lib, eco
 
 
 # ── Test data generation ────────────────────────────────────────────
@@ -835,13 +242,13 @@ def _parse_test_name(name: str) -> tuple[str, str, str]:
 
 def _data_path_from_test_name(test_name: str) -> Path:
     """Compute the data file path from a test name."""
-    lang, lib, eco = _parse_test_name(test_name)
+    lang, lib, eco = split_test_name(test_name)
     return TESTS_DIR / lang / lib / f"data-{eco}.json"
 
 
 def _results_dir_from_test_name(test_name: str) -> Path:
     """Compute the results directory path from a test name."""
-    lang, lib, eco = _parse_test_name(test_name)
+    lang, lib, eco = split_test_name(test_name)
     return TESTS_DIR / lang / lib / "results" / eco
 
 
@@ -925,60 +332,6 @@ def _install_with_uv(*install_args: str, label: str) -> None:
         cwd=SCRIPT_DIR,
         check=True,
     )
-
-
-def _python_read_dependency_versions(test_dir: Path, ecosystem: str) -> dict[str, str]:
-    versions: dict[str, str] = {}
-    req_file = test_dir / f"requirements-{ecosystem}.txt"
-    if not req_file.exists():
-        return versions
-
-    for line in req_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if "==" not in line:
-            continue
-        pkg, ver = line.split("==", 1)
-        versions[pkg.strip()] = ver.strip()
-    return versions
-
-
-def _js_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
-    pkg_file = test_dir / "package.json"
-    if not pkg_file.exists():
-        return {}
-
-    try:
-        data = json.loads(pkg_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return dict(data.get("dependencies", {}))
-
-
-def _java_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
-    versions: dict[str, str] = {}
-    gradle_file = test_dir / "build.gradle.kts"
-    if not gradle_file.exists():
-        return versions
-
-    content = gradle_file.read_text(encoding="utf-8")
-    for match in re.finditer(r'implementation\("([^"]+)"\)', content):
-        coord = match.group(1)
-        parts = coord.rsplit(":", 1)
-        if len(parts) == 2:
-            versions[parts[0]] = parts[1]
-    return versions
-
-
-def _dotnet_read_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, str]:
-    versions: dict[str, str] = {}
-    for csproj in test_dir.glob("*.csproj"):
-        content = csproj.read_text(encoding="utf-8")
-        for match in re.finditer(
-            r'PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"',
-            content,
-        ):
-            versions[match.group(1)] = match.group(2)
-    return versions
 
 
 def _python_install_dependencies(lib: str, ecosystem: str) -> None:
@@ -1091,28 +444,24 @@ def _dotnet_list_tests() -> list[str]:
 
 LANGUAGE_ADAPTERS: dict[str, LanguageAdapter] = {
     "python": LanguageAdapter(
-        read_dependency_versions=_python_read_dependency_versions,
         install_dependencies=_python_install_dependencies,
         prebuild_test=_noop_prebuild,
         run_test=_python_run_test,
         list_tests=_python_list_tests,
     ),
     "js": LanguageAdapter(
-        read_dependency_versions=_js_read_dependency_versions,
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_js_prebuild_test,
         run_test=_js_run_test,
         list_tests=_js_list_tests,
     ),
     "java": LanguageAdapter(
-        read_dependency_versions=_java_read_dependency_versions,
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_java_prebuild_test,
         run_test=_java_run_test,
         list_tests=_java_list_tests,
     ),
     "dotnet": LanguageAdapter(
-        read_dependency_versions=_dotnet_read_dependency_versions,
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_dotnet_prebuild_test,
         run_test=_dotnet_run_test,
@@ -1127,7 +476,7 @@ def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     Returns whether the test was found and the test command's exit code.
     Weaver violations are handled separately from test-process failures.
     """
-    lang, lib, eco = _parse_test_name(name)
+    lang, lib, eco = split_test_name(name)
     adapter = LANGUAGE_ADAPTERS.get(lang)
     if adapter is None:
         return TestCommandResult(False, 0)
@@ -1189,7 +538,7 @@ def main() -> None:
     # ── Configuration from environment ──────────────────────────────
 
     try:
-        lang, lib, eco = _parse_test_name(test_name)
+        lang, lib, eco = split_test_name(test_name)
     except ValueError:
         print(f"ERROR: Invalid test name '{test_name}'", file=sys.stderr)
         print("Expected format: <lang>-<library>-<ecosystem>", file=sys.stderr)

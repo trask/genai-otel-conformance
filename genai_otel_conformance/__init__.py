@@ -1,0 +1,1 @@
+"""Shared support code for GenAI OTel conformance scripts."""

@@ -17,25 +17,31 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from result_helpers import merge_signal_counts, relevant_span_type_keys, span_type_present_attributes
-from run_test import (
-    _LANG_DIRS,
+from genai_otel_conformance.result_helpers import (
+    merge_signal_counts,
+    relevant_span_type_keys,
+    span_type_present_attributes,
+)
+from genai_otel_conformance.results import (
     ECOSYSTEM_DISPLAY,
     ECOSYSTEM_REPOS,
     GENAI_EVENT_TYPES,
     GENAI_METRIC_TYPES,
+    LANGUAGE_DISPLAY_NAMES,
+    NATIVE_REPOS,
     SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
+    TESTS_DIR,
     TestResult,
     extract_version_from_deps,
+    library_display_name,
     parse_result_dir,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
-TESTS_DIR = SCRIPT_DIR / "tests"
 
-# ── Library display names / native repos (from tests/<language>/<library>/metadata.json) ─
+_LANG_DIRS = LANGUAGE_DISPLAY_NAMES
 
 # Reverse of _LANG_DIRS: display language → directory slug.
 _LANG_SLUG = {v: k for k, v in _LANG_DIRS.items()}
@@ -54,53 +60,6 @@ def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     """
     lang_slug = _LANG_SLUG.get(language, language.lower())
     return f"{library}-{lang_slug}-{ecosystem}"
-
-
-def _discover_library_metadata() -> tuple[
-    dict[str, str],
-    dict[tuple[str, str], str],
-]:
-    """Scan tests/<language>/<library>/metadata.json for display_name and repo entries.
-
-    Returns (display_names, native_repos) where:
-    - display_names maps library directory slug → display name.
-    - native_repos maps (language slug, library slug) → GitHub repo slug
-      for native ecosystem tests.
-    Libraries that appear under multiple languages only need one metadata.json
-    with a display_name (the first one found wins, they should all agree).
-    Falls back to the slug itself when no metadata is found.
-    """
-    names: dict[str, str] = {}
-    repos: dict[tuple[str, str], str] = {}
-    if not TESTS_DIR.is_dir():
-        return names, repos
-    for lang_dir in sorted(TESTS_DIR.iterdir()):
-        if not lang_dir.is_dir() or lang_dir.name not in _LANG_DIRS:
-            continue
-        for lib_dir in sorted(lang_dir.iterdir()):
-            if not lib_dir.is_dir():
-                continue
-            slug = lib_dir.name
-            meta = lib_dir / "metadata.json"
-            if not meta.is_file():
-                continue
-            try:
-                data = json.loads(meta.read_text(encoding="utf-8"))
-                if slug not in names and "display_name" in data:
-                    names[slug] = data["display_name"]
-                if "repo" in data:
-                    repos[(lang_dir.name, slug)] = data["repo"]
-            except (OSError, json.JSONDecodeError):
-                pass
-    return names, repos
-
-
-_LIBRARY_DISPLAY_NAMES, NATIVE_REPOS = _discover_library_metadata()
-
-
-def _library_display_name(slug: str) -> str:
-    """Return the human-readable display name for a library slug."""
-    return _LIBRARY_DISPLAY_NAMES.get(slug, slug)
 
 # Deprecated attributes: shown with yellow background when present.
 DEPRECATED_ATTRS = {
@@ -242,7 +201,7 @@ def _prepare_details(
         (r for r in results.values()
          if _make_anchor_id(r.language, r.library, r.ecosystem) not in seen_ids),
         key=lambda r: (
-            _library_display_name(r.library).lower(),
+            library_display_name(r.library).lower(),
             r.language.lower(),
             r.ecosystem.lower(),
         ),
@@ -347,7 +306,7 @@ def _prepare_details(
         lib = entry["_lib"]
         eco = entry["_eco"]
         language = entry.get("language", _LANG_DIRS.get(lang, lang))
-        lib_display = entry.get("library", _library_display_name(lib))
+        lib_display = entry.get("library", library_display_name(lib))
         eco_display = entry.get("ecosystem", ECOSYSTEM_DISPLAY.get(eco, eco))
         label = f"{lib_display} ({language}) \u2014 {eco_display}"
         r = result_by_id.get(entry["test_name"])
@@ -356,7 +315,7 @@ def _prepare_details(
     for r in extra_results:
         lang_slug = _LANG_SLUG.get(r.language, r.language.lower())
         anchor_id = _make_anchor_id(r.language, r.library, r.ecosystem)
-        lib_display = _library_display_name(r.library)
+        lib_display = library_display_name(r.library)
         eco_display = ECOSYSTEM_DISPLAY.get(r.ecosystem, r.ecosystem)
         label = f"{lib_display} ({r.language}) \u2014 {eco_display}"
         _append(anchor_id, label, lang_slug, r.library, r.ecosystem, r.language, r)
@@ -379,7 +338,7 @@ def _load_test_data_files() -> list[dict]:
             eco = data_file.stem.removeprefix("data-")
             lib = data_file.parent.name
             lang = data_file.parent.parent.name
-            data.setdefault("library", _library_display_name(lib))
+            data.setdefault("library", library_display_name(lib))
             data.setdefault("language", _LANG_DIRS.get(lang, lang))
             data.setdefault("ecosystem", ECOSYSTEM_DISPLAY.get(eco, eco))
             data["test_name"] = _make_anchor_id(data["language"], lib, eco)
