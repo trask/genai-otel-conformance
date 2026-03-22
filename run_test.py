@@ -928,6 +928,11 @@ def _gradle_cmd(test_dir: Path) -> list[str]:
     return ["./gradlew"]
 
 
+def _npm_cmd() -> str:
+    """Return the platform-specific npm executable name."""
+    return "npm.cmd" if sys.platform == "win32" else "npm"
+
+
 def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     """Run the test command.
 
@@ -946,10 +951,7 @@ def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
         test_dir = Path(f"tests/js/{lib}")
         if not test_dir.is_dir():
             return TestCommandResult(False, 0)
-        npm = "npm.cmd" if sys.platform == "win32" else "npm"
-        install_proc = subprocess.run([npm, "install", "--silent"], cwd=test_dir, env=env)
-        if install_proc.returncode != 0:
-            return TestCommandResult(True, install_proc.returncode)
+        npm = _npm_cmd()
         test_proc = subprocess.run([npm, "run", f"test:{eco}"], cwd=test_dir, env=env)
         return TestCommandResult(True, test_proc.returncode)
     elif lang == "java":
@@ -1106,7 +1108,12 @@ def main() -> None:
         # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
         # can cause it to shut down before the test sends any data.
 
-        if lang == "java":
+        if lang == "js":
+            test_dir = Path(f"tests/js/{lib}")
+            npm = _npm_cmd()
+            print(f"=== Installing JS dependencies in {test_dir} ===")
+            subprocess.run([npm, "install", "--silent"], cwd=test_dir, check=True)
+        elif lang == "java":
             test_dir = Path(f"tests/java/{lib}")
             gradle = _gradle_cmd(test_dir)
             print(f"=== Pre-building Java project in {test_dir} ===")
