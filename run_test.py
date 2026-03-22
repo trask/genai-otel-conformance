@@ -393,9 +393,7 @@ def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestComman
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
     gradle = _gradle_cmd(test_dir)
-    build_file = test_dir / "build.gradle.kts"
-    gradle_task = "bootRun" if "spring-boot" in build_file.read_text() else "run"
-    proc = subprocess.run([*gradle, gradle_task], cwd=test_dir, env=env)
+    proc = subprocess.run([*gradle, "run"], cwd=test_dir, env=env)
     return TestCommandResult(True, proc.returncode)
 
 
@@ -429,8 +427,7 @@ def _java_list_tests() -> list[str]:
     tests: list[str] = []
     for build_file in sorted(Path("tests/java").glob("*/build.gradle.kts")):
         lib = build_file.parent.name
-        ecosystem = "native" if "spring-boot" in build_file.read_text() else "otelcontrib"
-        tests.append(f"java-{lib}-{ecosystem}")
+        tests.append(f"java-{lib}-otelcontrib")
     return tests
 
 
