@@ -437,16 +437,26 @@ def _has_result_directories() -> bool:
     return any(d.is_dir() for d in TESTS_DIR.glob("*/*/results/*"))
 
 
-def generate_dashboard_html(details_available: bool) -> str:
+def _render_template(template_name: str, **context: object) -> str:
+    """Render a dashboard template with shared environment setup."""
+    import jinja2
+
+    css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+        autoescape=jinja2.select_autoescape(["html"]),
+    )
+    template = env.get_template(template_name)
+    return template.render(css=css, **context)
+
+
+def generate_dashboard_html(test_data_entries: list[dict], details_available: bool) -> str:
     """Generate the dashboard HTML with span heatmap tables.
 
     All dashboard heatmaps come from committed data-*.json files.
     """
-    import jinja2
-
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    test_data_entries = _load_test_data_files()
     heatmaps = _prepare_heatmaps_from_data(test_data_entries, details_available)
     event_heatmap = _prepare_signal_heatmap(
         test_data_entries,
@@ -463,17 +473,13 @@ def generate_dashboard_html(details_available: bool) -> str:
         details_available,
     )
 
-    css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
-
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
-        autoescape=jinja2.select_autoescape(["html"]),
-    )
-    template = env.get_template("dashboard.html")
-    return template.render(
-        css=css, now=now, heatmaps=heatmaps,
+    return _render_template(
+        "dashboard.html",
+        now=now,
+        heatmaps=heatmaps,
         details_available=details_available,
-        event_heatmap=event_heatmap, metric_heatmap=metric_heatmap,
+        event_heatmap=event_heatmap,
+        metric_heatmap=metric_heatmap,
     )
 
 
@@ -482,20 +488,10 @@ def generate_details_html(
     test_data_entries: list[dict],
 ) -> str:
     """Generate the details HTML from Weaver results."""
-    import jinja2
-
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     details = _prepare_details(results, test_data_entries)
-
-    css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
-
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
-        autoescape=jinja2.select_autoescape(["html"]),
-    )
-    template = env.get_template("details.html")
-    return template.render(css=css, now=now, details=details)
+    return _render_template("details.html", now=now, details=details)
 
 
 # ── Main ─────────────────────────────────────────────────────────────
@@ -526,7 +522,7 @@ def main():
     details_available = bool(test_data_entries)
 
     # Dashboard (index.html) always generated from data files only.
-    dashboard_html = generate_dashboard_html(details_available)
+    dashboard_html = generate_dashboard_html(test_data_entries, details_available)
     (out / "index.html").write_text(dashboard_html, encoding="utf-8")
     print(f"Dashboard written to {out / 'index.html'}")
 
