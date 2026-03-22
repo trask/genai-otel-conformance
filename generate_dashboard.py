@@ -17,6 +17,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from result_helpers import merge_signal_counts, relevant_span_type_keys, span_type_present_attributes
 from run_test import (
     _LANG_DIRS,
     ECOSYSTEM_DISPLAY,
@@ -253,25 +254,9 @@ def _prepare_details(
                 detail["entity_summary"] = "0 entities"
 
         if r and r.has_data:
-
-            # Span-type attribute checklists
-            all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
-
-            for st_key in SPAN_TYPE_ORDER:
+            for st_key in relevant_span_type_keys(r, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS):
                 spec = SPAN_TYPE_SPECS[st_key]
-                all_spec_attrs: set[str] = set()
-                for level in ("required", "conditionally_required", "recommended"):
-                    all_spec_attrs.update(spec.get(level, []))
-
-                discriminators = spec.get("discriminator_attrs", set())
-                if discriminators:
-                    if not ((all_present & discriminators)
-                            or st_key in r.detected_span_types):
-                        continue
-                elif not (all_present & all_spec_attrs):
-                    continue
-
-                type_present = r.per_type_attrs.get(st_key, all_present)
+                type_present = span_type_present_attributes(r, st_key)
                 groups = []
                 for level, level_label in [("required", "Required"),
                                            ("conditionally_required", "Conditionally Required"),
@@ -297,14 +282,14 @@ def _prepare_details(
                     for a, c in sorted(r.seen_non_registry_attrs.items())
                 ]
 
-            merged_events = _merge_signal_counts(r.seen_events, r.detected_events)
+            merged_events = merge_signal_counts(r.seen_events, r.detected_events)
             if merged_events:
                 detail["events"] = [
                     {"name": a, "count": c}
                     for a, c in sorted(merged_events.items())
                 ]
 
-            merged_metrics = _merge_signal_counts(r.seen_metrics, r.detected_metrics)
+            merged_metrics = merge_signal_counts(r.seen_metrics, r.detected_metrics)
             if merged_metrics:
                 detail["metrics"] = [
                     {"name": a, "count": c}
@@ -435,17 +420,6 @@ def _prepare_heatmaps_from_data(
         heatmaps.append({"label": st_label, "columns": columns, "rows": rows})
 
     return heatmaps
-
-
-def _merge_signal_counts(
-    statistics_counts: dict[str, int],
-    detected_counts: dict[str, int],
-) -> dict[str, int]:
-    """Merge statistic-derived and sample-derived signal counts."""
-    merged = dict(statistics_counts)
-    for name, count in detected_counts.items():
-        merged[name] = max(merged.get(name, 0), count)
-    return merged
 
 
 def _prepare_signal_heatmap(

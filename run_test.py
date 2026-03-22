@@ -52,6 +52,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
+from result_helpers import (
+    build_signal_statuses,
+    build_span_type_statuses,
+    present_attributes,
+)
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 VERSIONS_FILE = SCRIPT_DIR / "versions.env"
@@ -807,17 +813,6 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     )
 
 
-def _merge_signal_counts(
-    statistics_counts: dict[str, int],
-    detected_counts: dict[str, int],
-) -> dict[str, int]:
-    """Merge statistic-derived and sample-derived signal counts."""
-    merged = dict(statistics_counts)
-    for name, count in detected_counts.items():
-        merged[name] = max(merged.get(name, 0), count)
-    return merged
-
-
 # ── Test name parsing (internal three-part split) ───────────────────
 
 
@@ -872,54 +867,14 @@ def generate_single_test_data(test_name: str) -> tuple[Path, dict] | None:
     if r is None or not r.has_data:
         return None
 
-    all_present = set(r.seen_attrs) | set(r.seen_non_registry_attrs)
+    all_present = present_attributes(r)
     has_genai = any(a.startswith("gen_ai.") for a in all_present)
-    merged_events = _merge_signal_counts(r.seen_events, r.detected_events)
-    merged_metrics = _merge_signal_counts(r.seen_metrics, r.detected_metrics)
-    event_statuses = {
-        name: ("present" if merged_events.get(name, 0) > 0 else "absent")
-        for name in GENAI_EVENT_TYPES
-    }
-    metric_statuses = {
-        name: ("present" if merged_metrics.get(name, 0) > 0 else "absent")
-        for name in GENAI_METRIC_TYPES
-    }
+    event_statuses = build_signal_statuses(GENAI_EVENT_TYPES, r.seen_events, r.detected_events)
+    metric_statuses = build_signal_statuses(GENAI_METRIC_TYPES, r.seen_metrics, r.detected_metrics)
     has_genai_signals = any(status == "present" for status in event_statuses.values()) or any(
         status == "present" for status in metric_statuses.values()
     )
-    if not has_genai and not r.detected_span_types and not has_genai_signals:
-        return None
-
-    # Compute span-type attribute statuses.
-    span_types: dict[str, dict[str, str]] = {}
-    for st_key in SPAN_TYPE_ORDER:
-        spec = SPAN_TYPE_SPECS[st_key]
-
-        attr_names: list[str] = []
-        for level in ("required", "conditionally_required", "recommended"):
-            attr_names.extend(spec.get(level, []))
-        if not attr_names:
-            continue
-
-        all_spec_attrs: set[str] = set(attr_names)
-        discriminators = spec.get("discriminator_attrs", set())
-        is_relevant = False
-        if discriminators:
-            is_relevant = bool(all_present & discriminators) or st_key in r.detected_span_types
-        else:
-            is_relevant = bool(all_present & all_spec_attrs)
-
-        if not is_relevant:
-            continue
-
-        # Use per-span-type attribute presence when available;
-        # fall back to global presence for span types not detected
-        # via sample classification (e.g. when only Weaver stats exist).
-        type_present = r.per_type_attrs.get(st_key, all_present)
-        span_types[st_key] = {
-            attr: ("present" if attr in type_present else "absent")
-            for attr in attr_names
-        }
+    span_types = build_span_type_statuses(r, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
 
     if not span_types and not has_genai_signals:
         return None
