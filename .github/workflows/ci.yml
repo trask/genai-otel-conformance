@@ -99,14 +99,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
       - name: Install test dependencies
         run: |
-          pip install -e tests/mock-server
-          pip install -e tests/python
-          pip install -r ${{ matrix.test.reqs }}
+          uv pip install --system -e tests/mock-server
+          uv pip install --system -e tests/python
+          uv pip install --system -r ${{ matrix.test.reqs }}
 
       - name: Run conformance test
         run: python run_test.py "python-${{ matrix.test.name }}"
@@ -152,11 +154,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
       - name: Install mock server dependencies
-        run: pip install -e tests/mock-server
+        run: uv pip install --system -e tests/mock-server
 
       - name: Run conformance test
         run: python run_test.py "java-${{ matrix.test.name }}"
@@ -199,11 +203,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
       - name: Install mock server dependencies
-        run: pip install -e tests/mock-server
+        run: uv pip install --system -e tests/mock-server
 
       - name: Build .NET test
         run: dotnet build ${{ matrix.test.dir }}/
@@ -249,11 +255,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install Weaver
         run: .github/scripts/install-weaver.sh
 
       - name: Install mock server dependencies
-        run: pip install -e tests/mock-server
+        run: uv pip install --system -e tests/mock-server
 
       - name: Install JS dependencies
         run: cd ${{ matrix.test.dir }} && npm install
@@ -292,8 +300,10 @@ jobs:
         with:
           python-version: "3.14"
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install dashboard dependencies
-        run: pip install jinja2
+        run: uv pip install --system jinja2
 
       - name: Generate dashboard
         run: python generate_dashboard.py --output-dir docs

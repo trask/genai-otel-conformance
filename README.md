@@ -26,19 +26,20 @@ Mock LLM Server (no API keys needed)
 ### Prerequisites
 
 - Python 3.12+ (test runner and mock server)
+- uv (for Python dependency installation)
 - Node.js 24+ (for JS/TS tests), Java 17+ (for Java tests), .NET 8+ (for .NET tests)
 
-Install shared Python dependencies used by the test runner and mock server:
+Install shared Python dependencies used by the test runner and mock server in your virtual environment:
 
 ```bash
-python -m pip install -e tests/mock-server
+uv pip install -e tests/mock-server
 ```
 
 If you are running a Python instrumentation test under `tests/python`, also install the Python test support package and that test's requirements in your virtual environment:
 
 ```bash
-python -m pip install -e tests/python
-python -m pip install -r tests/python/openai/requirements-otelcontrib.txt
+uv pip install -e tests/python
+uv pip install -r tests/python/openai/requirements-otelcontrib.txt
 ```
 
 Replace the requirements file with the Python test you plan to run.
