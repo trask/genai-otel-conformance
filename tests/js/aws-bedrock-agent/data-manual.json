@@ -1,0 +1,18 @@
+{
+  "span_types": {
+    "invoke_agent": {
+      "gen_ai.operation.name": "present",
+      "gen_ai.provider.name": "present",
+      "gen_ai.system": "absent",
+      "gen_ai.agent.id": "present",
+      "gen_ai.agent.name": "present",
+      "gen_ai.agent.description": "absent",
+      "gen_ai.agent.version": "absent",
+      "gen_ai.data_source.id": "absent",
+      "gen_ai.request.model": "absent",
+      "error.type": "absent",
+      "server.address": "present",
+      "server.port": "present"
+    }
+  }
+}

@@ -4,6 +4,7 @@
   "workspaces": [
     "anthropic",
     "aws-bedrock",
+    "aws-bedrock-agent",
     "azure-openai",
     "cohere",
     "langchain",

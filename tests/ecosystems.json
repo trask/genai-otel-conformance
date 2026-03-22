@@ -24,5 +24,8 @@
   },
   "native": {
     "display_name": "Native"
+  },
+  "manual": {
+    "display_name": "Manual"
   }
 }

@@ -400,12 +400,15 @@ def _js_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandRe
     return TestCommandResult(True, test_proc.returncode)
 
 
-def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+def _java_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
     test_dir = Path(f"tests/java/{lib}")
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
     gradle = _gradle_cmd(test_dir)
-    proc = subprocess.run([*gradle, "run"], cwd=test_dir, env=env)
+    cmd = [*gradle, "run"]
+    if ecosystem == "manual":
+        cmd.append("-Pmanual")
+    proc = subprocess.run(cmd, cwd=test_dir, env=env)
     return TestCommandResult(True, proc.returncode)
 
 
@@ -439,7 +442,15 @@ def _java_list_tests() -> list[str]:
     tests: list[str] = []
     for build_file in sorted(Path("tests/java").glob("*/build.gradle.kts")):
         lib = build_file.parent.name
-        tests.append(f"java-{lib}-otelcontrib")
+        # Discover ecosystems from data files
+        data_files = sorted(build_file.parent.glob("data-*.json"))
+        if data_files:
+            for df in data_files:
+                eco = df.stem.removeprefix("data-")
+                tests.append(f"java-{lib}-{eco}")
+        else:
+            # Default to otelcontrib when no data files exist
+            tests.append(f"java-{lib}-otelcontrib")
     return tests
 
 
