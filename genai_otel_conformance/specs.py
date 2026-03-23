@@ -29,6 +29,12 @@ _INFERENCE_RECOMMENDED = [
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
 ]
+_INFERENCE_OPT_IN = [
+    "gen_ai.input.messages",
+    "gen_ai.output.messages",
+    "gen_ai.system_instructions",
+    "gen_ai.tool.definitions",
+]
 
 SPAN_TYPE_SPECS: dict[str, dict] = {
     "inference": {
@@ -43,6 +49,7 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
         "required": _COMMON_REQUIRED + _PROVIDER_REQUIRED,
         "conditionally_required": _COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED,
         "recommended": _INFERENCE_RECOMMENDED + ["gen_ai.request.top_k"] + _CLIENT_RECOMMENDED,
+        "opt_in": _INFERENCE_OPT_IN,
     },
     "embeddings": {
         "label": "Embeddings",
@@ -58,6 +65,7 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
             "gen_ai.response.model",
             "gen_ai.usage.input_tokens",
         ] + _CLIENT_RECOMMENDED,
+        "opt_in": [],
     },
     "retrieval": {
         "label": "Retrieval",
@@ -70,6 +78,10 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
             "gen_ai.system",
         ] + _CLIENT_COND_REQUIRED,
         "recommended": ["gen_ai.request.top_k"] + _CLIENT_RECOMMENDED,
+        "opt_in": [
+            "gen_ai.retrieval.documents",
+            "gen_ai.retrieval.query.text",
+        ],
     },
     "execute_tool": {
         "label": "Execute Tool",
@@ -85,6 +97,10 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
             "gen_ai.tool.name",
             "gen_ai.tool.type",
         ],
+        "opt_in": [
+            "gen_ai.tool.call.arguments",
+            "gen_ai.tool.call.result",
+        ],
     },
     "create_agent": {
         "label": "Create Agent",
@@ -98,6 +114,7 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
             "gen_ai.agent.version",
         ],
         "recommended": _CLIENT_RECOMMENDED,
+        "opt_in": ["gen_ai.system_instructions"],
     },
     "invoke_agent": {
         "label": "Invoke Agent",
@@ -112,6 +129,7 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
             "gen_ai.data_source.id",
         ],
         "recommended": _INFERENCE_RECOMMENDED + _CLIENT_RECOMMENDED,
+        "opt_in": _INFERENCE_OPT_IN,
     },
     "invoke_workflow": {
         "label": "Invoke Workflow",
@@ -120,6 +138,10 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
         "required": _COMMON_REQUIRED,
         "conditionally_required": _COMMON_COND_REQUIRED + ["gen_ai.workflow.name"],
         "recommended": [],
+        "opt_in": [
+            "gen_ai.input.messages",
+            "gen_ai.output.messages",
+        ],
     },
 }
 
