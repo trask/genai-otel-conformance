@@ -94,31 +94,44 @@ def relevant_span_type_keys(
     return relevant
 
 
-def build_signal_statuses(
+def build_present_signal_entries(
     signal_names: list[str],
     statistics_counts: dict[str, int],
     detected_counts: dict[str, int],
-) -> dict[str, str]:
-    """Return present/absent statuses for the given signal names."""
+) -> dict[str, list[str]]:
+    """Return sparse per-signal attribute lists for observed signals."""
     merged_counts = merge_signal_counts(statistics_counts, detected_counts)
-    statuses: dict[str, str] = {}
-    for name in signal_names:
-        statuses[name] = "present" if merged_counts.get(name, 0) > 0 else "absent"
-    return statuses
+    return {
+        name: []
+        for name in signal_names
+        if merged_counts.get(name, 0) > 0
+    }
 
 
-def build_span_type_statuses(
+def build_statuses_from_present_names(
+    expected_names: list[str],
+    present_names: list[str] | set[str],
+) -> dict[str, str]:
+    """Expand a sparse present-name list into present/absent statuses."""
+    present = set(present_names)
+    return {
+        name: "present" if name in present else "absent"
+        for name in expected_names
+    }
+
+
+def build_span_type_present_names(
     result: TestResult,
     span_type_order: list[str],
     span_type_specs: dict[str, dict],
-) -> dict[str, dict[str, str]]:
-    """Return present/absent attribute statuses for relevant span types."""
-    statuses: dict[str, dict[str, str]] = {}
+) -> dict[str, list[str]]:
+    """Return sparse per-span-type attribute lists for relevant span types."""
+    sparse: dict[str, list[str]] = {}
     for span_type_key in relevant_span_type_keys(result, span_type_order, span_type_specs):
         spec = span_type_specs[span_type_key]
         type_present = span_type_present_attributes(result, span_type_key)
-        attr_statuses: dict[str, str] = {}
-        for attr in _expected_span_type_attributes(spec):
-            attr_statuses[attr] = "present" if attr in type_present else "absent"
-        statuses[span_type_key] = attr_statuses
-    return statuses
+        sparse[span_type_key] = [
+            attr for attr in _expected_span_type_attributes(spec)
+            if attr in type_present
+        ]
+    return sparse

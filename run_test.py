@@ -52,8 +52,8 @@ from genai_otel_conformance.language_adapters import (
     run_test_cmd,
 )
 from genai_otel_conformance.statuses import (
-    build_signal_statuses,
-    build_span_type_statuses,
+    build_present_signal_entries,
+    build_span_type_present_names,
 )
 from genai_otel_conformance.results import (
     TestResult,
@@ -130,31 +130,31 @@ def _has_weaver_output(result_dir: Path) -> bool:
 
 def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTestData:
     """Build committed dashboard data from a parsed Weaver result."""
-    event_statuses = build_signal_statuses(
+    event_entries = build_present_signal_entries(
         GENAI_EVENT_TYPES,
         result.seen_events,
         result.detected_events,
     )
-    metric_statuses = build_signal_statuses(
+    metric_entries = build_present_signal_entries(
         GENAI_METRIC_TYPES,
         result.seen_metrics,
         result.detected_metrics,
     )
-    has_genai_signals = "present" in event_statuses.values() or "present" in metric_statuses.values()
-    span_types = build_span_type_statuses(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
+    has_genai_signals = bool(event_entries) or bool(metric_entries)
+    spans = build_span_type_present_names(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
     path = _data_path_from_test_name(test_name)
 
     data: GeneratedTestPayload = {
-        "events": event_statuses,
-        "metrics": metric_statuses,
+        "events": event_entries,
+        "metrics": metric_entries,
     }
-    if span_types:
-        data["span_types"] = span_types
+    if spans:
+        data["spans"] = spans
 
     return GeneratedTestData(
         path=path,
         data=data,
-        has_relevant_data=bool(span_types) or has_genai_signals,
+        has_relevant_data=bool(spans) or has_genai_signals,
     )
 
 
