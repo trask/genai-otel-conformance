@@ -1,12 +1,10 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
     "create_agent": [
-      "gen_ai.operation.name",
-      "gen_ai.system",
       "gen_ai.agent.description",
-      "gen_ai.agent.name"
+      "gen_ai.agent.name",
+      "gen_ai.operation.name",
+      "gen_ai.system"
     ]
   }
 }

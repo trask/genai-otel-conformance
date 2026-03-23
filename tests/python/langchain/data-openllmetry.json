@@ -1,30 +1,29 @@
 {
-  "events": {},
   "metrics": {
     "gen_ai.client.token.usage": [],
     "gen_ai.client.operation.duration": []
   },
   "spans": {
     "create_agent": [
+      "gen_ai.agent.name",
       "gen_ai.operation.name",
-      "gen_ai.provider.name",
-      "gen_ai.agent.name"
+      "gen_ai.provider.name"
     ],
     "invoke_agent": [
-      "gen_ai.operation.name",
-      "gen_ai.provider.name",
       "gen_ai.agent.id",
-      "gen_ai.agent.name"
+      "gen_ai.agent.name",
+      "gen_ai.operation.name",
+      "gen_ai.provider.name"
     ],
     "invoke_workflow": [
       "gen_ai.operation.name"
     ],
     "inference": [
       "gen_ai.operation.name",
-      "gen_ai.system",
       "gen_ai.request.model",
       "gen_ai.response.id",
       "gen_ai.response.model",
+      "gen_ai.system",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
     ],

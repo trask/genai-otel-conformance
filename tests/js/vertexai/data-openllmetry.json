@@ -1,11 +1,9 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
     "inference": [
-      "gen_ai.system",
       "gen_ai.request.model",
-      "gen_ai.response.model"
+      "gen_ai.response.model",
+      "gen_ai.system"
     ]
   }
 }

@@ -1,6 +1,4 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
     "inference": [
       "gen_ai.system"

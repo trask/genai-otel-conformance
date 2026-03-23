@@ -1,12 +1,9 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
     "invoke_agent": [
-      "gen_ai.system",
-      "gen_ai.agent.name"
+      "gen_ai.agent.name",
+      "gen_ai.system"
     ],
-    "invoke_workflow": [],
     "inference": [
       "gen_ai.operation.name",
       "gen_ai.system"

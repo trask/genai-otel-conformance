@@ -4,25 +4,24 @@
     "gen_ai.user.message": [],
     "gen_ai.choice": []
   },
-  "metrics": {},
   "spans": {
     "invoke_agent": [
-      "gen_ai.operation.name",
-      "gen_ai.system",
-      "gen_ai.request.model",
-      "gen_ai.conversation.id",
       "gen_ai.agent.description",
       "gen_ai.agent.name",
+      "gen_ai.conversation.id",
+      "gen_ai.operation.name",
+      "gen_ai.request.model",
       "gen_ai.response.finish_reasons",
+      "gen_ai.system",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
     ],
     "inference": [
-      "gen_ai.operation.name",
-      "gen_ai.system",
-      "gen_ai.request.model",
       "gen_ai.conversation.id",
+      "gen_ai.operation.name",
+      "gen_ai.request.model",
       "gen_ai.response.finish_reasons",
+      "gen_ai.system",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
     ]

@@ -1,16 +1,14 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
     "inference": [
       "gen_ai.operation.name",
-      "gen_ai.system",
       "gen_ai.request.model",
-      "server.port",
       "gen_ai.response.id",
+      "gen_ai.system",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens",
-      "server.address"
+      "server.address",
+      "server.port"
     ],
     "execute_tool": [
       "gen_ai.operation.name",

@@ -1,12 +1,9 @@
 {
-  "events": {},
-  "metrics": {},
   "spans": {
-    "invoke_workflow": [],
     "inference": [
-      "gen_ai.system",
       "gen_ai.request.model",
-      "gen_ai.response.model"
+      "gen_ai.response.model",
+      "gen_ai.system"
     ]
   }
 }
