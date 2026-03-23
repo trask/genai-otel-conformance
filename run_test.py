@@ -173,6 +173,9 @@ def _normalize_generated_test_payload(data: GeneratedTestPayload) -> GeneratedTe
             if not normalized[key]:
                 normalized.pop(key)
             continue
+        if key in ("events", "metrics") and isinstance(value, dict):
+            normalized[key] = dict(sorted(value.items()))
+            continue
         normalized[key] = value
     return normalized
 
