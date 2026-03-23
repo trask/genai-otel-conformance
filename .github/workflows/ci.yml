@@ -52,21 +52,17 @@ jobs:
           js_matrix+=']}'
           echo "js=${js_matrix}" >> "$GITHUB_OUTPUT"
 
-          # Java: one entry per directory, detect ecosystem from build.gradle.kts
+          # Java: discover committed data files so only real test modules/ecosystems are included
           java_matrix='{"test":['
           first=true
-          for d in tests/java/*/; do
-            [[ -d "$d" ]] || continue
-            dir=$(basename "$d")
-            if grep -q 'spring-boot' "$d/build.gradle.kts" 2>/dev/null; then
-              eco="native"
-            else
-              eco="otelcontrib"
-            fi
+          for f in tests/java/*/data-*.json; do
+            [[ -f "$f" ]] || continue
+            dir=$(basename "$(dirname "$f")")
+            eco=$(basename "$f" .json | sed 's/^data-//')
             name="${dir}-${eco}"
             $first || java_matrix+=','
             first=false
-            java_matrix+="{\"name\":\"${name}\",\"dir\":\"${d%/}\",\"lib\":\"${dir}\",\"eco\":\"${eco}\"}"
+            java_matrix+="{\"name\":\"${name}\",\"dir\":\"tests/java/${dir}\",\"lib\":\"${dir}\",\"eco\":\"${eco}\"}"
           done
           java_matrix+=']}'
           echo "java=${java_matrix}" >> "$GITHUB_OUTPUT"

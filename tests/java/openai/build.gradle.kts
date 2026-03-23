@@ -1,6 +1,7 @@
+import org.gradle.api.tasks.JavaExec
+
 plugins {
     java
-    application
 }
 
 group = "com.example"
@@ -16,10 +17,6 @@ repositories {
     mavenCentral()
 }
 
-application {
-    mainClass = "com.example.openaitest.OpenAiOtelContribTest"
-}
-
 dependencies {
     implementation("com.openai:openai-java:4.28.0")
     implementation("io.opentelemetry.instrumentation:opentelemetry-openai-java-1.1:2.26.0-alpha")
@@ -28,7 +25,12 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.60.1")
 }
 
-tasks.named<JavaExec>("run") {
-    val configFile = rootProject.file("../otel-config.yaml").absolutePath
+val mainSourceSet = sourceSets["main"]
+val configFile = rootProject.file("otel-config.yaml").absolutePath
+
+tasks.register<JavaExec>("runOtelcontrib") {
+    group = "application"
+    classpath = mainSourceSet.runtimeClasspath
+    mainClass.set("com.example.openaitest.OpenAiOtelContribTest")
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }
