@@ -1,23 +1,7 @@
 {
-  "events": {
-    "gen_ai.system.message": "absent",
-    "gen_ai.user.message": "absent",
-    "gen_ai.assistant.message": "absent",
-    "gen_ai.tool.message": "absent",
-    "gen_ai.choice": "absent"
-  },
-  "metrics": {
-    "gen_ai.client.token.usage": "absent",
-    "gen_ai.client.operation.duration": "absent"
-  },
-  "span_types": {
-    "execute_tool": {
-      "gen_ai.operation.name": "absent",
-      "error.type": "absent",
-      "gen_ai.tool.call.id": "absent",
-      "gen_ai.tool.description": "absent",
-      "gen_ai.tool.name": "absent",
-      "gen_ai.tool.type": "absent"
-    }
+  "events": {},
+  "metrics": {},
+  "spans": {
+    "execute_tool": []
   }
 }

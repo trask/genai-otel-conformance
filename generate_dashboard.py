@@ -27,6 +27,7 @@ from genai_otel_conformance.metadata import (
     library_display_name,
 )
 from genai_otel_conformance.statuses import (
+    build_statuses_from_present_names,
     merge_signal_counts,
     relevant_span_type_keys,
     span_type_attribute_groups,
@@ -423,10 +424,60 @@ def _load_test_data_files() -> list[dict]:
             data["_lang"] = location.lang
             data["_lib"] = location.library
             data["_eco"] = location.ecosystem
-            entries.append(data)
+            entries.append(_normalize_test_data_entry(data))
         except (OSError, ValueError, json.JSONDecodeError) as e:
             print(f"Warning: Could not load {data_file}: {e}", file=sys.stderr)
     return entries
+
+
+def _normalize_signal_data(
+    value: object,
+    signal_names: list[str],
+) -> dict[str, str]:
+    return build_statuses_from_present_names(signal_names, _present_signal_names(value))
+
+
+def _present_name_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [name for name in value if isinstance(name, str)]
+
+
+def _present_signal_names(value: object) -> list[str]:
+    if isinstance(value, dict):
+        return [name for name in value if isinstance(name, str)]
+    return _present_name_list(value)
+
+
+def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
+    if not isinstance(value, dict):
+        return {}
+
+    normalized: dict[str, dict[str, str]] = {}
+    for span_type_key, spec in SPAN_TYPE_SPECS.items():
+        if span_type_key not in value:
+            continue
+
+        expected_names = [column["header_text"] for column in span_type_heatmap_columns(spec)]
+        present_names = _present_name_list(value[span_type_key])
+        normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
+
+    return normalized
+
+
+def _raw_spans(entry: dict) -> object:
+    if "spans" in entry:
+        return entry.get("spans")
+    return entry.get("span_types")
+
+
+def _normalize_test_data_entry(entry: dict) -> dict:
+    normalized = dict(entry)
+    normalized["events"] = _normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES)
+    normalized["metrics"] = _normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES)
+    normalized["spans"] = _normalize_span_type_data(_raw_spans(entry))
+    normalized.pop("span_types", None)
+    return normalized
 
 
 def _build_span_type_cells(
@@ -436,7 +487,7 @@ def _build_span_type_cells(
 ) -> list[dict]:
     return _build_status_cells(
         definitions,
-        entry["span_types"][span_type_key],
+        entry["spans"][span_type_key],
         deprecated_attrs=DEPRECATED_ATTRS,
     )
 
@@ -452,8 +503,8 @@ def _build_signal_cells(
 def _entries_with_span_type(test_data_entries: list[dict], span_type_key: str) -> list[dict]:
     entries: list[dict] = []
     for entry in test_data_entries:
-        span_types = entry.get("span_types", {})
-        if span_type_key in span_types:
+        spans = entry.get("spans", {})
+        if span_type_key in spans:
             entries.append(entry)
     return entries
 
