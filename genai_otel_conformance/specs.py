@@ -1,6 +1,9 @@
 """Semantic convention span type specs, event types, and metric types."""
 
 _COMMON_REQUIRED = ["gen_ai.operation.name"]
+# gen_ai.system is the deprecated predecessor of gen_ai.provider.name.
+# It is no longer part of the semantic conventions, but many instrumentations
+# still emit it, so we track it here to grade their output accurately.
 _PROVIDER_REQUIRED = ["gen_ai.provider.name", "gen_ai.system"]
 _COMMON_COND_REQUIRED = ["error.type"]
 _CLIENT_COND_REQUIRED = ["gen_ai.request.model", "server.port"]
