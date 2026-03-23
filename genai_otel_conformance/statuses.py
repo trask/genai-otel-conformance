@@ -31,6 +31,7 @@ _SPAN_TYPE_LEVELS = (
         "Required only when the span matches the relevant condition.",
     ),
     ("recommended", "Recommended", "Expected when the library exposes the signal."),
+    ("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
 )
 
 
