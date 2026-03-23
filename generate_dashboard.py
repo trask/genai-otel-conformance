@@ -70,6 +70,9 @@ def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     return f"{library}-{lang_slug}-{ecosystem}"
 
 # Deprecated attributes: shown with yellow background when present.
+# gen_ai.system is the deprecated predecessor of gen_ai.provider.name.
+# It is no longer part of the semantic conventions, but many instrumentations
+# still emit it, so we track it here to grade their output accurately.
 DEPRECATED_ATTRS = {
     "gen_ai.system",
 }
