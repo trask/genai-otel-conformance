@@ -55,20 +55,20 @@
 </div>
 {% endif %}
 
-{% if detail.events %}
-<br><strong>Events ({{ detail.events|length }}):</strong>
-<div class="attr-list">
-{% for evt in detail.events -%}
-<div class="attr"><code>{{ evt.name }}</code> &times;{{ evt.count }}</div>
-{% endfor -%}
-</div>
-{% endif %}
-
 {% if detail.metrics %}
 <br><strong>Metrics ({{ detail.metrics|length }}):</strong>
 <div class="attr-list">
 {% for metric in detail.metrics -%}
 <div class="attr"><code>{{ metric.name }}</code> &times;{{ metric.count }}</div>
+{% endfor -%}
+</div>
+{% endif %}
+
+{% if detail.events %}
+<br><strong>Events ({{ detail.events|length }}):</strong>
+<div class="attr-list">
+{% for evt in detail.events -%}
+<div class="attr"><code>{{ evt.name }}</code> &times;{{ evt.count }}</div>
 {% endfor -%}
 </div>
 {% endif %}
