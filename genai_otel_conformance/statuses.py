@@ -24,19 +24,28 @@ def present_attributes(result: TestResult) -> set[str]:
 
 
 _SPAN_TYPE_LEVELS = (
-    ("required", "Required"),
-    ("conditionally_required", "Conditionally Required"),
-    ("recommended", "Recommended"),
+    ("required", "Required", "Must be present for spans of this type."),
+    (
+        "conditionally_required",
+        "Conditionally Required",
+        "Required only when the span matches the relevant condition.",
+    ),
+    ("recommended", "Recommended", "Expected when the library exposes the signal."),
 )
 
 
 def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
     """Return ordered attribute groups for a span-type specification."""
     groups: list[dict[str, object]] = []
-    for level, label in _SPAN_TYPE_LEVELS:
+    for level, label, description in _SPAN_TYPE_LEVELS:
         attrs = sorted(spec.get(level, []))
         if attrs:
-            groups.append({"key": level, "label": label, "attrs": attrs})
+            groups.append({
+                "key": level,
+                "label": label,
+                "description": description,
+                "attrs": attrs,
+            })
     return groups
 
 
@@ -46,8 +55,26 @@ def span_type_heatmap_columns(spec: dict) -> list[dict[str, object]]:
     for group in span_type_attribute_groups(spec):
         attrs = group["attrs"]
         for index, attr in enumerate(attrs):
-            columns.append({"header_text": attr, "is_group_start": index == 0})
+            columns.append({
+                "header_text": attr,
+                "is_group_start": index == 0,
+                "group_key": group["key"],
+                "group_label": group["label"],
+            })
     return columns
+
+
+def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
+    """Return grouped header metadata for a span-type heatmap."""
+    groups: list[dict[str, object]] = []
+    for group in span_type_attribute_groups(spec):
+        groups.append({
+            "key": group["key"],
+            "label": group["label"],
+            "description": group["description"],
+            "colspan": len(group["attrs"]),
+        })
+    return groups
 
 
 def span_type_present_attributes(result: TestResult, span_type_key: str) -> set[str]:

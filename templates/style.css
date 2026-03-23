@@ -4,6 +4,20 @@
   --fail: #f8d7da; --fail-border: #dc3545;
   --nodata: #f0f0f0; --nodata-border: #ccc;
   --bg: #fff; --text: #212529; --muted: #6c757d;
+  --group-separator: #8b95a1;
+  --grid-line: #e6eaee;
+  --group-required-bg: #e3e6ea;
+  --group-required-text: #2f3742;
+  --group-conditional-bg: #eceff2;
+  --group-conditional-text: #424a54;
+  --group-recommended-bg: #f4f6f8;
+  --group-recommended-text: #5a6169;
+  --meta-library-bg: var(--group-required-bg);
+  --meta-library-cell-bg: #e9edf1;
+  --meta-lang-bg: var(--group-conditional-bg);
+  --meta-lang-cell-bg: #f0f3f6;
+  --meta-instrumentation-bg: var(--group-recommended-bg);
+  --meta-instrumentation-cell-bg: #f6f8fa;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -17,7 +31,7 @@ h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
                box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem; overflow-x: auto; }
 .matrix-wrap h2 { font-size: 1.2rem; margin-bottom: 1rem; }
 table.matrix { border-collapse: collapse; }
-table.matrix th, table.matrix td { padding: 0.6rem 0.8rem; text-align: center; border: 1px solid #dee2e6; }
+table.matrix th, table.matrix td { padding: 0.6rem 0.8rem; text-align: center; border: 1px solid var(--grid-line); }
 table.matrix th { background: #f8f9fa; font-size: 0.85rem; font-weight: 600; }
 table.matrix td.lib { text-align: left; font-weight: 500; white-space: nowrap; }
 table.matrix td.pass  { background: var(--pass); }
@@ -29,15 +43,32 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 
 /* Heatmap matrix */
 .heatmap th.attr-header {
-  vertical-align: bottom; height: 160px; padding: 4px 2px;
+  vertical-align: bottom; height: 164px; padding: 8px 2px 4px;
   width: 28px; min-width: 28px; max-width: 28px; background: #f8f9fa;
+}
+.heatmap th.group-header {
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 0.5rem 0.35rem; border-bottom: 2px solid #bfc7d1;
 }
 .heatmap th.attr-header span {
   writing-mode: vertical-rl; transform: rotate(180deg);
-  font-size: 0.72rem; font-weight: 500;
+  display: inline-block; font-size: 0.72rem; font-weight: 500; line-height: 1;
   font-family: "SFMono-Regular", Consolas, monospace; white-space: nowrap;
 }
 .heatmap th.lib-header { text-align: left; background: #f8f9fa; vertical-align: bottom; white-space: nowrap; }
+.heatmap th.library-header,
+.heatmap th.lang-header,
+.heatmap th.instrumentation-header { background: #f8f9fa; }
+.heatmap th.group-required,
+.group-pill.group-required { background: var(--group-required-bg); color: var(--group-required-text); }
+.heatmap th.group-conditionally_required,
+.group-pill.group-conditionally_required { background: var(--group-conditional-bg); color: var(--group-conditional-text); }
+.heatmap th.group-recommended,
+.group-pill.group-recommended { background: var(--group-recommended-bg); color: var(--group-recommended-text); }
+.group-pill {
+  display: inline-flex; align-items: center; padding: 0.22rem 0.55rem; border-radius: 999px;
+  font-size: 0.76rem; font-weight: 700; white-space: nowrap;
+}
 .heatmap td.present, .heatmap td.absent, .heatmap td.deprecated, .heatmap td.kind-match, .heatmap td.kind-mismatch {
   width: 28px; min-width: 28px; max-width: 28px; padding: 0;
 }
@@ -46,12 +77,13 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 .heatmap td.deprecated { background: var(--warn); text-align: center; color: #856404; font-weight: 600; }
 .heatmap td.kind-match { background: #c6efce; text-align: center; color: #28a745; font-weight: 600; }
 .heatmap td.kind-mismatch { background: #fce4ec; text-align: center; color: #c62828; font-size: 0.75rem; }
-.heatmap .group-start { border-left: 3px solid #555 !important; }
+.heatmap .group-start { border-left: 2px solid var(--group-separator) !important; }
 
 /* Hierarchy grouping */
-.heatmap td.lang-cell { vertical-align: top; font-weight: 600; background: #f0f1f4; border-right: 2px solid #bbb; }
-.heatmap td.lib-cell { vertical-align: top; background: #f8f9fa; }
-.heatmap tr.lang-group-start td { border-top: 2px solid #999; }
+.heatmap td.library-cell { vertical-align: top; background: var(--meta-library-cell-bg); }
+.heatmap td.lang-cell { vertical-align: top; font-weight: 600; background: var(--meta-lang-cell-bg); }
+.heatmap td.instrumentation-cell { background: var(--meta-instrumentation-cell-bg); }
+.heatmap tr.lang-group-start td { border-top: 2px solid #c7ced6; }
 
 /* Version display */
 .version { font-size: 0.7rem; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; display: block; }

@@ -31,6 +31,7 @@ from genai_otel_conformance.statuses import (
     merge_signal_counts,
     relevant_span_type_keys,
     span_type_attribute_groups,
+    span_type_heatmap_groups,
     span_type_heatmap_columns,
     span_type_present_attributes,
 )
@@ -166,6 +167,7 @@ def _build_heatmap(
     entries: list[dict],
     details_available: bool,
     cell_builder,
+    column_groups: list[dict] | None = None,
 ) -> dict | None:
     if not entries or not columns:
         return None
@@ -187,7 +189,12 @@ def _build_heatmap(
         })
 
     _compute_rowspans(rows)
-    return {"label": label, "columns": columns, "rows": rows}
+    return {
+        "label": label,
+        "columns": columns,
+        "column_groups": column_groups or [],
+        "rows": rows,
+    }
 
 
 def _build_status_cells(
@@ -533,6 +540,7 @@ def _prepare_heatmaps_from_data(
             continue
 
         columns = span_type_heatmap_columns(spec)
+        column_groups = span_type_heatmap_groups(spec)
         col_defs = _column_definitions(columns)
 
         if not columns:
@@ -541,7 +549,14 @@ def _prepare_heatmaps_from_data(
         def build_cells(entry: dict) -> list[dict]:
             return _build_span_type_cells(entry, st_key, col_defs)
 
-        heatmap = _build_heatmap(st_label, columns, relevant, details_available, build_cells)
+        heatmap = _build_heatmap(
+            st_label,
+            columns,
+            relevant,
+            details_available,
+            build_cells,
+            column_groups=column_groups,
+        )
         if heatmap is not None:
             heatmaps.append(heatmap)
 
