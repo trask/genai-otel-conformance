@@ -3,6 +3,7 @@ results/
 
 # Python
 __pycache__/
+.venv/
 *.egg-info/
 
 # Node.js
