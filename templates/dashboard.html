@@ -54,20 +54,20 @@
 </tbody></table></div>
 {% endfor %}
 
-{# ── Event heatmap ── #}
-{% if event_heatmap %}
+{# ── Metric heatmap ── #}
+{% if metric_heatmap %}
 <div class="matrix-wrap">
-<h2>{{ event_heatmap.label }}</h2>
+<h2>{{ metric_heatmap.label }}</h2>
 <table class="matrix heatmap"><thead><tr>
 <th class="lib-header library-header">Library</th>
 <th class="lib-header lang-header">Lang</th>
 <th class="lib-header instrumentation-header">Instrumentation</th>
-{% for col in event_heatmap.columns -%}
+{% for col in metric_heatmap.columns -%}
 <th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
 {% endfor -%}
 </tr></thead>
 <tbody>
-{% for row in event_heatmap.rows -%}
+{% for row in metric_heatmap.rows -%}
 <tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
 <td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
@@ -88,20 +88,20 @@
 </tbody></table></div>
 {% endif %}
 
-{# ── Metric heatmap ── #}
-{% if metric_heatmap %}
+{# ── Event heatmap ── #}
+{% if event_heatmap %}
 <div class="matrix-wrap">
-<h2>{{ metric_heatmap.label }}</h2>
+<h2>{{ event_heatmap.label }}</h2>
 <table class="matrix heatmap"><thead><tr>
 <th class="lib-header library-header">Library</th>
 <th class="lib-header lang-header">Lang</th>
 <th class="lib-header instrumentation-header">Instrumentation</th>
-{% for col in metric_heatmap.columns -%}
+{% for col in event_heatmap.columns -%}
 <th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
 {% endfor -%}
 </tr></thead>
 <tbody>
-{% for row in metric_heatmap.rows -%}
+{% for row in event_heatmap.rows -%}
 <tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
 <td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
