@@ -29,6 +29,22 @@ Mock LLM Server (no API keys needed)
 - uv (for Python dependency installation)
 - Node.js 24+ (for JS/TS tests), Java 17+ (for Java tests), .NET 8+ (for .NET tests)
 
+### Recommended Local Setup
+
+Run the test runner from an activated virtual environment so Python dependency
+installs stay isolated and local validation is more predictable.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows use:
+
+```powershell
+.venv\Scripts\activate
+```
+
 ### Running a Test
 
 ```bash
