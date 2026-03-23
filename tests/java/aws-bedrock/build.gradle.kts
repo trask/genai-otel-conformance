@@ -1,6 +1,7 @@
+import org.gradle.api.tasks.JavaExec
+
 plugins {
     java
-    application
 }
 
 group = "com.example"
@@ -16,10 +17,6 @@ repositories {
     mavenCentral()
 }
 
-application {
-    mainClass = "com.example.bedrocktest.AwsBedrockOtelContribTest"
-}
-
 dependencies {
     implementation("software.amazon.awssdk:bedrockruntime:2.42.13")
     implementation("software.amazon.awssdk:apache-client:2.42.13")
@@ -29,7 +26,12 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.60.1")
 }
 
-tasks.named<JavaExec>("run") {
-    val configFile = rootProject.file("../otel-config.yaml").absolutePath
+val mainSourceSet = sourceSets["main"]
+val configFile = rootProject.file("otel-config.yaml").absolutePath
+
+tasks.register<JavaExec>("runOtelcontrib") {
+    group = "application"
+    classpath = mainSourceSet.runtimeClasspath
+    mainClass.set("com.example.bedrocktest.AwsBedrockOtelContribTest")
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }

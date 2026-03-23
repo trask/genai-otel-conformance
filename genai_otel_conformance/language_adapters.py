@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -31,7 +32,10 @@ class LanguageAdapter:
 
 def _gradle_cmd(test_dir: Path) -> list[str]:
     """Return the Gradle wrapper command for the given test directory."""
+    gradlew = test_dir / "gradlew"
     if sys.platform == "win32":
+        if os.environ.get("MSYSTEM") and gradlew.is_file():
+            return ["bash", str(gradlew.resolve())]
         return [str((test_dir / "gradlew.bat").resolve())]
     return ["./gradlew"]
 
@@ -135,23 +139,35 @@ def _js_list_tests() -> list[str]:
 
 
 def _java_prebuild_test(lib: str) -> None:
-    test_dir = TESTS_DIR / "java" / lib
-    gradle = _gradle_cmd(test_dir)
+    workspace_dir = TESTS_DIR / "java"
+    test_dir = workspace_dir / lib
+    gradle = _gradle_cmd(workspace_dir)
     print(f"=== Pre-building Java project in {test_dir} ===")
-    subprocess.run([*gradle, "classes"], cwd=test_dir, check=True)
+    subprocess.run([*gradle, f":{lib}:classes"], cwd=workspace_dir, check=True)
 
 
 def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
-    test_dir = TESTS_DIR / "java" / lib
+    workspace_dir = TESTS_DIR / "java"
+    test_dir = workspace_dir / lib
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
-    gradle = _gradle_cmd(test_dir)
-    proc = subprocess.run([*gradle, "run"], cwd=test_dir, env=env)
+
+    data_file = test_dir / f"data-{_ecosystem}.json"
+    if not data_file.is_file():
+        return TestCommandResult(False, 0)
+
+    gradle = _gradle_cmd(workspace_dir)
+    ecosystem_task = "run" + "".join(part.capitalize() for part in _ecosystem.split("-"))
+    proc = subprocess.run([*gradle, f":{lib}:{ecosystem_task}"], cwd=workspace_dir, env=env)
     return TestCommandResult(True, proc.returncode)
 
 
 def _java_list_tests() -> list[str]:
-    return _list_tests_from_matches("java", "*/build.gradle.kts", lambda _path: "otelcontrib")
+    return _list_tests_from_matches(
+        "java",
+        "*/data-*.json",
+        lambda path: path.stem.removeprefix("data-"),
+    )
 
 
 # ── .NET adapter ────────────────────────────────────────────────────
