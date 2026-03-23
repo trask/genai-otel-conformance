@@ -17,24 +17,31 @@
 {% for heatmap in heatmaps %}
 <div class="matrix-wrap">
 <h2>{{ heatmap.label }} Spans</h2>
-<table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
-<th class="lib-header">Lang</th>
-<th class="lib-header">Instrumentation</th>
-{% for col in heatmap.columns -%}
-<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+<table class="matrix heatmap"><thead>
+<tr class="group-row">
+<th class="lib-header library-header" rowspan="2">Library</th>
+<th class="lib-header lang-header" rowspan="2">Lang</th>
+<th class="lib-header instrumentation-header" rowspan="2">Instrumentation</th>
+{% for group in heatmap.column_groups -%}
+<th class="group-header group-{{ group.key }}" colspan="{{ group.colspan }}">{{ group.label }}</th>
 {% endfor -%}
-</tr></thead>
+</tr>
+<tr>
+{% for col in heatmap.columns -%}
+<th class="attr-header group-{{ col.group_key }}{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr>
+</thead>
 <tbody>
 {% for row in heatmap.rows -%}
 <tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
-<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+<td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">
+<td class="lib instrumentation-cell">
   {% if row.has_details %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
   {{ row.eco_display }}
   {% if row.has_details %}</a>{% endif %}
@@ -52,9 +59,9 @@
 <div class="matrix-wrap">
 <h2>{{ event_heatmap.label }}</h2>
 <table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
-<th class="lib-header">Lang</th>
-<th class="lib-header">Instrumentation</th>
+<th class="lib-header library-header">Library</th>
+<th class="lib-header lang-header">Lang</th>
+<th class="lib-header instrumentation-header">Instrumentation</th>
 {% for col in event_heatmap.columns -%}
 <th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
 {% endfor -%}
@@ -63,12 +70,12 @@
 {% for row in event_heatmap.rows -%}
 <tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
-<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+<td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">
+<td class="lib instrumentation-cell">
   {% if row.has_details %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
   {{ row.eco_display }}
   {% if row.has_details %}</a>{% endif %}
@@ -86,9 +93,9 @@
 <div class="matrix-wrap">
 <h2>{{ metric_heatmap.label }}</h2>
 <table class="matrix heatmap"><thead><tr>
-<th class="lib-header">Library</th>
-<th class="lib-header">Lang</th>
-<th class="lib-header">Instrumentation</th>
+<th class="lib-header library-header">Library</th>
+<th class="lib-header lang-header">Lang</th>
+<th class="lib-header instrumentation-header">Instrumentation</th>
 {% for col in metric_heatmap.columns -%}
 <th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
 {% endfor -%}
@@ -97,12 +104,12 @@
 {% for row in metric_heatmap.rows -%}
 <tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
-<td class="lib lib-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
+<td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
 {% if row.lang_rowspan > 0 -%}
 <td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
 {% endif -%}
-<td class="lib">
+<td class="lib instrumentation-cell">
   {% if row.has_details %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
   {{ row.eco_display }}
   {% if row.has_details %}</a>{% endif %}
