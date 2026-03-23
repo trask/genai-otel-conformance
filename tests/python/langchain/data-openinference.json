@@ -1,9 +1,1 @@
-{
-  "events": {},
-  "metrics": {},
-  "spans": {
-    "inference": [],
-    "retrieval": [],
-    "execute_tool": []
-  }
-}
+{}

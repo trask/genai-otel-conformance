@@ -153,9 +153,28 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
 
     return GeneratedTestData(
         path=path,
-        data=data,
+        data=_normalize_generated_test_payload(data),
         has_relevant_data=bool(spans) or has_genai_signals,
     )
+
+
+def _normalize_generated_test_payload(data: GeneratedTestPayload) -> GeneratedTestPayload:
+    """Drop empty top-level objects and sort span attribute names alphabetically."""
+    normalized: GeneratedTestPayload = {}
+    for key, value in data.items():
+        if not value:
+            continue
+        if key == "spans" and isinstance(value, dict):
+            normalized[key] = {
+                span_type: sorted(attrs)
+                for span_type, attrs in value.items()
+                if attrs
+            }
+            if not normalized[key]:
+                normalized.pop(key)
+            continue
+        normalized[key] = value
+    return normalized
 
 
 def generate_single_test_data(test_name: str) -> GeneratedTestData | None:
