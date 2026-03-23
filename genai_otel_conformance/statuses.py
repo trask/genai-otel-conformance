@@ -68,14 +68,10 @@ def _is_relevant_span_type(
     span_type_key: str,
     spec: dict,
 ) -> bool:
-    all_present = present_attributes(result)
-    discriminators = spec.get("discriminator_attrs", set())
-    if discriminators:
-        for attr in discriminators:
-            if attr in all_present:
-                return True
+    if spec.get("discriminator_attrs"):
         return span_type_key in result.detected_span_types
 
+    all_present = present_attributes(result)
     for attr in _expected_span_type_attributes(spec):
         if attr in all_present:
             return True
