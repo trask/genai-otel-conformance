@@ -139,6 +139,6 @@ GENAI_EVENT_TYPES = [
 ]
 
 GENAI_METRIC_TYPES = [
-    "gen_ai.client.token.usage",
     "gen_ai.client.operation.duration",
+    "gen_ai.client.token.usage",
 ]

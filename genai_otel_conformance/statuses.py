@@ -34,7 +34,7 @@ def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
     """Return ordered attribute groups for a span-type specification."""
     groups: list[dict[str, object]] = []
     for level, label in _SPAN_TYPE_LEVELS:
-        attrs = list(spec.get(level, []))
+        attrs = sorted(spec.get(level, []))
         if attrs:
             groups.append({"key": level, "label": label, "attrs": attrs})
     return groups

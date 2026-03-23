@@ -1,7 +1,7 @@
 {
   "metrics": {
-    "gen_ai.client.token.usage": [],
-    "gen_ai.client.operation.duration": []
+    "gen_ai.client.operation.duration": [],
+    "gen_ai.client.token.usage": []
   },
   "spans": {
     "create_agent": [
