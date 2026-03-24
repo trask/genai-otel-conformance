@@ -40,6 +40,7 @@ from genai_otel_conformance.results import (
     parse_result_dir,
 )
 from genai_otel_conformance.specs import (
+    DISPLAY_DEPRECATED_ATTRS,
     GENAI_EVENT_TYPES,
     GENAI_METRIC_TYPES,
     SPAN_TYPE_ORDER,
@@ -68,14 +69,6 @@ def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     """
     lang_slug = _LANG_SLUG.get(language, language.lower())
     return f"{library}-{lang_slug}-{ecosystem}"
-
-# Deprecated attributes: shown with yellow background when present.
-# gen_ai.system is the deprecated predecessor of gen_ai.provider.name.
-# It is no longer part of the semantic conventions, but many instrumentations
-# still emit it, so we track it here to grade their output accurately.
-DEPRECATED_ATTRS = {
-    "gen_ai.system",
-}
 
 # ── Data structures ──────────────────────────────────────────────────
 
@@ -498,7 +491,7 @@ def _build_span_type_cells(
     return _build_status_cells(
         definitions,
         entry["spans"][span_type_key],
-        deprecated_attrs=DEPRECATED_ATTRS,
+        deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
     )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from genai_otel_conformance.results import TestResult
+from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS
 
 
 def merge_signal_counts(
@@ -35,11 +36,22 @@ _SPAN_TYPE_LEVELS = (
 )
 
 
+def _display_attrs_for_group(spec: dict, level: str) -> list[str]:
+    """Return attrs for one visual group, including deprecated predecessors."""
+    display_attrs: list[str] = []
+    for attr in sorted(spec.get(level, [])):
+        display_attrs.append(attr)
+        deprecated_attr = DISPLAY_DEPRECATED_ATTRS.get(attr)
+        if deprecated_attr is not None:
+            display_attrs.append(deprecated_attr)
+    return display_attrs
+
+
 def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
     """Return ordered attribute groups for a span-type specification."""
     groups: list[dict[str, object]] = []
     for level, label, description in _SPAN_TYPE_LEVELS:
-        attrs = sorted(spec.get(level, []))
+        attrs = _display_attrs_for_group(spec, level)
         if attrs:
             groups.append({
                 "key": level,
