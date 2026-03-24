@@ -9,9 +9,7 @@
       "gen_ai.usage.output_tokens"
     ],
     "embeddings": [
-      "gen_ai.provider.name",
       "gen_ai.request.model",
-      "gen_ai.system",
       "server.address",
       "server.port"
     ]
