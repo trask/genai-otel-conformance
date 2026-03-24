@@ -269,9 +269,9 @@ def _build_span_sections(result: TestResult) -> list[dict]:
     sections = []
     for span_type_key in relevant_span_type_keys(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS):
         spec = SPAN_TYPE_SPECS[span_type_key]
-        type_present = span_type_present_attributes(result, span_type_key)
         groups = []
         for group_spec in span_type_attribute_groups(spec):
+            type_present = span_type_present_attributes(result, span_type_key, group_spec["key"])
             attrs = []
             for attr in group_spec["attrs"]:
                 if attr in type_present:

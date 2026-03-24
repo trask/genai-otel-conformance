@@ -35,6 +35,7 @@ class TestResult:
     has_data: bool
     detected_span_types: set[str] = field(default_factory=set)
     per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
+    per_type_any_attrs: dict[str, set[str]] = field(default_factory=dict)
     detected_events: dict[str, int] = field(default_factory=dict)
     detected_metrics: dict[str, int] = field(default_factory=dict)
 
@@ -181,10 +182,11 @@ def _span_attributes(span: dict[str, object]) -> dict[str, object]:
 
 def _summarize_samples(
     all_objects: list[dict],
-) -> tuple[set[str], dict[str, set[str]], dict[str, int], dict[str, int]]:
+) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]], dict[str, int], dict[str, int]]:
     """Scan sample payloads once and collect detected spans, events, and metrics."""
     span_types: set[str] = set()
     per_type_attrs: dict[str, set[str]] = {}
+    per_type_any_attrs: dict[str, set[str]] = {}
     events: dict[str, int] = {}
     metrics: dict[str, int] = {}
     for obj in all_objects:
@@ -198,7 +200,11 @@ def _summarize_samples(
                 span_types.update(classified)
                 attr_names = set(attrs.keys())
                 for span_type in classified:
-                    per_type_attrs.setdefault(span_type, set()).update(attr_names)
+                    if span_type not in per_type_attrs:
+                        per_type_attrs[span_type] = set(attr_names)
+                    else:
+                        per_type_attrs[span_type].intersection_update(attr_names)
+                    per_type_any_attrs.setdefault(span_type, set()).update(attr_names)
 
             log = sample.get("log")
             if log:
@@ -212,7 +218,7 @@ def _summarize_samples(
                 if metric_name.startswith("gen_ai."):
                     metrics[metric_name] = metrics.get(metric_name, 0) + 1
 
-    return span_types, per_type_attrs, events, metrics
+    return span_types, per_type_attrs, per_type_any_attrs, events, metrics
 
 
 def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
@@ -320,7 +326,13 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     has_data = False
     if statistics and statistics.get("total_entities", 0) > 0:
         has_data = True
-    detected_span_types, per_type_attrs, detected_events, detected_metrics = _summarize_samples(
+    (
+        detected_span_types,
+        per_type_attrs,
+        per_type_any_attrs,
+        detected_events,
+        detected_metrics,
+    ) = _summarize_samples(
         all_objects
     )
 
@@ -350,6 +362,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         has_data=has_data,
         detected_span_types=detected_span_types,
         per_type_attrs=per_type_attrs,
+        per_type_any_attrs=per_type_any_attrs,
         detected_events=detected_events,
         detected_metrics=detected_metrics,
     )

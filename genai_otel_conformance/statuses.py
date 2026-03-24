@@ -78,10 +78,16 @@ def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
     return groups
 
 
-def span_type_present_attributes(result: TestResult, span_type_key: str) -> set[str]:
-    """Return attrs present for a span type, falling back to global presence."""
+def span_type_present_attributes(
+    result: TestResult,
+    span_type_key: str,
+    level: str,
+) -> set[str]:
+    """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
-    return result.per_type_attrs.get(span_type_key, all_present)
+    if level == "required":
+        return result.per_type_attrs.get(span_type_key, all_present)
+    return result.per_type_any_attrs.get(span_type_key, all_present)
 
 
 def _expected_span_type_attributes(spec: dict) -> list[str]:
@@ -157,9 +163,12 @@ def build_span_type_present_names(
     sparse: dict[str, list[str]] = {}
     for span_type_key in relevant_span_type_keys(result, span_type_order, span_type_specs):
         spec = span_type_specs[span_type_key]
-        type_present = span_type_present_attributes(result, span_type_key)
-        sparse[span_type_key] = [
-            attr for attr in _expected_span_type_attributes(spec)
-            if attr in type_present
-        ]
+        present_names: list[str] = []
+        for group in span_type_attribute_groups(spec):
+            type_present = span_type_present_attributes(result, span_type_key, group["key"])
+            present_names.extend(
+                attr for attr in group["attrs"]
+                if attr in type_present
+            )
+        sparse[span_type_key] = present_names
     return sparse
