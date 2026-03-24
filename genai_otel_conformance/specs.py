@@ -1,10 +1,12 @@
 """Semantic convention span type specs, event types, and metric types."""
 
 _COMMON_REQUIRED = ["gen_ai.operation.name"]
-# gen_ai.system is the deprecated predecessor of gen_ai.provider.name.
-# It is no longer part of the semantic conventions, but many instrumentations
-# still emit it, so we track it here to grade their output accurately.
-_PROVIDER_REQUIRED = ["gen_ai.provider.name", "gen_ai.system"]
+_PROVIDER_REQUIRED = ["gen_ai.provider.name"]
+# This deprecated attr is rendered next to its canonical attr in the same
+# dashboard group, but it is not a semconv requirement.
+DISPLAY_DEPRECATED_ATTRS = {
+    "gen_ai.provider.name": "gen_ai.system",
+}
 _COMMON_COND_REQUIRED = ["error.type"]
 _CLIENT_COND_REQUIRED = ["gen_ai.request.model", "server.port"]
 _CLIENT_RECOMMENDED = ["server.address"]
@@ -75,7 +77,6 @@ SPAN_TYPE_SPECS: dict[str, dict] = {
         "conditionally_required": _COMMON_COND_REQUIRED + [
             "gen_ai.data_source.id",
             "gen_ai.provider.name",
-            "gen_ai.system",
         ] + _CLIENT_COND_REQUIRED,
         "recommended": ["gen_ai.request.top_k"] + _CLIENT_RECOMMENDED,
         "opt_in": [
