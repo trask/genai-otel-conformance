@@ -8,15 +8,28 @@
 </head>
 <body>
 <div class="container">
+<div id="top"></div>
 <h1>GenAI OTel Conformance Dashboard</h1>
 <p class="subtitle">Generated {{ now }} &mdash;
   <a href="https://github.com/trask/genai-otel-conformance">genai-otel-conformance</a>
-  | {% if details_available %}<a href="details.html">Detailed Results</a>{% else %}Detailed Results require local Weaver output{% endif %}</p>
+  | {% if details_available %}<a href="details.html">Detailed Results</a>{% else %}Detailed Results require local Weaver output{% endif %}
+  <span class="subtitle-controls" aria-label="Section controls">
+    | <button class="inline-action" type="button" data-section-toggle="expand">Expand all</button>
+    | <button class="inline-action" type="button" data-section-toggle="collapse">Collapse all</button>
+  </span></p>
 
 {# ── Attribute heatmap matrices (one per span type) ── #}
 {% for heatmap in heatmaps %}
-<div class="matrix-wrap">
-<h2>{{ heatmap.label }} Spans</h2>
+<details class="matrix-wrap section-anchor matrix-section" id="span-{{ heatmap.label|lower|replace(' ', '-') }}">
+<summary class="section-summary">
+<span class="section-summary-main">
+<span class="section-title" role="heading" aria-level="2">{{ heatmap.label }} Spans</span>
+<span class="section-meta">{{ heatmap.rows|length }} implementations, {{ heatmap.columns|length }} checks</span>
+</span>
+<span class="section-toggle" aria-hidden="true"></span>
+</summary>
+<div class="section-body">
+<div class="section-table">
 <table class="matrix heatmap"><thead>
 <tr class="group-row">
 <th class="lib-header library-header" rowspan="2">Library</th>
@@ -51,13 +64,25 @@
 {% endfor -%}
 </tr>
 {% endfor -%}
-</tbody></table></div>
+</tbody></table>
+</div>
+<div class="section-footer"><a href="#top">Back to top</a></div>
+</div>
+</details>
 {% endfor %}
 
 {# ── Metric heatmap ── #}
 {% if metric_heatmap %}
-<div class="matrix-wrap">
-<h2>{{ metric_heatmap.label }}</h2>
+<details class="matrix-wrap section-anchor matrix-section" id="metrics">
+<summary class="section-summary">
+<span class="section-summary-main">
+<span class="section-title" role="heading" aria-level="2">{{ metric_heatmap.label }}</span>
+<span class="section-meta">{{ metric_heatmap.rows|length }} implementations, {{ metric_heatmap.columns|length }} checks</span>
+</span>
+<span class="section-toggle" aria-hidden="true"></span>
+</summary>
+<div class="section-body">
+<div class="section-table">
 <table class="matrix heatmap"><thead><tr>
 <th class="lib-header library-header">Library</th>
 <th class="lib-header lang-header">Lang</th>
@@ -85,13 +110,25 @@
 {% endfor -%}
 </tr>
 {% endfor -%}
-</tbody></table></div>
+</tbody></table>
+</div>
+<div class="section-footer"><a href="#top">Back to top</a></div>
+</div>
+</details>
 {% endif %}
 
 {# ── Event heatmap ── #}
 {% if event_heatmap %}
-<div class="matrix-wrap">
-<h2>{{ event_heatmap.label }}</h2>
+<details class="matrix-wrap section-anchor matrix-section" id="events">
+<summary class="section-summary">
+<span class="section-summary-main">
+<span class="section-title" role="heading" aria-level="2">{{ event_heatmap.label }}</span>
+<span class="section-meta">{{ event_heatmap.rows|length }} implementations, {{ event_heatmap.columns|length }} checks</span>
+</span>
+<span class="section-toggle" aria-hidden="true"></span>
+</summary>
+<div class="section-body">
+<div class="section-table">
 <table class="matrix heatmap"><thead><tr>
 <th class="lib-header library-header">Library</th>
 <th class="lib-header lang-header">Lang</th>
@@ -119,9 +156,46 @@
 {% endfor -%}
 </tr>
 {% endfor -%}
-</tbody></table></div>
+</tbody></table>
+</div>
+<div class="section-footer"><a href="#top">Back to top</a></div>
+</div>
+</details>
 {% endif %}
 
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const sections = Array.from(document.querySelectorAll(".matrix-section"));
+
+  function openSectionFromHash() {
+    if (!window.location.hash) {
+      return;
+    }
+
+    const target = document.querySelector(window.location.hash);
+    if (!(target instanceof HTMLDetailsElement)) {
+      return;
+    }
+
+    target.open = true;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }
+
+  document.querySelectorAll("[data-section-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const shouldOpen = button.getAttribute("data-section-toggle") === "expand";
+      sections.forEach((section) => {
+        section.open = shouldOpen;
+      });
+    });
+  });
+
+  window.addEventListener("hashchange", openSectionFromHash);
+  openSectionFromHash();
+});
+</script>
 </body>
 </html>
