@@ -1,12 +1,24 @@
 ---
 name: semconv-prototyping
-description: 'Prototype and review semantic convention attributes, especially manual instrumentation examples for native library instrumentation. Use when evaluating whether an attribute is directly observable, semantically derivable by native instrumentation, or too app-specific, cross-call, or test-only to be convincing.'
+description: 'Prototype and review semantic convention proposals and manual instrumentation examples, especially in this repository, to determine whether an attribute is directly observable, semantically derivable by native instrumentation, too app-specific, or evidence that the upstream proposal is too strong.'
 argument-hint: 'Describe the proposed semantic convention or manual instrumentation example to review.'
 ---
 
 # Semantic Convention Prototyping
 
 Use this skill when reviewing or drafting semantic convention prototypes in this repository, especially when judging whether a manual instrumentation example is believable for native instrumentation.
+
+## POC Stance
+
+In this repository, a mismatch between a proposed semantic convention and a believable manual example is not automatically a bug in the example.
+
+It may be valid evidence that the proposed requirement level, span shape, or attribute definition is too strong.
+
+When this repo is being used as a proof of concept for an upstream semantic convention proposal:
+
+- Do not assume missing attributes should be added just to satisfy the proposal.
+- Treat non-capturable attributes as feedback for the upstream proposal.
+- Distinguish `example needs fixing` from `proposal needs weakening`.
 
 ## Core Rule
 
@@ -61,16 +73,27 @@ When reviewing a manual scenario or prototype:
 
 1. List each attribute set on the span.
 2. Mark each attribute as `direct`, `derivable`, or `weak`.
-3. Prefer keeping `direct` and `derivable` attributes.
-4. Remove or downgrade `weak` attributes from manual examples and expected baselines.
+3. For each weak or missing attribute, decide whether:
+	- the example should be fixed because the SDK call already exposes the data
+	- the proposal should be weakened because the data is not credibly capturable
+	- the provider should not be used as supporting evidence for that requirement
+4. Do not recommend changing the example unless the current call boundary actually provides the needed information.
 5. When in doubt, explain the exact native instrumentation mechanism that would populate the field.
+6. If the repository is acting as a proof of concept for an upstream proposal, prefer preserving honest negative evidence over making the local example superficially conform.
 
 ## Output Format
 
-When using this skill in a review, summarize the result in three groups.
+When using this skill in a review, summarize the result in four groups.
 
 - `Directly observable`
 - `Semantically derivable`
 - `Too app-specific or cross-call`
+- `Proposal feedback`
 
 For each flagged attribute, state why it is weak and point to the current call inputs or outputs that are missing the needed information.
+
+Under `Proposal feedback`, state whether:
+
+- the local example should be fixed
+- the upstream proposal should be weakened
+- the provider should be excluded as supporting evidence
