@@ -2,7 +2,7 @@
 
 For local validation in this repository, use `python run_test.py <test-name>` as the standard command.
 
-For semantic convention prototype reviews, especially manual instrumentation examples for native library instrumentation, use the `semconv-prototyping` skill under `.github/skills/semconv-prototyping/`.
+For semantic convention capturability reviews, especially manual instrumentation examples for native library instrumentation, use the `capturability-study` skill under `.github/skills/capturability-study/`.
 
 Optimize all code in this repository for readability and simplicity.
 
