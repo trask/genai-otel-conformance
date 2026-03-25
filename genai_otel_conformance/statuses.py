@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from genai_otel_conformance.results import TestResult
 from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS
+
+
+class SpanTypeLevel(NamedTuple):
+    key: str
+    label: str
+    description: str
 
 
 def merge_signal_counts(
@@ -19,20 +27,20 @@ def merge_signal_counts(
 
 def present_attributes(result: TestResult) -> set[str]:
     """Return all attribute names present in registry and non-registry stats."""
-    attrs = set(result.seen_attrs)
-    attrs.update(result.seen_non_registry_attrs)
+    attrs = set(result.observed.attrs)
+    attrs.update(result.observed.non_registry_attrs)
     return attrs
 
 
 _SPAN_TYPE_LEVELS = (
-    ("required", "Required", "Must be present for spans of this type."),
-    (
+    SpanTypeLevel("required", "Required", "Must be present for spans of this type."),
+    SpanTypeLevel(
         "conditionally_required",
         "Conditionally Required",
         "Required only when the span matches the relevant condition.",
     ),
-    ("recommended", "Recommended", "Expected when the library exposes the signal."),
-    ("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
+    SpanTypeLevel("recommended", "Recommended", "Expected when the library exposes the signal."),
+    SpanTypeLevel("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
 )
 
 
@@ -50,13 +58,13 @@ def _display_attrs_for_group(spec: dict, level: str) -> list[str]:
 def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
     """Return ordered attribute groups for a span-type specification."""
     groups: list[dict[str, object]] = []
-    for level, label, description in _SPAN_TYPE_LEVELS:
-        attrs = _display_attrs_for_group(spec, level)
+    for level in _SPAN_TYPE_LEVELS:
+        attrs = _display_attrs_for_group(spec, level.key)
         if attrs:
             groups.append({
-                "key": level,
-                "label": label,
-                "description": description,
+                "key": level.key,
+                "label": level.label,
+                "description": level.description,
                 "attrs": attrs,
             })
     return groups
@@ -64,30 +72,29 @@ def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
 
 def span_type_heatmap_columns(spec: dict) -> list[dict[str, object]]:
     """Return ordered heatmap columns for a span-type specification."""
-    columns: list[dict[str, object]] = []
-    for group in span_type_attribute_groups(spec):
-        attrs = group["attrs"]
-        for index, attr in enumerate(attrs):
-            columns.append({
-                "header_text": attr,
-                "is_group_start": index == 0,
-                "group_key": group["key"],
-                "group_label": group["label"],
-            })
-    return columns
+    return [
+        {
+            "header_text": attr,
+            "is_group_start": i == 0,
+            "group_key": group["key"],
+            "group_label": group["label"],
+        }
+        for group in span_type_attribute_groups(spec)
+        for i, attr in enumerate(group["attrs"])
+    ]
 
 
 def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
     """Return grouped header metadata for a span-type heatmap."""
-    groups: list[dict[str, object]] = []
-    for group in span_type_attribute_groups(spec):
-        groups.append({
+    return [
+        {
             "key": group["key"],
             "label": group["label"],
             "description": group["description"],
             "colspan": len(group["attrs"]),
-        })
-    return groups
+        }
+        for group in span_type_attribute_groups(spec)
+    ]
 
 
 def span_type_present_attributes(
@@ -98,8 +105,8 @@ def span_type_present_attributes(
     """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
     if level == "required":
-        return result.per_type_attrs.get(span_type_key, all_present)
-    return result.per_type_any_attrs.get(span_type_key, all_present)
+        return result.spans.per_type_attrs.get(span_type_key, all_present)
+    return result.spans.per_type_any_attrs.get(span_type_key, all_present)
 
 
 def _expected_span_type_attributes(spec: dict) -> list[str]:
@@ -115,7 +122,7 @@ def _is_relevant_span_type(
     spec: dict,
 ) -> bool:
     if spec.get("discriminator_attrs"):
-        return span_type_key in result.detected_span_types
+        return span_type_key in result.spans.detected_types
 
     all_present = present_attributes(result)
     for attr in _expected_span_type_attributes(spec):

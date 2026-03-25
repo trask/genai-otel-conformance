@@ -41,8 +41,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple
 
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.language_adapters import (
@@ -51,22 +51,12 @@ from genai_otel_conformance.language_adapters import (
     list_available_tests,
     run_test_cmd,
 )
-from genai_otel_conformance.statuses import (
-    build_present_signal_entries,
-    build_span_type_present_names,
-)
-from genai_otel_conformance.results import (
-    TestResult,
-    parse_result_dir,
-    split_test_name,
-)
-from genai_otel_conformance.specs import (
-    GENAI_EVENT_TYPES,
-    GENAI_METRIC_TYPES,
-    SPAN_TYPE_ORDER,
-    SPAN_TYPE_SPECS,
-)
 from genai_otel_conformance.locations import TestLocation
+from genai_otel_conformance.results import parse_result_dir
+from genai_otel_conformance.data_files import (
+    GeneratedTestData,
+    generate_single_test_data,
+)
 from genai_otel_conformance.weaver import (
     SEMCONV_VERSION,
     ensure_weaver,
@@ -85,30 +75,10 @@ def _allocate_free_tcp_ports(count: int) -> list[int]:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.bind(("127.0.0.1", 0))
             sockets.append(sock)
-        ports: list[int] = []
-        for sock in sockets:
-            ports.append(int(sock.getsockname()[1]))
-        return ports
+        return [sock.getsockname()[1] for sock in sockets]
     finally:
         for sock in sockets:
             sock.close()
-
-
-GeneratedTestPayload = dict[str, object]
-
-
-class GeneratedTestData(NamedTuple):
-    path: Path
-    data: GeneratedTestPayload
-    has_relevant_data: bool
-
-
-# ── Test data generation ────────────────────────────────────────────
-
-
-def _data_path_from_test_name(test_name: str) -> Path:
-    """Compute the data file path from a test name."""
-    return TestLocation.from_test_name(test_name).data_file(TESTS_DIR)
 
 
 def _results_dir_from_test_name(test_name: str) -> Path:
@@ -126,71 +96,6 @@ def _prepare_results_dir(result_dir: Path) -> None:
 def _has_weaver_output(result_dir: Path) -> bool:
     """Return whether Weaver wrote any JSON output files for this run."""
     return any(result_dir.glob("**/*.json"))
-
-
-def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTestData:
-    """Build committed dashboard data from a parsed Weaver result."""
-    event_entries = build_present_signal_entries(
-        GENAI_EVENT_TYPES,
-        result.seen_events,
-        result.detected_events,
-    )
-    metric_entries = build_present_signal_entries(
-        GENAI_METRIC_TYPES,
-        result.seen_metrics,
-        result.detected_metrics,
-    )
-    has_genai_signals = bool(event_entries) or bool(metric_entries)
-    spans = build_span_type_present_names(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
-    path = _data_path_from_test_name(test_name)
-
-    data: GeneratedTestPayload = {
-        "events": event_entries,
-        "metrics": metric_entries,
-    }
-    if spans:
-        data["spans"] = spans
-
-    return GeneratedTestData(
-        path=path,
-        data=_normalize_generated_test_payload(data),
-        has_relevant_data=bool(spans) or has_genai_signals,
-    )
-
-
-def _normalize_generated_test_payload(data: GeneratedTestPayload) -> GeneratedTestPayload:
-    """Drop empty top-level objects and sort span attribute names alphabetically."""
-    normalized: GeneratedTestPayload = {}
-    for key, value in data.items():
-        if not value:
-            continue
-        if key == "spans" and isinstance(value, dict):
-            normalized[key] = {
-                span_type: sorted(attrs)
-                for span_type, attrs in value.items()
-                if attrs
-            }
-            if not normalized[key]:
-                normalized.pop(key)
-            continue
-        if key in ("events", "metrics") and isinstance(value, dict):
-            normalized[key] = dict(sorted(value.items()))
-            continue
-        normalized[key] = value
-    return normalized
-
-
-def generate_single_test_data(test_name: str) -> GeneratedTestData | None:
-    """Generate data for a single test from its results directory.
-
-    Returns generated dashboard data or None if the Weaver output could not be parsed.
-    """
-    result_dir = _results_dir_from_test_name(test_name)
-    result = parse_result_dir(result_dir, test_name)
-    if result is None:
-        return None
-    return _build_single_test_data(test_name, result)
-
 
 
 # ── Health check helper ─────────────────────────────────────────────
@@ -350,6 +255,118 @@ def _print_available_tests() -> None:
 # ── Main ────────────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class PipelineConfig:
+    test_name: str
+    extra_weaver_args: list[str]
+    mock_url: str
+    weaver_port: int
+    admin_port: int
+    registry: str
+
+
+def _run_test_pipeline(
+    config: PipelineConfig,
+    mock_proc: subprocess.Popen | None,
+) -> tuple[subprocess.Popen | None, subprocess.Popen | None]:
+    """Run the test pipeline: mock server, pre-build, weaver, test, collect results.
+
+    Returns (mock_proc, weaver_proc) so the caller can clean them up.
+    """
+    location = TestLocation.from_test_name(config.test_name)
+
+    if mock_proc is None:
+        mock_proc = _start_mock_server(config.mock_url)
+
+    # ── Pre-build (compile before starting weaver) ──────────────
+    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
+    # can cause it to shut down before the test sends any data.
+
+    LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
+
+    # ── Start weaver ────────────────────────────────────────────
+
+    test_results_dir = _results_dir_from_test_name(config.test_name).resolve()
+    _prepare_results_dir(test_results_dir)
+
+    print(f"=== Starting weaver live-check for: {config.test_name} (ports {config.weaver_port}/{config.admin_port}) ===")
+    weaver_bin = ensure_weaver()
+    weaver_cmd = _build_weaver_command(
+        weaver_bin,
+        config.registry,
+        test_results_dir,
+        config.weaver_port,
+        config.admin_port,
+        config.extra_weaver_args,
+    )
+
+    weaver_proc = subprocess.Popen(weaver_cmd)
+
+    print("Waiting for weaver to be ready...")
+    wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", weaver_proc)
+
+    test_env = _build_test_environment(config.mock_url, config.weaver_port)
+    print(f"=== Running test: {config.test_name} ===")
+
+    test_run = run_test_cmd(config.test_name, test_env)
+    if not test_run.found:
+        print(f"ERROR: Could not find test '{config.test_name}'", file=sys.stderr)
+        _print_available_tests()
+        sys.exit(1)
+
+    # ── Stop weaver ─────────────────────────────────────────────
+
+    weaver_exit = _stop_weaver(config.admin_port, weaver_proc)
+    print(f"=== Weaver exit code: {weaver_exit} ===")
+    print(f"=== Results in: {test_results_dir} ===")
+
+    if test_run.exit_code != 0:
+        print(
+            f"ERROR: Test command exited with code {test_run.exit_code}.",
+            file=sys.stderr,
+        )
+        sys.exit(test_run.exit_code or 1)
+
+    fresh_result = parse_result_dir(test_results_dir, config.test_name)
+    has_weaver_output = _has_weaver_output(test_results_dir)
+    has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
+
+    if not has_weaver_output:
+        print(
+            f"ERROR: Weaver produced no JSON output for test: {config.test_name}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if weaver_exit != 0 and not has_weaver_stats:
+        print(
+            "ERROR: Weaver exited non-zero before writing statistics.",
+            file=sys.stderr,
+        )
+        sys.exit(weaver_exit or 1)
+    if weaver_exit != 0:
+        print(
+            "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
+            file=sys.stderr,
+        )
+
+    # ── Update the per-test data file ───────────────────────────
+
+    print("=== Updating test data file ===")
+    result = _write_generated_test_data(config.test_name)
+    if result is None:
+        print(f"ERROR: Could not parse Weaver results for test: {config.test_name}", file=sys.stderr)
+        sys.exit(1)
+    if not result.has_relevant_data:
+        print(
+            f"ERROR: No relevant data for test: {config.test_name}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return mock_proc, weaver_proc
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python run_test.py <test-name> [weaver-args...]", file=sys.stderr)
@@ -360,116 +377,35 @@ def main() -> None:
 
     print(f"Test: {test_name}")
 
-    # ── Configuration from environment ──────────────────────────────
-
     try:
-        lang, lib, eco = split_test_name(test_name)
+        location = TestLocation.from_test_name(test_name)
     except ValueError:
         print(f"ERROR: Invalid test name '{test_name}'", file=sys.stderr)
         print("Expected format: <lang>-<library>-<ecosystem>", file=sys.stderr)
         _print_available_tests()
         sys.exit(1)
 
-    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, eco)
+    lang, lib = location.lang, location.library
+    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
 
     weaver_port, admin_port = _allocate_free_tcp_ports(2)
     registry = _ensure_semconv_registry()
-
-    # ── Mock server ─────────────────────────────────────────────────
-
     mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
+
+    config = PipelineConfig(
+        test_name=test_name,
+        extra_weaver_args=extra_weaver_args,
+        mock_url=mock_url,
+        weaver_port=weaver_port,
+        admin_port=admin_port,
+        registry=registry,
+    )
+
     mock_proc: subprocess.Popen | None = None
     weaver_proc: subprocess.Popen | None = None
 
     try:
-        mock_proc = _start_mock_server(mock_url)
-
-        # ── Pre-build (compile before starting weaver) ──────────────
-        # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
-        # can cause it to shut down before the test sends any data.
-
-        LANGUAGE_ADAPTERS[lang].prebuild_test(lib)
-
-        # ── Start weaver ────────────────────────────────────────────
-
-        test_results_dir = _results_dir_from_test_name(test_name).resolve()
-        _prepare_results_dir(test_results_dir)
-
-        print(f"=== Starting weaver live-check for: {test_name} (ports {weaver_port}/{admin_port}) ===")
-        weaver_bin = ensure_weaver()
-        weaver_cmd = _build_weaver_command(
-            weaver_bin,
-            registry,
-            test_results_dir,
-            weaver_port,
-            admin_port,
-            extra_weaver_args,
-        )
-
-        weaver_proc = subprocess.Popen(weaver_cmd)
-
-        print("Waiting for weaver to be ready...")
-        wait_for_health(f"http://localhost:{admin_port}/health", 60, "Weaver", weaver_proc)
-
-        test_env = _build_test_environment(mock_url, weaver_port)
-        print(f"=== Running test: {test_name} ===")
-
-        test_run = run_test_cmd(test_name, test_env)
-        if not test_run.found:
-            print(f"ERROR: Could not find test '{test_name}'", file=sys.stderr)
-            _print_available_tests()
-            sys.exit(1)
-
-        # ── Stop weaver ─────────────────────────────────────────────
-
-        weaver_exit = _stop_weaver(admin_port, weaver_proc)
-        print(f"=== Weaver exit code: {weaver_exit} ===")
-        print(f"=== Results in: {test_results_dir} ===")
-
-        if test_run.exit_code != 0:
-            print(
-                f"ERROR: Test command exited with code {test_run.exit_code}.",
-                file=sys.stderr,
-            )
-            sys.exit(test_run.exit_code or 1)
-
-        fresh_result = parse_result_dir(test_results_dir, test_name)
-        has_weaver_output = _has_weaver_output(test_results_dir)
-        has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
-
-        if not has_weaver_output:
-            print(
-                f"ERROR: Weaver produced no JSON output for test: {test_name}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        if weaver_exit != 0 and not has_weaver_stats:
-            print(
-                "ERROR: Weaver exited non-zero before writing statistics.",
-                file=sys.stderr,
-            )
-            sys.exit(weaver_exit or 1)
-        if weaver_exit != 0:
-            print(
-                "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
-                file=sys.stderr,
-            )
-
-        # ── Update the per-test data file ───────────────────────────
-
-        print("=== Updating test data file ===")
-        result = _write_generated_test_data(test_name)
-        if result is None:
-            print(f"ERROR: Could not parse Weaver results for test: {test_name}", file=sys.stderr)
-            sys.exit(1)
-        if not result.has_relevant_data:
-            print(
-                f"ERROR: No relevant data for test: {test_name}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
+        mock_proc, weaver_proc = _run_test_pipeline(config, mock_proc)
     finally:
         _stop_process(weaver_proc, "weaver")
         _stop_process(mock_proc, "mock server")
