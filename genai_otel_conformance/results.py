@@ -255,13 +255,6 @@ def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
     return {name: count for name, count in statistics.get(key, {}).items() if count > 0}
 
 
-def _combined_non_zero_counts(statistics: dict | None, *keys: str) -> dict[str, int]:
-    combined: dict[str, int] = {}
-    for key in keys:
-        combined.update(_non_zero_counts(statistics, key))
-    return combined
-
-
 def _extract_statistics(all_objects: list[dict]) -> dict | None:
     statistics = None
     for obj in all_objects:
@@ -316,16 +309,10 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
 
     seen_attrs = _non_zero_counts(statistics, "seen_registry_attributes")
     seen_non_registry_attrs = _non_zero_counts(statistics, "seen_non_registry_attributes")
-    seen_events = _combined_non_zero_counts(
-        statistics,
-        "seen_registry_events",
-        "seen_non_registry_events",
-    )
-    seen_metrics = _combined_non_zero_counts(
-        statistics,
-        "seen_registry_metrics",
-        "seen_non_registry_metrics",
-    )
+    seen_events = _non_zero_counts(statistics, "seen_registry_events")
+    seen_events.update(_non_zero_counts(statistics, "seen_non_registry_events"))
+    seen_metrics = _non_zero_counts(statistics, "seen_registry_metrics")
+    seen_metrics.update(_non_zero_counts(statistics, "seen_non_registry_metrics"))
 
     violation_count = 0
     if statistics:
