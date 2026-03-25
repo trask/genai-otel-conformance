@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from genai_otel_conformance.results import TestResult
-from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS
+from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS
 
 
 class SpanTypeLevel(NamedTuple):
@@ -131,15 +131,11 @@ def _is_relevant_span_type(
     return False
 
 
-def relevant_span_type_keys(
-    result: TestResult,
-    span_type_order: list[str],
-    span_type_specs: dict[str, dict],
-) -> list[str]:
+def relevant_span_type_keys(result: TestResult) -> list[str]:
     """Return span-type keys that are relevant for this result."""
     relevant: list[str] = []
-    for span_type_key in span_type_order:
-        spec = span_type_specs[span_type_key]
+    for span_type_key in SPAN_TYPE_ORDER:
+        spec = SPAN_TYPE_SPECS[span_type_key]
         if not _expected_span_type_attributes(spec):
             continue
         if _is_relevant_span_type(result, span_type_key, spec):
@@ -173,15 +169,11 @@ def build_statuses_from_present_names(
     }
 
 
-def build_span_type_present_names(
-    result: TestResult,
-    span_type_order: list[str],
-    span_type_specs: dict[str, dict],
-) -> dict[str, list[str]]:
+def build_span_type_present_names(result: TestResult) -> dict[str, list[str]]:
     """Return sparse per-span-type attribute lists for relevant span types."""
     sparse: dict[str, list[str]] = {}
-    for span_type_key in relevant_span_type_keys(result, span_type_order, span_type_specs):
-        spec = span_type_specs[span_type_key]
+    for span_type_key in relevant_span_type_keys(result):
+        spec = SPAN_TYPE_SPECS[span_type_key]
         present_names: list[str] = []
         for group in span_type_attribute_groups(spec):
             type_present = span_type_present_attributes(result, span_type_key, group["key"])

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.classification import (
     DetectedSignals,
     SpanClassification,
@@ -201,3 +203,26 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         spans=span_classification,
         detected=detected,
     )
+
+
+def parse_all_results() -> dict[str, TestResult]:
+    """Parse all Weaver output directories under tests/.
+
+    Layout: tests/<lang>/<lib>/results/<eco>/
+    """
+    results: dict[str, TestResult] = {}
+
+    if not TESTS_DIR.exists():
+        print(f"Tests directory not found: {TESTS_DIR}", file=sys.stderr)
+        return results
+
+    result_dirs = [p for p in TESTS_DIR.glob("*/*/results/*") if p.is_dir()]
+
+    for result_dir in sorted(result_dirs):
+        location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
+        result = parse_result_dir(result_dir, location.test_name)
+        if result is None or not result.has_detail_content:
+            continue
+        results[location.test_name] = result
+
+    return results

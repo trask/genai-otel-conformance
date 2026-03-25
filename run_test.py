@@ -58,9 +58,8 @@ from genai_otel_conformance.data_files import (
     generate_single_test_data,
 )
 from genai_otel_conformance.weaver import (
-    SEMCONV_VERSION,
+    ensure_semconv_registry,
     ensure_weaver,
-    path_from_env,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -120,39 +119,6 @@ def wait_for_health(url: str, timeout: int, label: str, proc: subprocess.Popen |
         time.sleep(1)
     print(f"ERROR: {label} failed to become ready after {timeout}s", file=sys.stderr)
     sys.exit(1)
-
-
-def _ensure_semconv_registry() -> str:
-    registry = os.environ.get("REGISTRY")
-    if registry:
-        return registry
-
-    semconv_cache_root = path_from_env(
-        "SEMCONV_CACHE",
-        Path.home() / ".cache" / "otel-conformance" / "semconv",
-    )
-    semconv_cache = semconv_cache_root / SEMCONV_VERSION.replace("/", "_")
-    model_dir = semconv_cache / "model"
-
-    if not model_dir.is_dir():
-        print(f"=== Caching semantic conventions registry ({SEMCONV_VERSION}) ===")
-        semconv_cache.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--branch",
-                SEMCONV_VERSION,
-                "--depth",
-                "1",
-                "-q",
-                "https://github.com/open-telemetry/semantic-conventions.git",
-                str(semconv_cache),
-            ],
-            check=True,
-        )
-
-    return str(model_dir)
 
 
 def _start_mock_server(mock_url: str) -> subprocess.Popen | None:
@@ -389,7 +355,7 @@ def main() -> None:
     LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
 
     weaver_port, admin_port = _allocate_free_tcp_ports(2)
-    registry = _ensure_semconv_registry()
+    registry = ensure_semconv_registry()
     mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
 
     config = PipelineConfig(

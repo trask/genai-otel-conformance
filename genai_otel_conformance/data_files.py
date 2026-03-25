@@ -21,7 +21,6 @@ from genai_otel_conformance.results import (
 from genai_otel_conformance.specs import (
     GENAI_EVENT_TYPES,
     GENAI_METRIC_TYPES,
-    SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
 )
 from genai_otel_conformance.statuses import (
@@ -68,7 +67,7 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
         result.detected.metrics,
     )
     has_genai_signals = bool(event_entries) or bool(metric_entries)
-    spans = build_span_type_present_names(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
+    spans = build_span_type_present_names(result)
     path = TestLocation.from_test_name(test_name).data_file(TESTS_DIR)
 
     data: dict[str, object] = {
@@ -116,14 +115,14 @@ def make_anchor_id(language: str, library: str, ecosystem: str) -> str:
 
 
 def _normalize_signal_data(
-    value: object,
+    value: dict | list | None,
     signal_names: list[str],
 ) -> dict[str, str]:
     present = [name for name in value if isinstance(name, str)] if isinstance(value, (dict, list)) else []
     return build_statuses_from_present_names(signal_names, present)
 
 
-def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
+def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
     if not isinstance(value, dict):
         return {}
 

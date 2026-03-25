@@ -147,18 +147,18 @@ def _java_prebuild_test(lib: str) -> None:
     subprocess.run([*gradle, f":{lib}:classes"], cwd=workspace_dir, check=True)
 
 
-def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+def _java_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
     workspace_dir = TESTS_DIR / "java"
     test_dir = workspace_dir / lib
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
 
-    data_file = test_dir / f"data-{_ecosystem}.json"
+    data_file = test_dir / f"data-{ecosystem}.json"
     if not data_file.is_file():
         return TestCommandResult(False, 0)
 
     gradle = _gradle_cmd(workspace_dir)
-    ecosystem_task = "run" + "".join(part.capitalize() for part in _ecosystem.split("-"))
+    ecosystem_task = "run" + "".join(part.capitalize() for part in ecosystem.split("-"))
     proc = subprocess.run([*gradle, f":{lib}:{ecosystem_task}"], cwd=workspace_dir, env=env)
     return TestCommandResult(True, proc.returncode)
 

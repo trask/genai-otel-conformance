@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
-from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -43,13 +42,12 @@ class LibraryInfo(NamedTuple):
     native_repos: dict[tuple[str, str], str]
 
 
-@lru_cache(maxsize=1)
 def _discover_library_metadata() -> LibraryInfo:
     """Scan metadata.json files for library display names and native repos."""
     names: dict[str, str] = {}
     repos: dict[tuple[str, str], str] = {}
     if not TESTS_DIR.is_dir():
-        return names, repos
+        return LibraryInfo(names, repos)
     for lang_dir in sorted(TESTS_DIR.iterdir()):
         if not lang_dir.is_dir() or lang_dir.name not in LANGUAGE_DISPLAY_NAMES:
             continue

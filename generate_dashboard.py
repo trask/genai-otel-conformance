@@ -12,7 +12,6 @@ script also generates details.html and local-only event/metric heatmaps.
 from __future__ import annotations
 
 import argparse
-import sys
 from datetime import datetime, timezone
 from itertools import groupby
 from pathlib import Path
@@ -37,6 +36,7 @@ from genai_otel_conformance.statuses import (
 )
 from genai_otel_conformance.results import (
     TestResult,
+    parse_all_results,
     parse_result_dir,
 )
 from genai_otel_conformance.specs import (
@@ -54,32 +54,6 @@ from genai_otel_conformance.data_files import (
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
-
-
-# ── Data structures ──────────────────────────────────────────────────
-
-
-def parse_results() -> dict[str, TestResult]:
-    """Parse all Weaver output directories under tests/.
-
-    Layout: tests/<lang>/<lib>/results/<eco>/
-    """
-    results: dict[str, TestResult] = {}
-
-    if not TESTS_DIR.exists():
-        print(f"Tests directory not found: {TESTS_DIR}", file=sys.stderr)
-        return results
-
-    result_dirs = [p for p in TESTS_DIR.glob("*/*/results/*") if p.is_dir()]
-
-    for result_dir in sorted(result_dirs):
-        location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
-        result = parse_result_dir(result_dir, location.test_name)
-        if result is None or not result.has_detail_content:
-            continue
-        results[location.test_name] = result
-
-    return results
 
 
 # ── HTML generation ──────────────────────────────────────────────────
@@ -120,7 +94,8 @@ def _build_heatmap(
     columns: list[dict],
     entries: list[dict],
     details_available: bool,
-    cell_builder,
+    status_extractor,
+    deprecated_attrs: set[str] | None = None,
     column_groups: list[dict] | None = None,
 ) -> dict | None:
     if not entries or not columns:
@@ -139,7 +114,7 @@ def _build_heatmap(
                 entry["_lib"],
                 entry["_eco"],
             ),
-            "cells": cell_builder(entry),
+            "cells": _build_status_cells(columns, status_extractor(entry), deprecated_attrs),
         })
 
     _compute_rowspans(rows)
@@ -197,7 +172,7 @@ def _entity_summary(result: TestResult) -> str:
 
 def _build_span_sections(result: TestResult) -> list[dict]:
     sections = []
-    for span_type_key in relevant_span_type_keys(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS):
+    for span_type_key in relevant_span_type_keys(result):
         spec = SPAN_TYPE_SPECS[span_type_key]
         groups = []
         for group_spec in span_type_attribute_groups(spec):
@@ -332,19 +307,13 @@ def _prepare_heatmaps_from_data(
         if not columns:
             continue
 
-        def build_cells(entry: dict, _key=st_key, _cols=columns) -> list[dict]:
-            return _build_status_cells(
-                _cols,
-                entry["spans"][_key],
-                deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
-            )
-
         heatmap = _build_heatmap(
             st_label,
             columns,
             relevant,
             details_available,
-            build_cells,
+            lambda entry, _key=st_key: entry["spans"][_key],
+            deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
             column_groups=column_groups,
         )
         if heatmap is not None:
@@ -365,10 +334,10 @@ def _prepare_signal_heatmap(
 
     columns = _signal_columns(signal_names)
 
-    def build_cells(entry: dict) -> list[dict]:
-        return _build_status_cells(columns, entry.get(data_key, {}))
-
-    return _build_heatmap(label, columns, relevant, details_available, build_cells)
+    return _build_heatmap(
+        label, columns, relevant, details_available,
+        lambda entry: entry.get(data_key, {}),
+    )
 
 
 def _has_result_directories() -> bool:
@@ -450,7 +419,7 @@ def main() -> None:
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    results = parse_results()
+    results = parse_all_results()
     if _has_result_directories() and not results:
         raise RuntimeError(
             "Found local Weaver result directories, but no parsable results. "

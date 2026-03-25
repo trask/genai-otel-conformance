@@ -169,3 +169,37 @@ def ensure_weaver() -> Path:
             f"Installed Weaver version mismatch: expected {WEAVER_VERSION}, found {installed_version or 'unknown'}"
         )
     return cached_binary
+
+
+def ensure_semconv_registry() -> str:
+    """Ensure the pinned semconv registry is cached locally and return its model dir path."""
+    registry = os.environ.get("REGISTRY")
+    if registry:
+        return registry
+
+    semconv_cache_root = path_from_env(
+        "SEMCONV_CACHE",
+        Path.home() / ".cache" / "otel-conformance" / "semconv",
+    )
+    semconv_cache = semconv_cache_root / SEMCONV_VERSION.replace("/", "_")
+    model_dir = semconv_cache / "model"
+
+    if not model_dir.is_dir():
+        print(f"=== Caching semantic conventions registry ({SEMCONV_VERSION}) ===")
+        semconv_cache.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--branch",
+                SEMCONV_VERSION,
+                "--depth",
+                "1",
+                "-q",
+                "https://github.com/open-telemetry/semantic-conventions.git",
+                str(semconv_cache),
+            ],
+            check=True,
+        )
+
+    return str(model_dir)
