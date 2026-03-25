@@ -67,14 +67,17 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 MOCK_SERVER_PORT = 8080
 
 
-@dataclass(frozen=True)
 class RunTestError(Exception):
-    message: str
-    exit_code: int = 1
-    show_available_tests: bool = False
-
-    def __str__(self) -> str:
-        return self.message
+    def __init__(
+        self,
+        message: str,
+        exit_code: int = 1,
+        show_available_tests: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.exit_code = exit_code
+        self.show_available_tests = show_available_tests
 
 
 @dataclass
