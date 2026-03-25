@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from genai_otel_conformance import REPO_ROOT, TESTS_DIR
+from genai_otel_conformance.results import split_test_name
 
 
 class TestCommandResult(NamedTuple):
@@ -261,8 +262,6 @@ def run_test_cmd(name: str, env: dict[str, str]) -> TestCommandResult:
     Returns whether the test was found and the test command's exit code.
     Weaver violations are handled separately from test-process failures.
     """
-    from genai_otel_conformance.results import split_test_name
-
     lang, lib, eco = split_test_name(name)
     adapter = LANGUAGE_ADAPTERS.get(lang)
     if adapter is None:
