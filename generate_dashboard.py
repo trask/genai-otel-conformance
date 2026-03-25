@@ -88,9 +88,7 @@ def parse_results() -> dict[str, TestResult]:
     for result_dir in sorted(result_dirs):
         location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
         result = parse_result_dir(result_dir, location.test_name)
-        if result is None:
-            continue
-        if not _has_detail_content(result):
+        if result is None or not _has_detail_content(result):
             continue
         results[location.test_name] = result
 
@@ -186,26 +184,22 @@ def _build_status_cells(
     statuses: dict[str, str],
     deprecated_attrs: set[str] | None = None,
 ) -> list[dict]:
-    cells = []
     deprecated = deprecated_attrs or set()
+    cells = []
     for name, is_group_start in definitions:
-        status = statuses.get(name, "absent")
-        if status == "present":
-            cls = "deprecated" if name in deprecated else "present"
-            symbol = "\u2713"
-        else:
-            cls = "absent"
-            symbol = ""
-        group_cls = " group-start" if is_group_start else ""
-        cells.append({"cls": f"{cls}{group_cls}", "symbol": symbol})
+        present = statuses.get(name) == "present"
+        cls = ("deprecated" if name in deprecated else "present") if present else "absent"
+        if is_group_start:
+            cls += " group-start"
+        cells.append({"cls": cls, "symbol": "\u2713" if present else ""})
     return cells
 
 
 def _signal_columns(signal_names: list[str]) -> list[dict[str, object]]:
-    columns: list[dict[str, object]] = []
-    for index, signal_name in enumerate(signal_names):
-        columns.append({"header_text": signal_name, "is_group_start": index == 0})
-    return columns
+    return [
+        {"header_text": name, "is_group_start": i == 0}
+        for i, name in enumerate(signal_names)
+    ]
 
 
 def _column_definitions(columns: list[dict]) -> list[tuple[str, bool]]:
@@ -227,13 +221,13 @@ def _detail_repo(lang_slug: str, library: str, ecosystem: str, language: str) ->
 
 
 def _entity_summary(result: TestResult) -> str:
-    entity_parts = []
-    for entity_type in ("span", "log", "resource", "attribute"):
-        count = result.entity_counts.get(entity_type, 0)
-        if count > 0:
-            entity_parts.append(f"{count} {entity_type}{'s' if count != 1 else ''}")
-    if entity_parts:
-        return ", ".join(entity_parts)
+    parts = [
+        f"{count} {t}{'s' if count != 1 else ''}"
+        for t in ("span", "log", "resource", "attribute")
+        if (count := result.entity_counts.get(t, 0)) > 0
+    ]
+    if parts:
+        return ", ".join(parts)
     if result.statistics is not None and result.statistics.get("total_entities") == 0:
         return "0 entities"
     return ""
@@ -259,10 +253,7 @@ def _build_span_sections(result: TestResult) -> list[dict]:
 
 
 def _sorted_count_items(counts: dict[str, int]) -> list[dict[str, int | str]]:
-    items: list[dict[str, int | str]] = []
-    for name, count in sorted(counts.items()):
-        items.append({"name": name, "count": count})
-    return items
+    return [{"name": name, "count": count} for name, count in sorted(counts.items())]
 
 
 def _build_detail(
@@ -406,19 +397,13 @@ def _normalize_signal_data(
     value: object,
     signal_names: list[str],
 ) -> dict[str, str]:
-    return build_statuses_from_present_names(signal_names, _present_signal_names(value))
+    return build_statuses_from_present_names(signal_names, _present_names(value))
 
 
-def _present_name_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [name for name in value if isinstance(name, str)]
-
-
-def _present_signal_names(value: object) -> list[str]:
-    if isinstance(value, dict):
+def _present_names(value: object) -> list[str]:
+    if isinstance(value, (dict, list)):
         return [name for name in value if isinstance(name, str)]
-    return _present_name_list(value)
+    return []
 
 
 def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
@@ -431,7 +416,7 @@ def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
             continue
 
         expected_names = [column["header_text"] for column in span_type_heatmap_columns(spec)]
-        present_names = _present_name_list(value[span_type_key])
+        present_names = _present_names(value[span_type_key])
         normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
 
     return normalized

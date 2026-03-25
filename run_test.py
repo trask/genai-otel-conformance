@@ -85,10 +85,7 @@ def _allocate_free_tcp_ports(count: int) -> list[int]:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.bind(("127.0.0.1", 0))
             sockets.append(sock)
-        ports: list[int] = []
-        for sock in sockets:
-            ports.append(int(sock.getsockname()[1]))
-        return ports
+        return [sock.getsockname()[1] for sock in sockets]
     finally:
         for sock in sockets:
             sock.close()

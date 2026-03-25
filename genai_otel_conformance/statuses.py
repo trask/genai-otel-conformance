@@ -64,30 +64,29 @@ def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
 
 def span_type_heatmap_columns(spec: dict) -> list[dict[str, object]]:
     """Return ordered heatmap columns for a span-type specification."""
-    columns: list[dict[str, object]] = []
-    for group in span_type_attribute_groups(spec):
-        attrs = group["attrs"]
-        for index, attr in enumerate(attrs):
-            columns.append({
-                "header_text": attr,
-                "is_group_start": index == 0,
-                "group_key": group["key"],
-                "group_label": group["label"],
-            })
-    return columns
+    return [
+        {
+            "header_text": attr,
+            "is_group_start": i == 0,
+            "group_key": group["key"],
+            "group_label": group["label"],
+        }
+        for group in span_type_attribute_groups(spec)
+        for i, attr in enumerate(group["attrs"])
+    ]
 
 
 def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
     """Return grouped header metadata for a span-type heatmap."""
-    groups: list[dict[str, object]] = []
-    for group in span_type_attribute_groups(spec):
-        groups.append({
+    return [
+        {
             "key": group["key"],
             "label": group["label"],
             "description": group["description"],
             "colspan": len(group["attrs"]),
-        })
-    return groups
+        }
+        for group in span_type_attribute_groups(spec)
+    ]
 
 
 def span_type_present_attributes(
