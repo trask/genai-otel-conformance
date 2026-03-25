@@ -59,12 +59,12 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
     """Build committed dashboard data from a parsed Weaver result."""
     event_entries = build_present_signal_entries(
         GENAI_EVENT_TYPES,
-        result.seen_events,
+        result.observed.events,
         result.detected.events,
     )
     metric_entries = build_present_signal_entries(
         GENAI_METRIC_TYPES,
-        result.seen_metrics,
+        result.observed.metrics,
         result.detected.metrics,
     )
     has_genai_signals = bool(event_entries) or bool(metric_entries)

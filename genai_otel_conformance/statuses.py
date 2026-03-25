@@ -27,8 +27,8 @@ def merge_signal_counts(
 
 def present_attributes(result: TestResult) -> set[str]:
     """Return all attribute names present in registry and non-registry stats."""
-    attrs = set(result.seen_attrs)
-    attrs.update(result.seen_non_registry_attrs)
+    attrs = set(result.observed.attrs)
+    attrs.update(result.observed.non_registry_attrs)
     return attrs
 
 

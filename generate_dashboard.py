@@ -47,7 +47,7 @@ from genai_otel_conformance.specs import (
     SPAN_TYPE_SPECS,
 )
 from genai_otel_conformance.locations import TestLocation
-from genai_otel_conformance.test_data import (
+from genai_otel_conformance.data_files import (
     load_test_data_files,
     make_anchor_id,
 )
@@ -186,7 +186,7 @@ def _entity_summary(result: TestResult) -> str:
     parts = [
         f"{count} {t}{'s' if count != 1 else ''}"
         for t in ("span", "log", "resource", "attribute")
-        if (count := result.entity_counts.get(t, 0)) > 0
+        if (count := result.observed.entity_counts.get(t, 0)) > 0
     ]
     if parts:
         return ", ".join(parts)
@@ -205,7 +205,7 @@ def _build_span_sections(result: TestResult) -> list[dict]:
             attrs = []
             for attr in group_spec["attrs"]:
                 if attr in type_present:
-                    count = result.seen_attrs.get(attr, result.seen_non_registry_attrs.get(attr, 0))
+                    count = result.observed.attrs.get(attr, result.observed.non_registry_attrs.get(attr, 0))
                     attrs.append({"name": attr, "present": True, "count": count})
                 else:
                     attrs.append({"name": attr, "present": False, "count": 0})
@@ -231,8 +231,8 @@ def _build_detail(
         "test_name": anchor_id,
         "label": label,
         "has_local_run": result is not None,
-        "has_data": result is not None and result.has_data,
-        "has_empty_run": result is not None and result.statistics is not None and not result.has_data,
+        "has_data": result is not None and result.observed.has_data,
+        "has_empty_run": result is not None and result.statistics is not None and not result.observed.has_data,
         "violation_count": result.violation_count if result else 0,
         "instrumentation_version": extract_version_from_deps(lang_slug, library, ecosystem),
         "repo": _detail_repo(lang_slug, library, ecosystem, language),
@@ -244,17 +244,17 @@ def _build_detail(
         "violation_messages": result.violation_messages if result and result.violation_messages else [],
     }
 
-    if result and result.has_data:
+    if result and result.observed.has_data:
         detail["span_sections"] = _build_span_sections(result)
 
-        if result.seen_non_registry_attrs:
-            detail["non_registry_attrs"] = _sorted_count_items(result.seen_non_registry_attrs)
+        if result.observed.non_registry_attrs:
+            detail["non_registry_attrs"] = _sorted_count_items(result.observed.non_registry_attrs)
 
-        merged_events = merge_signal_counts(result.seen_events, result.detected.events)
+        merged_events = merge_signal_counts(result.observed.events, result.detected.events)
         if merged_events:
             detail["events"] = _sorted_count_items(merged_events)
 
-        merged_metrics = merge_signal_counts(result.seen_metrics, result.detected.metrics)
+        merged_metrics = merge_signal_counts(result.observed.metrics, result.detected.metrics)
         if merged_metrics:
             detail["metrics"] = _sorted_count_items(merged_metrics)
 

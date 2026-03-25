@@ -7,6 +7,7 @@ import re
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 
 from genai_otel_conformance import REPO_ROOT, TESTS_DIR
 
@@ -14,10 +15,12 @@ LANGUAGE_DISPLAY_NAMES = {"python": "Python", "java": "Java", "js": "JS", "dotne
 LANGUAGE_SLUGS = {display: slug for slug, display in LANGUAGE_DISPLAY_NAMES.items()}
 
 
-def _load_ecosystems() -> tuple[
-    dict[str, str],
-    dict[tuple[str, str], str],
-]:
+class EcosystemInfo(NamedTuple):
+    display: dict[str, str]
+    repos: dict[tuple[str, str], str]
+
+
+def _load_ecosystems() -> EcosystemInfo:
     """Load ecosystem definitions from tests/ecosystems.json."""
     eco_file = TESTS_DIR / "ecosystems.json"
     data = json.loads(eco_file.read_text(encoding="utf-8"))
@@ -28,17 +31,20 @@ def _load_ecosystems() -> tuple[
         for lang_slug, repo in info.get("repos", {}).items():
             lang_display = LANGUAGE_DISPLAY_NAMES.get(lang_slug, lang_slug)
             repos[(eco, lang_display)] = repo
-    return display, repos
+    return EcosystemInfo(display, repos)
+
+_ECOSYSTEM_INFO = _load_ecosystems()
+ECOSYSTEM_DISPLAY = _ECOSYSTEM_INFO.display
+ECOSYSTEM_REPOS = _ECOSYSTEM_INFO.repos
 
 
-ECOSYSTEM_DISPLAY, ECOSYSTEM_REPOS = _load_ecosystems()
+class LibraryInfo(NamedTuple):
+    display_names: dict[str, str]
+    native_repos: dict[tuple[str, str], str]
 
 
 @lru_cache(maxsize=1)
-def _discover_library_metadata() -> tuple[
-    dict[str, str],
-    dict[tuple[str, str], str],
-]:
+def _discover_library_metadata() -> LibraryInfo:
     """Scan metadata.json files for library display names and native repos."""
     names: dict[str, str] = {}
     repos: dict[tuple[str, str], str] = {}
@@ -59,10 +65,12 @@ def _discover_library_metadata() -> tuple[
                 names[slug] = data["display_name"]
             if "repo" in data:
                 repos[(lang_dir.name, slug)] = data["repo"]
-    return names, repos
+    return LibraryInfo(names, repos)
 
 
-LIBRARY_DISPLAY_NAMES, NATIVE_REPOS = _discover_library_metadata()
+_LIBRARY_INFO = _discover_library_metadata()
+LIBRARY_DISPLAY_NAMES = _LIBRARY_INFO.display_names
+NATIVE_REPOS = _LIBRARY_INFO.native_repos
 
 
 def library_display_name(slug: str) -> str:

@@ -22,6 +22,16 @@ def _validate_test_lang(location: TestLocation) -> None:
 
 
 @dataclass
+class ObservedTelemetry:
+    attrs: dict[str, int] = field(default_factory=dict)
+    non_registry_attrs: dict[str, int] = field(default_factory=dict)
+    events: dict[str, int] = field(default_factory=dict)
+    metrics: dict[str, int] = field(default_factory=dict)
+    entity_counts: dict[str, int] = field(default_factory=dict)
+    has_data: bool = False
+
+
+@dataclass
 class TestResult:
     language: str
     library: str
@@ -29,12 +39,7 @@ class TestResult:
     statistics: dict | None
     violation_count: int
     violation_messages: list[str]
-    entity_counts: dict[str, int]
-    seen_attrs: dict[str, int]
-    seen_non_registry_attrs: dict[str, int]
-    seen_events: dict[str, int]
-    seen_metrics: dict[str, int]
-    has_data: bool
+    observed: ObservedTelemetry = field(default_factory=ObservedTelemetry)
     spans: SpanClassification = field(default_factory=SpanClassification)
     detected: DetectedSignals = field(default_factory=DetectedSignals)
 
@@ -43,11 +48,11 @@ class TestResult:
         """Return whether this result contains any renderable detail content."""
         return (
             self.statistics is not None
-            or self.has_data
+            or self.observed.has_data
             or bool(self.violation_messages)
-            or bool(self.seen_attrs)
-            or bool(self.seen_non_registry_attrs)
-            or bool(self.seen_events)
+            or bool(self.observed.attrs)
+            or bool(self.observed.non_registry_attrs)
+            or bool(self.observed.events)
             or bool(self.spans.detected_types)
             or bool(self.detected.events)
             or bool(self.detected.metrics)
@@ -185,12 +190,14 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         statistics=statistics,
         violation_count=violation_count,
         violation_messages=violation_messages,
-        entity_counts=entity_counts,
-        seen_attrs=seen_attrs,
-        seen_non_registry_attrs=seen_non_registry_attrs,
-        seen_events=seen_events,
-        seen_metrics=seen_metrics,
-        has_data=has_data,
+        observed=ObservedTelemetry(
+            attrs=seen_attrs,
+            non_registry_attrs=seen_non_registry_attrs,
+            events=seen_events,
+            metrics=seen_metrics,
+            entity_counts=entity_counts,
+            has_data=has_data,
+        ),
         spans=span_classification,
         detected=detected,
     )
