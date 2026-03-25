@@ -11,6 +11,7 @@ from pathlib import Path
 from genai_otel_conformance import REPO_ROOT, TESTS_DIR
 
 LANGUAGE_DISPLAY_NAMES = {"python": "Python", "java": "Java", "js": "JS", "dotnet": "C#"}
+LANGUAGE_SLUGS = {display: slug for slug, display in LANGUAGE_DISPLAY_NAMES.items()}
 
 
 def _load_ecosystems() -> tuple[

@@ -23,6 +23,7 @@ from genai_otel_conformance.metadata import (
     ECOSYSTEM_DISPLAY,
     ECOSYSTEM_REPOS,
     LANGUAGE_DISPLAY_NAMES,
+    LANGUAGE_SLUGS,
     NATIVE_REPOS,
     extract_version_from_deps,
     library_display_name,
@@ -52,8 +53,6 @@ from genai_otel_conformance.locations import TestLocation
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
-_LANG_SLUG = {display: slug for slug, display in LANGUAGE_DISPLAY_NAMES.items()}
-
 
 def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     """Build an anchor ID in library-language-ecosystem order.
@@ -66,7 +65,7 @@ def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
         library: Library slug (e.g. "openai").
         ecosystem: Ecosystem slug (e.g. "otelcontrib").
     """
-    lang_slug = _LANG_SLUG.get(language, language.lower())
+    lang_slug = LANGUAGE_SLUGS.get(language, language.lower())
     return f"{library}-{lang_slug}-{ecosystem}"
 
 # ── Data structures ──────────────────────────────────────────────────
@@ -326,7 +325,7 @@ def _prepare_details(
         details.append(_build_detail(entry["test_name"], label, lang, lib, eco, language, result))
 
     for result in extra_results:
-        lang_slug = _LANG_SLUG.get(result.language, result.language.lower())
+        lang_slug = LANGUAGE_SLUGS.get(result.language, result.language.lower())
         anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
         lib_display = library_display_name(result.library)
         eco_display = ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem)
