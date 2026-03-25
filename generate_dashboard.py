@@ -395,26 +395,6 @@ def _normalize_test_data_entry(entry: dict) -> dict:
     return normalized
 
 
-def _build_span_type_cells(
-    entry: dict,
-    span_type_key: str,
-    columns: list[dict],
-) -> list[dict]:
-    return _build_status_cells(
-        columns,
-        entry["spans"][span_type_key],
-        deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
-    )
-
-
-def _build_signal_cells(
-    entry: dict,
-    data_key: str,
-    columns: list[dict],
-) -> list[dict]:
-    return _build_status_cells(columns, entry.get(data_key, {}))
-
-
 def _prepare_heatmaps_from_data(
     test_data_entries: list[dict],
     details_available: bool,
@@ -437,7 +417,11 @@ def _prepare_heatmaps_from_data(
             continue
 
         def build_cells(entry: dict, _key=st_key, _cols=columns) -> list[dict]:
-            return _build_span_type_cells(entry, _key, _cols)
+            return _build_status_cells(
+                _cols,
+                entry["spans"][_key],
+                deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
+            )
 
         heatmap = _build_heatmap(
             st_label,
@@ -466,7 +450,7 @@ def _prepare_signal_heatmap(
     columns = _signal_columns(signal_names)
 
     def build_cells(entry: dict) -> list[dict]:
-        return _build_signal_cells(entry, data_key, columns)
+        return _build_status_cells(columns, entry.get(data_key, {}))
 
     return _build_heatmap(label, columns, relevant, details_available, build_cells)
 
