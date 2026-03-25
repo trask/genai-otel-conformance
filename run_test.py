@@ -161,22 +161,17 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
 def _normalize_generated_test_payload(data: GeneratedTestPayload) -> GeneratedTestPayload:
     """Drop empty top-level objects and sort span attribute names alphabetically."""
     normalized: GeneratedTestPayload = {}
-    for key, value in data.items():
-        if not value:
-            continue
-        if key == "spans" and isinstance(value, dict):
-            normalized[key] = {
-                span_type: sorted(attrs)
-                for span_type, attrs in value.items()
-                if attrs
-            }
-            if not normalized[key]:
-                normalized.pop(key)
-            continue
-        if key in ("events", "metrics") and isinstance(value, dict):
+    if spans := data.get("spans"):
+        cleaned = {
+            span_type: sorted(attrs)
+            for span_type, attrs in spans.items()
+            if attrs
+        }
+        if cleaned:
+            normalized["spans"] = cleaned
+    for key in ("events", "metrics"):
+        if value := data.get(key):
             normalized[key] = dict(sorted(value.items()))
-            continue
-        normalized[key] = value
     return normalized
 
 

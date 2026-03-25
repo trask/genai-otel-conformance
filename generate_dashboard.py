@@ -15,6 +15,7 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
+from itertools import groupby
 from pathlib import Path
 
 from genai_otel_conformance import TESTS_DIR
@@ -124,22 +125,14 @@ def _compute_rowspans(rows: list[dict]) -> None:
     for row in rows:
         row["lang_rowspan"] = 0
         row["lib_rowspan"] = 0
-    if not rows:
-        return
-    i = 0
-    while i < len(rows):
-        lib = rows[i]["lib_display"]
-        lib_start = i
-        while i < len(rows) and rows[i]["lib_display"] == lib:
-            i += 1
-        rows[lib_start]["lib_rowspan"] = i - lib_start
-        j = lib_start
-        while j < i:
-            lang = rows[j]["language"]
-            lang_start = j
-            while j < i and rows[j]["language"] == lang:
-                j += 1
-            rows[lang_start]["lang_rowspan"] = j - lang_start
+    for _, lib_group in groupby(rows, key=lambda r: r["lib_display"]):
+        lib_rows = list(lib_group)
+        lib_rows[0]["lib_rowspan"] = len(lib_rows)
+        lang_offset = 0
+        for _, lang_group in groupby(lib_rows, key=lambda r: r["language"]):
+            lang_rows = list(lang_group)
+            lib_rows[lang_offset]["lang_rowspan"] = len(lang_rows)
+            lang_offset += len(lang_rows)
 
 
 _LANGUAGE_ORDER = {"python": 0, "js": 1, "java": 2, "c#": 3}
