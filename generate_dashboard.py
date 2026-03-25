@@ -227,10 +227,6 @@ def _column_definitions(columns: list[dict]) -> list[tuple[str, bool]]:
     return definitions
 
 
-def _detail_sort_key(entry: dict) -> tuple[str, int, str]:
-    return _heatmap_sort_key(entry)
-
-
 def _extra_result_sort_key(result: TestResult) -> tuple[str, str, str]:
     return (
         library_display_name(result.library).lower(),
@@ -293,33 +289,24 @@ def _build_detail(
     language: str,
     result: TestResult | None,
 ) -> dict:
-    has_local_run = result is not None
-    has_data = has_local_run and result.has_data
-    has_empty_run = has_local_run and result.statistics is not None and not result.has_data
-
     detail: dict = {
         "test_name": anchor_id,
         "label": label,
-        "has_local_run": has_local_run,
-        "has_data": has_data,
-        "has_empty_run": has_empty_run,
+        "has_local_run": result is not None,
+        "has_data": result is not None and result.has_data,
+        "has_empty_run": result is not None and result.statistics is not None and not result.has_data,
         "violation_count": result.violation_count if result else 0,
         "instrumentation_version": extract_version_from_deps(lang_slug, library, ecosystem),
         "repo": _detail_repo(lang_slug, library, ecosystem, language),
-        "entity_summary": "",
+        "entity_summary": _entity_summary(result) if result else "",
         "span_sections": [],
         "non_registry_attrs": [],
         "events": [],
         "metrics": [],
-        "violation_messages": [],
+        "violation_messages": result.violation_messages if result and result.violation_messages else [],
     }
 
-    if not result:
-        return detail
-
-    detail["entity_summary"] = _entity_summary(result)
-
-    if result.has_data:
+    if result and result.has_data:
         detail["span_sections"] = _build_span_sections(result)
 
         if result.seen_non_registry_attrs:
@@ -332,9 +319,6 @@ def _build_detail(
         merged_metrics = merge_signal_counts(result.seen_metrics, result.detected_metrics)
         if merged_metrics:
             detail["metrics"] = _sorted_count_items(merged_metrics)
-
-    if result.violation_messages:
-        detail["violation_messages"] = result.violation_messages
 
     return detail
 
@@ -353,7 +337,7 @@ def _prepare_details(
         anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
         result_by_id[anchor_id] = result
 
-    sorted_entries = sorted(test_data_entries, key=_detail_sort_key)
+    sorted_entries = sorted(test_data_entries, key=_heatmap_sort_key)
 
     # Also include any results that have no corresponding data file.
     seen_ids: set[str] = set()

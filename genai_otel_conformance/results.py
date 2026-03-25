@@ -6,17 +6,9 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
-
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.metadata import LANGUAGE_DISPLAY_NAMES
 from genai_otel_conformance.locations import TestLocation
-
-
-class TestName(NamedTuple):
-    language: str
-    library: str
-    ecosystem: str
 
 
 @dataclass
@@ -53,12 +45,6 @@ def split_test_name(name: str) -> tuple[str, str, str]:
     return location.lang, location.library, location.ecosystem
 
 
-def parse_test_name(test_name: str) -> TestName:
-    """Parse a supported test name into display values."""
-    lang, library, ecosystem = split_test_name(test_name)
-    return TestName(LANGUAGE_DISPLAY_NAMES[lang], library, ecosystem)
-
-
 def try_parse_json(content: str) -> list[dict]:
     """Parse JSON content, handling a single object, array, or JSONL."""
     objects: list[dict] = []
@@ -87,17 +73,11 @@ def try_parse_json(content: str) -> list[dict]:
 
 
 def _has_any_attr(span_attrs: dict[str, object], *names: str) -> bool:
-    for name in names:
-        if span_attrs.get(name):
-            return True
-    return False
+    return any(span_attrs.get(name) for name in names)
 
 
 def _has_all_attrs(span_attrs: dict[str, object], *names: str) -> bool:
-    for name in names:
-        if span_attrs.get(name) is None:
-            return False
-    return True
+    return all(span_attrs.get(name) is not None for name in names)
 
 
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
@@ -224,18 +204,13 @@ def _summarize_samples(
 def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
     if not statistics:
         return {}
-    counts: dict[str, int] = {}
-    for name, count in statistics.get(key, {}).items():
-        if count > 0:
-            counts[name] = count
-    return counts
+    return {name: count for name, count in statistics.get(key, {}).items() if count > 0}
 
 
 def _combined_non_zero_counts(statistics: dict | None, *keys: str) -> dict[str, int]:
     combined: dict[str, int] = {}
     for key in keys:
-        for name, count in _non_zero_counts(statistics, key).items():
-            combined[name] = count
+        combined.update(_non_zero_counts(statistics, key))
     return combined
 
 
@@ -318,10 +293,11 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         entity_counts = statistics.get("total_entities_by_type", {})
 
     try:
-        language, library, ecosystem = parse_test_name(test_name)
+        lang, library, ecosystem = split_test_name(test_name)
     except ValueError:
         print(f"Warning: Could not parse test name: {test_name}", file=sys.stderr)
         return None
+    language = LANGUAGE_DISPLAY_NAMES[lang]
 
     has_data = False
     if statistics and statistics.get("total_entities", 0) > 0:
