@@ -359,13 +359,8 @@ def _normalize_signal_data(
     value: object,
     signal_names: list[str],
 ) -> dict[str, str]:
-    return build_statuses_from_present_names(signal_names, _present_names(value))
-
-
-def _present_names(value: object) -> list[str]:
-    if isinstance(value, (dict, list)):
-        return [name for name in value if isinstance(name, str)]
-    return []
+    present = [name for name in value if isinstance(name, str)] if isinstance(value, (dict, list)) else []
+    return build_statuses_from_present_names(signal_names, present)
 
 
 def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
@@ -378,7 +373,8 @@ def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
             continue
 
         expected_names = [column["header_text"] for column in span_type_heatmap_columns(spec)]
-        present_names = _present_names(value[span_type_key])
+        raw = value[span_type_key]
+        present_names = [name for name in raw if isinstance(name, str)] if isinstance(raw, (dict, list)) else []
         normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
 
     return normalized
