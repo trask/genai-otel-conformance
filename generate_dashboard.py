@@ -88,26 +88,11 @@ def parse_results() -> dict[str, TestResult]:
     for result_dir in sorted(result_dirs):
         location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
         result = parse_result_dir(result_dir, location.test_name)
-        if result is None or not _has_detail_content(result):
+        if result is None or not result.has_detail_content:
             continue
         results[location.test_name] = result
 
     return results
-
-
-def _has_detail_content(result: TestResult) -> bool:
-    """Return whether a parsed result contains any renderable detail content."""
-    return (
-        result.statistics is not None
-        or result.has_data
-        or bool(result.violation_messages)
-        or bool(result.seen_attrs)
-        or bool(result.seen_non_registry_attrs)
-        or bool(result.seen_events)
-        or bool(result.spans.detected_types)
-        or bool(result.detected.events)
-        or bool(result.detected.metrics)
-    )
 
 
 # ── HTML generation ──────────────────────────────────────────────────

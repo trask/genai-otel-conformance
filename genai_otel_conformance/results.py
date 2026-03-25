@@ -41,6 +41,21 @@ class TestResult:
     spans: SpanClassification = field(default_factory=SpanClassification)
     detected: DetectedSignals = field(default_factory=DetectedSignals)
 
+    @property
+    def has_detail_content(self) -> bool:
+        """Return whether this result contains any renderable detail content."""
+        return (
+            self.statistics is not None
+            or self.has_data
+            or bool(self.violation_messages)
+            or bool(self.seen_attrs)
+            or bool(self.seen_non_registry_attrs)
+            or bool(self.seen_events)
+            or bool(self.spans.detected_types)
+            or bool(self.detected.events)
+            or bool(self.detected.metrics)
+        )
+
 
 def split_test_name(name: str) -> tuple[str, str, str]:
     """Parse a test name into language/library/ecosystem slugs."""
