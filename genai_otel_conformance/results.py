@@ -284,16 +284,17 @@ def _merge_detected_signal_counts(
     detected_counts: dict[str, int],
     statistics: dict | None,
     statistics_key: str,
-) -> None:
+) -> dict[str, int]:
+    merged = dict(detected_counts)
     if not statistics:
-        return
+        return merged
 
     for signal_name, count in statistics.get(statistics_key, {}).items():
         if count <= 0 or not signal_name.startswith("gen_ai."):
             continue
-        current_count = detected_counts.get(signal_name, 0)
-        if count > current_count:
-            detected_counts[signal_name] = count
+        if count > merged.get(signal_name, 0):
+            merged[signal_name] = count
+    return merged
 
 
 def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
@@ -333,12 +334,12 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         has_data = True
     span_classification, detected = _summarize_samples(all_objects)
 
-    _merge_detected_signal_counts(
+    detected.events = _merge_detected_signal_counts(
         detected.events,
         statistics,
         "seen_non_registry_events",
     )
-    _merge_detected_signal_counts(
+    detected.metrics = _merge_detected_signal_counts(
         detected.metrics,
         statistics,
         "seen_non_registry_metrics",
