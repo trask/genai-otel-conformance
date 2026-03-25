@@ -110,9 +110,9 @@ def _has_detail_content(result: TestResult) -> bool:
         or bool(result.seen_attrs)
         or bool(result.seen_non_registry_attrs)
         or bool(result.seen_events)
-        or bool(result.detected_span_types)
-        or bool(result.detected_events)
-        or bool(result.detected_metrics)
+        or bool(result.spans.detected_types)
+        or bool(result.detected.events)
+        or bool(result.detected.metrics)
     )
 
 
@@ -312,11 +312,11 @@ def _build_detail(
         if result.seen_non_registry_attrs:
             detail["non_registry_attrs"] = _sorted_count_items(result.seen_non_registry_attrs)
 
-        merged_events = merge_signal_counts(result.seen_events, result.detected_events)
+        merged_events = merge_signal_counts(result.seen_events, result.detected.events)
         if merged_events:
             detail["events"] = _sorted_count_items(merged_events)
 
-        merged_metrics = merge_signal_counts(result.seen_metrics, result.detected_metrics)
+        merged_metrics = merge_signal_counts(result.seen_metrics, result.detected.metrics)
         if merged_metrics:
             detail["metrics"] = _sorted_count_items(merged_metrics)
 

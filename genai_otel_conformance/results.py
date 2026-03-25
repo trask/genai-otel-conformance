@@ -12,6 +12,19 @@ from genai_otel_conformance.locations import TestLocation
 
 
 @dataclass
+class SpanClassification:
+    detected_types: set[str] = field(default_factory=set)
+    per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
+    per_type_any_attrs: dict[str, set[str]] = field(default_factory=dict)
+
+
+@dataclass
+class DetectedSignals:
+    events: dict[str, int] = field(default_factory=dict)
+    metrics: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass
 class TestResult:
     language: str
     library: str
@@ -25,11 +38,8 @@ class TestResult:
     seen_events: dict[str, int]
     seen_metrics: dict[str, int]
     has_data: bool
-    detected_span_types: set[str] = field(default_factory=set)
-    per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
-    per_type_any_attrs: dict[str, set[str]] = field(default_factory=dict)
-    detected_events: dict[str, int] = field(default_factory=dict)
-    detected_metrics: dict[str, int] = field(default_factory=dict)
+    spans: SpanClassification = field(default_factory=SpanClassification)
+    detected: DetectedSignals = field(default_factory=DetectedSignals)
 
 
 def split_test_name(name: str) -> tuple[str, str, str]:
@@ -162,13 +172,10 @@ def _span_attributes(span: dict[str, object]) -> dict[str, object]:
 
 def _summarize_samples(
     all_objects: list[dict],
-) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]], dict[str, int], dict[str, int]]:
+) -> tuple[SpanClassification, DetectedSignals]:
     """Scan sample payloads once and collect detected spans, events, and metrics."""
-    span_types: set[str] = set()
-    per_type_attrs: dict[str, set[str]] = {}
-    per_type_any_attrs: dict[str, set[str]] = {}
-    events: dict[str, int] = {}
-    metrics: dict[str, int] = {}
+    spans = SpanClassification()
+    signals = DetectedSignals()
     for obj in all_objects:
         if not isinstance(obj, dict):
             continue
@@ -177,28 +184,28 @@ def _summarize_samples(
             if span:
                 attrs = _span_attributes(span)
                 classified = _classify_span(span.get("name", ""), attrs)
-                span_types.update(classified)
+                spans.detected_types.update(classified)
                 attr_names = set(attrs.keys())
                 for span_type in classified:
-                    if span_type not in per_type_attrs:
-                        per_type_attrs[span_type] = set(attr_names)
+                    if span_type not in spans.per_type_attrs:
+                        spans.per_type_attrs[span_type] = set(attr_names)
                     else:
-                        per_type_attrs[span_type].intersection_update(attr_names)
-                    per_type_any_attrs.setdefault(span_type, set()).update(attr_names)
+                        spans.per_type_attrs[span_type].intersection_update(attr_names)
+                    spans.per_type_any_attrs.setdefault(span_type, set()).update(attr_names)
 
             log = sample.get("log")
             if log:
                 event_name = log.get("event_name", "")
                 if event_name.startswith("gen_ai."):
-                    events[event_name] = events.get(event_name, 0) + 1
+                    signals.events[event_name] = signals.events.get(event_name, 0) + 1
 
             metric = sample.get("metric")
             if metric:
                 metric_name = metric.get("name", "")
                 if metric_name.startswith("gen_ai."):
-                    metrics[metric_name] = metrics.get(metric_name, 0) + 1
+                    signals.metrics[metric_name] = signals.metrics.get(metric_name, 0) + 1
 
-    return span_types, per_type_attrs, per_type_any_attrs, events, metrics
+    return spans, signals
 
 
 def _non_zero_counts(statistics: dict | None, key: str) -> dict[str, int]:
@@ -302,23 +309,15 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     has_data = False
     if statistics and statistics.get("total_entities", 0) > 0:
         has_data = True
-    (
-        detected_span_types,
-        per_type_attrs,
-        per_type_any_attrs,
-        detected_events,
-        detected_metrics,
-    ) = _summarize_samples(
-        all_objects
-    )
+    span_classification, detected = _summarize_samples(all_objects)
 
     _merge_detected_signal_counts(
-        detected_events,
+        detected.events,
         statistics,
         "seen_non_registry_events",
     )
     _merge_detected_signal_counts(
-        detected_metrics,
+        detected.metrics,
         statistics,
         "seen_non_registry_metrics",
     )
@@ -336,9 +335,6 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         seen_events=seen_events,
         seen_metrics=seen_metrics,
         has_data=has_data,
-        detected_span_types=detected_span_types,
-        per_type_attrs=per_type_attrs,
-        per_type_any_attrs=per_type_any_attrs,
-        detected_events=detected_events,
-        detected_metrics=detected_metrics,
+        spans=span_classification,
+        detected=detected,
     )

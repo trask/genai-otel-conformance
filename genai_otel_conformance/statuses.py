@@ -98,8 +98,8 @@ def span_type_present_attributes(
     """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
     if level == "required":
-        return result.per_type_attrs.get(span_type_key, all_present)
-    return result.per_type_any_attrs.get(span_type_key, all_present)
+        return result.spans.per_type_attrs.get(span_type_key, all_present)
+    return result.spans.per_type_any_attrs.get(span_type_key, all_present)
 
 
 def _expected_span_type_attributes(spec: dict) -> list[str]:
@@ -115,7 +115,7 @@ def _is_relevant_span_type(
     spec: dict,
 ) -> bool:
     if spec.get("discriminator_attrs"):
-        return span_type_key in result.detected_span_types
+        return span_type_key in result.spans.detected_types
 
     all_present = present_attributes(result)
     for attr in _expected_span_type_attributes(spec):
