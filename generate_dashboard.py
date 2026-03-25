@@ -164,13 +164,15 @@ def _build_heatmap(
 
 
 def _build_status_cells(
-    definitions: list[tuple[str, bool]],
+    columns: list[dict],
     statuses: dict[str, str],
     deprecated_attrs: set[str] | None = None,
 ) -> list[dict]:
     deprecated = deprecated_attrs or set()
     cells = []
-    for name, is_group_start in definitions:
+    for col in columns:
+        name = col["header_text"]
+        is_group_start = col["is_group_start"]
         present = statuses.get(name) == "present"
         cls = ("deprecated" if name in deprecated else "present") if present else "absent"
         if is_group_start:
@@ -184,10 +186,6 @@ def _signal_columns(signal_names: list[str]) -> list[dict[str, object]]:
         {"header_text": name, "is_group_start": i == 0}
         for i, name in enumerate(signal_names)
     ]
-
-
-def _column_definitions(columns: list[dict]) -> list[tuple[str, bool]]:
-    return [(col["header_text"], col["is_group_start"]) for col in columns]
 
 
 def _detail_repo(lang_slug: str, library: str, ecosystem: str, language: str) -> str:
@@ -404,10 +402,10 @@ def _normalize_test_data_entry(entry: dict) -> dict:
 def _build_span_type_cells(
     entry: dict,
     span_type_key: str,
-    definitions: list[tuple[str, bool]],
+    columns: list[dict],
 ) -> list[dict]:
     return _build_status_cells(
-        definitions,
+        columns,
         entry["spans"][span_type_key],
         deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
     )
@@ -416,9 +414,9 @@ def _build_span_type_cells(
 def _build_signal_cells(
     entry: dict,
     data_key: str,
-    definitions: list[tuple[str, bool]],
+    columns: list[dict],
 ) -> list[dict]:
-    return _build_status_cells(definitions, entry.get(data_key, {}))
+    return _build_status_cells(columns, entry.get(data_key, {}))
 
 
 def _entries_with_span_type(test_data_entries: list[dict], span_type_key: str) -> list[dict]:
@@ -446,13 +444,12 @@ def _prepare_heatmaps_from_data(
 
         columns = span_type_heatmap_columns(spec)
         column_groups = span_type_heatmap_groups(spec)
-        col_defs = _column_definitions(columns)
 
         if not columns:
             continue
 
         def build_cells(entry: dict) -> list[dict]:
-            return _build_span_type_cells(entry, st_key, col_defs)
+            return _build_span_type_cells(entry, st_key, columns)
 
         heatmap = _build_heatmap(
             st_label,
@@ -479,10 +476,9 @@ def _prepare_signal_heatmap(
     relevant = _entries_with_key(test_data_entries, data_key)
 
     columns = _signal_columns(signal_names)
-    definitions = _column_definitions(columns)
 
     def build_cells(entry: dict) -> list[dict]:
-        return _build_signal_cells(entry, data_key, definitions)
+        return _build_signal_cells(entry, data_key, columns)
 
     return _build_heatmap(label, columns, relevant, details_available, build_cells)
 
