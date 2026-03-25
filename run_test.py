@@ -47,7 +47,7 @@ from pathlib import Path
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.language_adapters import (
     LANGUAGE_ADAPTERS,
-    TestCommandResult,
+    UvNotInstalledError,
     install_with_uv,
     list_available_tests,
     run_test_cmd,
@@ -240,13 +240,6 @@ class PipelineConfig:
     registry: str
 
 
-def _prebuild_test(location: TestLocation) -> None:
-    """Compile the test before starting Weaver."""
-    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
-    # can cause it to shut down before the test sends any data.
-    LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
-
-
 def _start_weaver_live_check(
     config: PipelineConfig,
     state: PipelineState,
@@ -274,20 +267,6 @@ def _start_weaver_live_check(
     return test_results_dir
 
 
-def _run_configured_test(config: PipelineConfig) -> TestCommandResult:
-    """Run the configured test command against the active Weaver instance."""
-    test_env = _build_test_environment(config.mock_url, config.weaver_port)
-    print(f"=== Running test: {config.test_name} ===")
-
-    test_run = run_test_cmd(config.test_name, test_env)
-    if not test_run.found:
-        raise RunTestError(
-            f"Could not find test '{config.test_name}'",
-            show_available_tests=True,
-        )
-    return test_run
-
-
 def _finish_weaver_run(
     config: PipelineConfig,
     state: PipelineState,
@@ -302,15 +281,6 @@ def _finish_weaver_run(
     print(f"=== Weaver exit code: {weaver_exit} ===")
     print(f"=== Results in: {test_results_dir} ===")
     return weaver_exit, parse_result_dir(test_results_dir, config.test_name)
-
-
-def _validate_test_run(test_run: TestCommandResult) -> None:
-    """Raise if the test command itself failed."""
-    if test_run.exit_code != 0:
-        raise RunTestError(
-            f"Test command exited with code {test_run.exit_code}.",
-            exit_code=test_run.exit_code or 1,
-        )
 
 
 def _validate_weaver_output(
@@ -340,16 +310,6 @@ def _validate_weaver_output(
         )
 
 
-def _update_generated_test_data_or_raise(test_name: str) -> None:
-    """Write the generated test data file and validate that it contains useful data."""
-    print("=== Updating test data file ===")
-    result = _write_generated_test_data(test_name)
-    if result is None:
-        raise RunTestError(f"Could not parse Weaver results for test: {test_name}")
-    if not result.has_relevant_data:
-        raise RunTestError(f"No relevant data for test: {test_name}")
-
-
 def _run_test_pipeline(
     config: PipelineConfig,
     state: PipelineState,
@@ -360,13 +320,37 @@ def _run_test_pipeline(
     if state.mock_proc is None:
         _start_mock_server(config.mock_url, state)
 
-    _prebuild_test(location)
+    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
+    # can cause it to shut down before the test sends any data.
+    LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
+
     test_results_dir = _start_weaver_live_check(config, state, location)
-    test_run = _run_configured_test(config)
+
+    test_env = _build_test_environment(config.mock_url, config.weaver_port)
+    print(f"=== Running test: {config.test_name} ===")
+    test_run = run_test_cmd(config.test_name, test_env)
+    if not test_run.found:
+        raise RunTestError(
+            f"Could not find test '{config.test_name}'",
+            show_available_tests=True,
+        )
+
     weaver_exit, fresh_result = _finish_weaver_run(config, state, test_results_dir)
-    _validate_test_run(test_run)
+
+    if test_run.exit_code != 0:
+        raise RunTestError(
+            f"Test command exited with code {test_run.exit_code}.",
+            exit_code=test_run.exit_code or 1,
+        )
+
     _validate_weaver_output(config, test_results_dir, weaver_exit, fresh_result)
-    _update_generated_test_data_or_raise(config.test_name)
+
+    print("=== Updating test data file ===")
+    result = _write_generated_test_data(config.test_name)
+    if result is None:
+        raise RunTestError(f"Could not parse Weaver results for test: {config.test_name}")
+    if not result.has_relevant_data:
+        raise RunTestError(f"No relevant data for test: {config.test_name}")
 
 
 def main() -> int:
@@ -387,31 +371,34 @@ def main() -> int:
         _print_available_tests()
         return 1
 
-    lang, lib = location.lang, location.library
-    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
-
-    weaver_port, admin_port = _allocate_free_tcp_ports(2)
-    registry = ensure_semconv_registry()
-    mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
-
-    config = PipelineConfig(
-        test_name=test_name,
-        extra_weaver_args=extra_weaver_args,
-        mock_url=mock_url,
-        weaver_port=weaver_port,
-        admin_port=admin_port,
-        registry=registry,
-    )
-
     state = PipelineState()
 
     try:
+        lang, lib = location.lang, location.library
+        LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
+
+        weaver_port, admin_port = _allocate_free_tcp_ports(2)
+        registry = ensure_semconv_registry()
+        mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
+
+        config = PipelineConfig(
+            test_name=test_name,
+            extra_weaver_args=extra_weaver_args,
+            mock_url=mock_url,
+            weaver_port=weaver_port,
+            admin_port=admin_port,
+            registry=registry,
+        )
+
         _run_test_pipeline(config, state)
     except RunTestError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         if exc.show_available_tests:
             _print_available_tests()
         return exc.exit_code
+    except UvNotInstalledError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     finally:
         _stop_process(state.weaver_proc, "weaver")
         _stop_process(state.mock_proc, "mock server")

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import groupby
 from pathlib import Path
@@ -54,21 +55,91 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
 
+@dataclass(frozen=True)
+class StatusCell:
+    cls: str
+    symbol: str
+
+
+@dataclass
+class HeatmapRow:
+    test_name: str
+    has_details: bool
+    lib_display: str
+    language: str
+    eco_display: str
+    instrumentation_version: str
+    cells: list[StatusCell]
+    lib_rowspan: int = 0
+    lang_rowspan: int = 0
+
+
+@dataclass(frozen=True)
+class HeatmapView:
+    label: str
+    columns: list[HeatmapColumn]
+    column_groups: list[HeatmapGroup]
+    rows: list[HeatmapRow]
+
+
+@dataclass(frozen=True)
+class DetailAttributeView:
+    name: str
+    present: bool
+    count: int
+
+
+@dataclass(frozen=True)
+class DetailGroupView:
+    label: str
+    attrs: list[DetailAttributeView]
+
+
+@dataclass(frozen=True)
+class SpanSectionView:
+    label: str
+    groups: list[DetailGroupView]
+
+
+@dataclass(frozen=True)
+class CountItemView:
+    name: str
+    count: int
+
+
+@dataclass(frozen=True)
+class DetailView:
+    test_name: str
+    label: str
+    has_local_run: bool
+    has_data: bool
+    has_empty_run: bool
+    violation_count: int
+    instrumentation_version: str
+    repo: str
+    entity_summary: str
+    span_sections: list[SpanSectionView] = field(default_factory=list)
+    non_registry_attrs: list[CountItemView] = field(default_factory=list)
+    events: list[CountItemView] = field(default_factory=list)
+    metrics: list[CountItemView] = field(default_factory=list)
+    violation_messages: list[str] = field(default_factory=list)
+
+
 # ── HTML generation ──────────────────────────────────────────────────
 
 
-def _compute_rowspans(rows: list[dict]) -> None:
+def _compute_rowspans(rows: list[HeatmapRow]) -> None:
     """Compute lib_rowspan / lang_rowspan for Library → Language hierarchy."""
     for row in rows:
-        row["lang_rowspan"] = 0
-        row["lib_rowspan"] = 0
-    for _, lib_group in groupby(rows, key=lambda r: r["lib_display"]):
+        row.lang_rowspan = 0
+        row.lib_rowspan = 0
+    for _, lib_group in groupby(rows, key=lambda row: row.lib_display):
         lib_rows = list(lib_group)
-        lib_rows[0]["lib_rowspan"] = len(lib_rows)
+        lib_rows[0].lib_rowspan = len(lib_rows)
         lang_offset = 0
-        for _, lang_group in groupby(lib_rows, key=lambda r: r["language"]):
+        for _, lang_group in groupby(lib_rows, key=lambda row: row.language):
             lang_rows = list(lang_group)
-            lib_rows[lang_offset]["lang_rowspan"] = len(lang_rows)
+            lib_rows[lang_offset].lang_rowspan = len(lang_rows)
             lang_offset += len(lang_rows)
 
 
@@ -95,42 +166,37 @@ def _build_heatmap(
     status_extractor: Callable[[TestDataEntry], dict[str, str]],
     deprecated_attrs: set[str] | None = None,
     column_groups: list[HeatmapGroup] | None = None,
-) -> dict | None:
+) -> HeatmapView | None:
     if not entries or not columns:
         return None
 
-    rows = []
+    rows: list[HeatmapRow] = []
     for entry in sorted(entries, key=_test_entry_sort_key):
-        rows.append({
-            "test_name": entry.test_name,
-            "has_details": details_available,
-            "lib_display": entry.library_display,
-            "language": entry.language_display,
-            "eco_display": entry.ecosystem_display,
-            "instrumentation_version": extract_version_from_deps(
+        rows.append(HeatmapRow(
+            test_name=entry.test_name,
+            has_details=details_available,
+            lib_display=entry.library_display,
+            language=entry.language_display,
+            eco_display=entry.ecosystem_display,
+            instrumentation_version=extract_version_from_deps(
                 entry.lang,
                 entry.library,
                 entry.ecosystem,
             ),
-            "cells": _build_status_cells(columns, status_extractor(entry), deprecated_attrs),
-        })
+            cells=_build_status_cells(columns, status_extractor(entry), deprecated_attrs),
+        ))
 
     _compute_rowspans(rows)
-    return {
-        "label": label,
-        "columns": columns,
-        "column_groups": column_groups or [],
-        "rows": rows,
-    }
+    return HeatmapView(label, columns, column_groups or [], rows)
 
 
 def _build_status_cells(
     columns: list[HeatmapColumn],
     statuses: dict[str, str],
     deprecated_attrs: set[str] | None = None,
-) -> list[dict]:
+) -> list[StatusCell]:
     deprecated = deprecated_attrs or set()
-    cells = []
+    cells: list[StatusCell] = []
     for col in columns:
         name = col.header_text
         is_group_start = col.is_group_start
@@ -138,7 +204,7 @@ def _build_status_cells(
         cls = ("deprecated" if name in deprecated else "present") if present else "absent"
         if is_group_start:
             cls += " group-start"
-        cells.append({"cls": cls, "symbol": "\u2713" if present else ""})
+        cells.append(StatusCell(cls, "\u2713" if present else ""))
     return cells
 
 
@@ -168,27 +234,27 @@ def _entity_summary(result: TestResult) -> str:
     return ""
 
 
-def _build_span_sections(result: TestResult) -> list[dict]:
-    sections = []
+def _build_span_sections(result: TestResult) -> list[SpanSectionView]:
+    sections: list[SpanSectionView] = []
     for span_type_key in relevant_span_type_keys(result):
         spec = SPAN_TYPE_SPECS[span_type_key]
-        groups = []
+        groups: list[DetailGroupView] = []
         for group_spec in span_type_attribute_groups(spec):
             type_present = span_type_present_attributes(result, span_type_key, group_spec.key)
-            attrs = []
+            attrs: list[DetailAttributeView] = []
             for attr in group_spec.attrs:
                 if attr in type_present:
                     count = result.observed.attrs.get(attr, result.observed.non_registry_attrs.get(attr, 0))
-                    attrs.append({"name": attr, "present": True, "count": count})
+                    attrs.append(DetailAttributeView(attr, True, count))
                 else:
-                    attrs.append({"name": attr, "present": False, "count": 0})
-            groups.append({"label": group_spec.label, "attrs": attrs})
-        sections.append({"label": spec.label, "groups": groups})
+                    attrs.append(DetailAttributeView(attr, False, 0))
+            groups.append(DetailGroupView(group_spec.label, attrs))
+        sections.append(SpanSectionView(spec.label, groups))
     return sections
 
 
-def _sorted_count_items(counts: dict[str, int]) -> list[dict[str, int | str]]:
-    return [{"name": name, "count": count} for name, count in sorted(counts.items())]
+def _sorted_count_items(counts: dict[str, int]) -> list[CountItemView]:
+    return [CountItemView(name, count) for name, count in sorted(counts.items())]
 
 
 def _build_detail(
@@ -199,45 +265,48 @@ def _build_detail(
     ecosystem: str,
     language: str,
     result: TestResult | None,
-) -> dict:
-    detail: dict = {
-        "test_name": anchor_id,
-        "label": label,
-        "has_local_run": result is not None,
-        "has_data": result is not None and result.observed.has_data,
-        "has_empty_run": result is not None and result.statistics is not None and not result.observed.has_data,
-        "violation_count": result.violation_count if result else 0,
-        "instrumentation_version": extract_version_from_deps(lang_slug, library, ecosystem),
-        "repo": _detail_repo(lang_slug, library, ecosystem, language),
-        "entity_summary": _entity_summary(result) if result else "",
-        "span_sections": [],
-        "non_registry_attrs": [],
-        "events": [],
-        "metrics": [],
-        "violation_messages": result.violation_messages if result and result.violation_messages else [],
-    }
+) -> DetailView:
+    span_sections: list[SpanSectionView] = []
+    non_registry_attrs: list[CountItemView] = []
+    events: list[CountItemView] = []
+    metrics: list[CountItemView] = []
 
     if result and result.observed.has_data:
-        detail["span_sections"] = _build_span_sections(result)
+        span_sections = _build_span_sections(result)
 
         if result.observed.non_registry_attrs:
-            detail["non_registry_attrs"] = _sorted_count_items(result.observed.non_registry_attrs)
+            non_registry_attrs = _sorted_count_items(result.observed.non_registry_attrs)
 
         merged_events = merge_signal_counts(result.observed.events, result.detected.events)
         if merged_events:
-            detail["events"] = _sorted_count_items(merged_events)
+            events = _sorted_count_items(merged_events)
 
         merged_metrics = merge_signal_counts(result.observed.metrics, result.detected.metrics)
         if merged_metrics:
-            detail["metrics"] = _sorted_count_items(merged_metrics)
+            metrics = _sorted_count_items(merged_metrics)
 
-    return detail
+    return DetailView(
+        test_name=anchor_id,
+        label=label,
+        has_local_run=result is not None,
+        has_data=result is not None and result.observed.has_data,
+        has_empty_run=result is not None and result.statistics is not None and not result.observed.has_data,
+        violation_count=result.violation_count if result else 0,
+        instrumentation_version=extract_version_from_deps(lang_slug, library, ecosystem),
+        repo=_detail_repo(lang_slug, library, ecosystem, language),
+        entity_summary=_entity_summary(result) if result else "",
+        span_sections=span_sections,
+        non_registry_attrs=non_registry_attrs,
+        events=events,
+        metrics=metrics,
+        violation_messages=result.violation_messages if result and result.violation_messages else [],
+    )
 
 
 def _prepare_details(
     results: dict[str, TestResult],
     test_data_entries: list[TestDataEntry],
-) -> list[dict]:
+) -> list[DetailView]:
     """Prepare detailed result data for the template.
 
     Every known test (from committed data-*.json files) gets an anchor.
@@ -260,7 +329,7 @@ def _prepare_details(
             extra_entries.append(TestDataEntry.from_result(result))
     extra_entries.sort(key=_test_entry_sort_key)
 
-    details = []
+    details: list[DetailView] = []
     for entry in sorted_entries + extra_entries:
         result = result_by_id.get(entry.test_name)
         details.append(
@@ -281,9 +350,9 @@ def _prepare_details(
 def _prepare_heatmaps_from_data(
     test_data_entries: list[TestDataEntry],
     details_available: bool,
-) -> list[dict]:
+) -> list[HeatmapView]:
     """Build per-span-type heatmap data from loaded data-*.json entries."""
-    heatmaps = []
+    heatmaps: list[HeatmapView] = []
     for st_key in SPAN_TYPE_ORDER:
         spec = SPAN_TYPE_SPECS[st_key]
         st_label = spec.label
@@ -320,7 +389,7 @@ def _prepare_signal_heatmap(
     label: str,
     status_extractor: Callable[[TestDataEntry], dict[str, str]],
     details_available: bool = True,
-) -> dict | None:
+) -> HeatmapView | None:
     """Build an event or metric heatmap from committed data-*.json entries."""
     relevant = [entry for entry in test_data_entries if status_extractor(entry)]
 

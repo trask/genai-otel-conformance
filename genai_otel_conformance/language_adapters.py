@@ -20,6 +20,10 @@ class TestCommandResult(NamedTuple):
     exit_code: int
 
 
+class UvNotInstalledError(RuntimeError):
+    """Raised when uv is required but not installed."""
+
+
 @dataclass(frozen=True)
 class LanguageAdapter:
     install_dependencies: Callable[[str, str], None]
@@ -47,14 +51,15 @@ def _npm_cmd() -> str:
 
 
 def _uv_cmd() -> str:
-    """Return the platform-specific uv executable name or exit with guidance."""
+    """Return the platform-specific uv executable name or raise with guidance."""
     uv = shutil.which("uv.exe" if sys.platform == "win32" else "uv")
     if uv:
         return uv
 
-    print("ERROR: uv is required to install Python test dependencies.", file=sys.stderr)
-    print("Install it and retry: https://docs.astral.sh/uv/getting-started/installation/", file=sys.stderr)
-    sys.exit(1)
+    raise UvNotInstalledError(
+        "uv is required to install Python test dependencies. "
+        "Install it and retry: https://docs.astral.sh/uv/getting-started/installation/"
+    )
 
 
 def install_with_uv(*install_args: str, label: str) -> None:
