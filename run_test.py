@@ -47,24 +47,43 @@ from pathlib import Path
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.language_adapters import (
     LANGUAGE_ADAPTERS,
+    UvNotInstalledError,
     install_with_uv,
     list_available_tests,
     run_test_cmd,
 )
 from genai_otel_conformance.locations import TestLocation
-from genai_otel_conformance.results import parse_result_dir
+from genai_otel_conformance.results import TestResult, parse_result_dir
 from genai_otel_conformance.data_files import (
     GeneratedTestData,
     generate_single_test_data,
 )
 from genai_otel_conformance.weaver import (
-    SEMCONV_VERSION,
+    ensure_semconv_registry,
     ensure_weaver,
-    path_from_env,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 MOCK_SERVER_PORT = 8080
+
+
+class RunTestError(Exception):
+    def __init__(
+        self,
+        message: str,
+        exit_code: int = 1,
+        show_available_tests: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.exit_code = exit_code
+        self.show_available_tests = show_available_tests
+
+
+@dataclass
+class PipelineState:
+    mock_proc: subprocess.Popen | None = None
+    weaver_proc: subprocess.Popen | None = None
 
 
 def _allocate_free_tcp_ports(count: int) -> list[int]:
@@ -79,11 +98,6 @@ def _allocate_free_tcp_ports(count: int) -> list[int]:
     finally:
         for sock in sockets:
             sock.close()
-
-
-def _results_dir_from_test_name(test_name: str) -> Path:
-    """Compute the results directory path from a test name."""
-    return TestLocation.from_test_name(test_name).results_dir(TESTS_DIR)
 
 
 def _prepare_results_dir(result_dir: Path) -> None:
@@ -115,55 +129,20 @@ def wait_for_health(url: str, timeout: int, label: str, proc: subprocess.Popen |
             print(f"{label} ready after {i}s")
             return
         if proc and proc.poll() is not None:
-            print(f"ERROR: {label} process died during startup", file=sys.stderr)
-            sys.exit(1)
+            raise RunTestError(f"{label} process died during startup")
         time.sleep(1)
-    print(f"ERROR: {label} failed to become ready after {timeout}s", file=sys.stderr)
-    sys.exit(1)
+    raise RunTestError(f"{label} failed to become ready after {timeout}s")
 
 
-def _ensure_semconv_registry() -> str:
-    registry = os.environ.get("REGISTRY")
-    if registry:
-        return registry
-
-    semconv_cache_root = path_from_env(
-        "SEMCONV_CACHE",
-        Path.home() / ".cache" / "otel-conformance" / "semconv",
-    )
-    semconv_cache = semconv_cache_root / SEMCONV_VERSION.replace("/", "_")
-    model_dir = semconv_cache / "model"
-
-    if not model_dir.is_dir():
-        print(f"=== Caching semantic conventions registry ({SEMCONV_VERSION}) ===")
-        semconv_cache.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--branch",
-                SEMCONV_VERSION,
-                "--depth",
-                "1",
-                "-q",
-                "https://github.com/open-telemetry/semantic-conventions.git",
-                str(semconv_cache),
-            ],
-            check=True,
-        )
-
-    return str(model_dir)
-
-
-def _start_mock_server(mock_url: str) -> subprocess.Popen | None:
+def _start_mock_server(mock_url: str, state: PipelineState) -> None:
     health_url = f"{mock_url}/health"
     if is_healthy(health_url):
         print(f"Mock server already running on port {MOCK_SERVER_PORT}")
-        return None
+        return
 
     install_with_uv("-e", "tests/mock-server", label="shared mock server dependencies")
     print(f"=== Starting mock server on port {MOCK_SERVER_PORT} ===")
-    mock_proc = subprocess.Popen(
+    state.mock_proc = subprocess.Popen(
         [
             sys.executable,
             str(SCRIPT_DIR / "tests" / "mock-server" / "mock_server" / "server.py"),
@@ -173,8 +152,7 @@ def _start_mock_server(mock_url: str) -> subprocess.Popen | None:
             str(MOCK_SERVER_PORT),
         ],
     )
-    wait_for_health(health_url, 30, "Mock server", mock_proc)
-    return mock_proc
+    wait_for_health(health_url, 30, "Mock server", state.mock_proc)
 
 
 def _build_weaver_command(
@@ -265,28 +243,13 @@ class PipelineConfig:
     registry: str
 
 
-def _run_test_pipeline(
+def _start_weaver_live_check(
     config: PipelineConfig,
-    mock_proc: subprocess.Popen | None,
-) -> tuple[subprocess.Popen | None, subprocess.Popen | None]:
-    """Run the test pipeline: mock server, pre-build, weaver, test, collect results.
-
-    Returns (mock_proc, weaver_proc) so the caller can clean them up.
-    """
-    location = TestLocation.from_test_name(config.test_name)
-
-    if mock_proc is None:
-        mock_proc = _start_mock_server(config.mock_url)
-
-    # ── Pre-build (compile before starting weaver) ──────────────
-    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
-    # can cause it to shut down before the test sends any data.
-
-    LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
-
-    # ── Start weaver ────────────────────────────────────────────
-
-    test_results_dir = _results_dir_from_test_name(config.test_name).resolve()
+    state: PipelineState,
+    location: TestLocation,
+) -> Path:
+    """Start Weaver live-check and return the result directory."""
+    test_results_dir = location.results_dir(TESTS_DIR).resolve()
     _prepare_results_dir(test_results_dir)
 
     print(f"=== Starting weaver live-check for: {config.test_name} (ports {config.weaver_port}/{config.admin_port}) ===")
@@ -300,77 +263,103 @@ def _run_test_pipeline(
         config.extra_weaver_args,
     )
 
-    weaver_proc = subprocess.Popen(weaver_cmd)
+    state.weaver_proc = subprocess.Popen(weaver_cmd)
 
     print("Waiting for weaver to be ready...")
-    wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", weaver_proc)
+    wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", state.weaver_proc)
+    return test_results_dir
 
-    test_env = _build_test_environment(config.mock_url, config.weaver_port)
-    print(f"=== Running test: {config.test_name} ===")
 
-    test_run = run_test_cmd(config.test_name, test_env)
-    if not test_run.found:
-        print(f"ERROR: Could not find test '{config.test_name}'", file=sys.stderr)
-        _print_available_tests()
-        sys.exit(1)
+def _finish_weaver_run(
+    config: PipelineConfig,
+    state: PipelineState,
+    test_results_dir: Path,
+) -> tuple[int, TestResult | None]:
+    """Stop Weaver and load the fresh parsed result, if any."""
+    if state.weaver_proc is None:
+        raise RunTestError("Weaver process was not started")
 
-    # ── Stop weaver ─────────────────────────────────────────────
-
-    weaver_exit = _stop_weaver(config.admin_port, weaver_proc)
+    weaver_exit = _stop_weaver(config.admin_port, state.weaver_proc)
+    state.weaver_proc = None
     print(f"=== Weaver exit code: {weaver_exit} ===")
     print(f"=== Results in: {test_results_dir} ===")
+    return weaver_exit, parse_result_dir(test_results_dir, config.test_name)
 
-    if test_run.exit_code != 0:
-        print(
-            f"ERROR: Test command exited with code {test_run.exit_code}.",
-            file=sys.stderr,
-        )
-        sys.exit(test_run.exit_code or 1)
 
-    fresh_result = parse_result_dir(test_results_dir, config.test_name)
+def _validate_weaver_output(
+    config: PipelineConfig,
+    test_results_dir: Path,
+    weaver_exit: int,
+    fresh_result: TestResult | None,
+) -> None:
+    """Raise if Weaver output is missing or unusable."""
     has_weaver_output = _has_weaver_output(test_results_dir)
     has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
 
     if not has_weaver_output:
-        print(
-            f"ERROR: Weaver produced no JSON output for test: {config.test_name}",
-            file=sys.stderr,
+        raise RunTestError(
+            f"Weaver produced no JSON output for test: {config.test_name}",
         )
-        sys.exit(1)
 
     if weaver_exit != 0 and not has_weaver_stats:
-        print(
-            "ERROR: Weaver exited non-zero before writing statistics.",
-            file=sys.stderr,
+        raise RunTestError(
+            "Weaver exited non-zero before writing statistics.",
+            exit_code=weaver_exit or 1,
         )
-        sys.exit(weaver_exit or 1)
     if weaver_exit != 0:
         print(
             "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
             file=sys.stderr,
         )
 
-    # ── Update the per-test data file ───────────────────────────
+
+def _run_test_pipeline(
+    config: PipelineConfig,
+    state: PipelineState,
+) -> None:
+    """Run the test pipeline: mock server, pre-build, weaver, test, collect results."""
+    location = TestLocation.from_test_name(config.test_name)
+
+    if state.mock_proc is None:
+        _start_mock_server(config.mock_url, state)
+
+    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
+    # can cause it to shut down before the test sends any data.
+    LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
+
+    test_results_dir = _start_weaver_live_check(config, state, location)
+
+    test_env = _build_test_environment(config.mock_url, config.weaver_port)
+    print(f"=== Running test: {config.test_name} ===")
+    test_run = run_test_cmd(config.test_name, test_env)
+    if not test_run.found:
+        raise RunTestError(
+            f"Could not find test '{config.test_name}'",
+            show_available_tests=True,
+        )
+
+    weaver_exit, fresh_result = _finish_weaver_run(config, state, test_results_dir)
+
+    if test_run.exit_code != 0:
+        raise RunTestError(
+            f"Test command exited with code {test_run.exit_code}.",
+            exit_code=test_run.exit_code or 1,
+        )
+
+    _validate_weaver_output(config, test_results_dir, weaver_exit, fresh_result)
 
     print("=== Updating test data file ===")
     result = _write_generated_test_data(config.test_name)
     if result is None:
-        print(f"ERROR: Could not parse Weaver results for test: {config.test_name}", file=sys.stderr)
-        sys.exit(1)
+        raise RunTestError(f"Could not parse Weaver results for test: {config.test_name}")
     if not result.has_relevant_data:
-        print(
-            f"ERROR: No relevant data for test: {config.test_name}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    return mock_proc, weaver_proc
+        raise RunTestError(f"No relevant data for test: {config.test_name}")
 
 
-def main() -> None:
+def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python run_test.py <test-name> [weaver-args...]", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     test_name = sys.argv[1]
     extra_weaver_args = sys.argv[2:]
@@ -383,33 +372,42 @@ def main() -> None:
         print(f"ERROR: Invalid test name '{test_name}'", file=sys.stderr)
         print("Expected format: <lang>-<library>-<ecosystem>", file=sys.stderr)
         _print_available_tests()
-        sys.exit(1)
+        return 1
 
-    lang, lib = location.lang, location.library
-    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
-
-    weaver_port, admin_port = _allocate_free_tcp_ports(2)
-    registry = _ensure_semconv_registry()
-    mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
-
-    config = PipelineConfig(
-        test_name=test_name,
-        extra_weaver_args=extra_weaver_args,
-        mock_url=mock_url,
-        weaver_port=weaver_port,
-        admin_port=admin_port,
-        registry=registry,
-    )
-
-    mock_proc: subprocess.Popen | None = None
-    weaver_proc: subprocess.Popen | None = None
+    state = PipelineState()
 
     try:
-        mock_proc, weaver_proc = _run_test_pipeline(config, mock_proc)
+        lang, lib = location.lang, location.library
+        LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
+
+        weaver_port, admin_port = _allocate_free_tcp_ports(2)
+        registry = ensure_semconv_registry()
+        mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
+
+        config = PipelineConfig(
+            test_name=test_name,
+            extra_weaver_args=extra_weaver_args,
+            mock_url=mock_url,
+            weaver_port=weaver_port,
+            admin_port=admin_port,
+            registry=registry,
+        )
+
+        _run_test_pipeline(config, state)
+    except RunTestError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        if exc.show_available_tests:
+            _print_available_tests()
+        return exc.exit_code
+    except UvNotInstalledError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     finally:
-        _stop_process(weaver_proc, "weaver")
-        _stop_process(mock_proc, "mock server")
+        _stop_process(state.weaver_proc, "weaver")
+        _stop_process(state.mock_proc, "mock server")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

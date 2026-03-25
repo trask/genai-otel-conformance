@@ -20,6 +20,10 @@ class TestCommandResult(NamedTuple):
     exit_code: int
 
 
+class UvNotInstalledError(RuntimeError):
+    """Raised when uv is required but not installed."""
+
+
 @dataclass(frozen=True)
 class LanguageAdapter:
     install_dependencies: Callable[[str, str], None]
@@ -47,14 +51,15 @@ def _npm_cmd() -> str:
 
 
 def _uv_cmd() -> str:
-    """Return the platform-specific uv executable name or exit with guidance."""
+    """Return the platform-specific uv executable name or raise with guidance."""
     uv = shutil.which("uv.exe" if sys.platform == "win32" else "uv")
     if uv:
         return uv
 
-    print("ERROR: uv is required to install Python test dependencies.", file=sys.stderr)
-    print("Install it and retry: https://docs.astral.sh/uv/getting-started/installation/", file=sys.stderr)
-    sys.exit(1)
+    raise UvNotInstalledError(
+        "uv is required to install Python test dependencies. "
+        "Install it and retry: https://docs.astral.sh/uv/getting-started/installation/"
+    )
 
 
 def install_with_uv(*install_args: str, label: str) -> None:
@@ -147,18 +152,18 @@ def _java_prebuild_test(lib: str) -> None:
     subprocess.run([*gradle, f":{lib}:classes"], cwd=workspace_dir, check=True)
 
 
-def _java_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+def _java_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
     workspace_dir = TESTS_DIR / "java"
     test_dir = workspace_dir / lib
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
 
-    data_file = test_dir / f"data-{_ecosystem}.json"
+    data_file = test_dir / f"data-{ecosystem}.json"
     if not data_file.is_file():
         return TestCommandResult(False, 0)
 
     gradle = _gradle_cmd(workspace_dir)
-    ecosystem_task = "run" + "".join(part.capitalize() for part in _ecosystem.split("-"))
+    ecosystem_task = "run" + "".join(part.capitalize() for part in ecosystem.split("-"))
     proc = subprocess.run([*gradle, f":{lib}:{ecosystem_task}"], cwd=workspace_dir, env=env)
     return TestCommandResult(True, proc.returncode)
 

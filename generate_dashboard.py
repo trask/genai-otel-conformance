@@ -12,22 +12,21 @@ script also generates details.html and local-only event/metric heatmaps.
 from __future__ import annotations
 
 import argparse
-import sys
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import groupby
 from pathlib import Path
 
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.metadata import (
-    ECOSYSTEM_DISPLAY,
     ECOSYSTEM_REPOS,
-    LANGUAGE_DISPLAY_NAMES,
-    LANGUAGE_SLUGS,
     NATIVE_REPOS,
     extract_version_from_deps,
-    library_display_name,
 )
 from genai_otel_conformance.statuses import (
+    HeatmapColumn,
+    HeatmapGroup,
     merge_signal_counts,
     relevant_span_type_keys,
     span_type_attribute_groups,
@@ -37,7 +36,7 @@ from genai_otel_conformance.statuses import (
 )
 from genai_otel_conformance.results import (
     TestResult,
-    parse_result_dir,
+    parse_all_results,
 )
 from genai_otel_conformance.specs import (
     DISPLAY_DEPRECATED_ATTRS,
@@ -46,8 +45,8 @@ from genai_otel_conformance.specs import (
     SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
 )
-from genai_otel_conformance.locations import TestLocation
 from genai_otel_conformance.data_files import (
+    TestDataEntry,
     load_test_data_files,
     make_anchor_id,
 )
@@ -56,47 +55,91 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
 
-# ── Data structures ──────────────────────────────────────────────────
+@dataclass(frozen=True)
+class StatusCell:
+    cls: str
+    symbol: str
 
 
-def parse_results() -> dict[str, TestResult]:
-    """Parse all Weaver output directories under tests/.
+@dataclass
+class HeatmapRow:
+    test_name: str
+    has_details: bool
+    lib_display: str
+    language: str
+    eco_display: str
+    instrumentation_version: str
+    cells: list[StatusCell]
+    lib_rowspan: int = 0
+    lang_rowspan: int = 0
 
-    Layout: tests/<lang>/<lib>/results/<eco>/
-    """
-    results: dict[str, TestResult] = {}
 
-    if not TESTS_DIR.exists():
-        print(f"Tests directory not found: {TESTS_DIR}", file=sys.stderr)
-        return results
+@dataclass(frozen=True)
+class HeatmapView:
+    label: str
+    columns: list[HeatmapColumn]
+    column_groups: list[HeatmapGroup]
+    rows: list[HeatmapRow]
 
-    result_dirs = [p for p in TESTS_DIR.glob("*/*/results/*") if p.is_dir()]
 
-    for result_dir in sorted(result_dirs):
-        location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
-        result = parse_result_dir(result_dir, location.test_name)
-        if result is None or not result.has_detail_content:
-            continue
-        results[location.test_name] = result
+@dataclass(frozen=True)
+class DetailAttributeView:
+    name: str
+    present: bool
+    count: int
 
-    return results
+
+@dataclass(frozen=True)
+class DetailGroupView:
+    label: str
+    attrs: list[DetailAttributeView]
+
+
+@dataclass(frozen=True)
+class SpanSectionView:
+    label: str
+    groups: list[DetailGroupView]
+
+
+@dataclass(frozen=True)
+class CountItemView:
+    name: str
+    count: int
+
+
+@dataclass(frozen=True)
+class DetailView:
+    test_name: str
+    label: str
+    has_local_run: bool
+    has_data: bool
+    has_empty_run: bool
+    violation_count: int
+    instrumentation_version: str
+    repo: str
+    entity_summary: str
+    span_sections: list[SpanSectionView] = field(default_factory=list)
+    non_registry_attrs: list[CountItemView] = field(default_factory=list)
+    events: list[CountItemView] = field(default_factory=list)
+    metrics: list[CountItemView] = field(default_factory=list)
+    violation_messages: list[str] = field(default_factory=list)
 
 
 # ── HTML generation ──────────────────────────────────────────────────
 
 
-def _compute_rowspans(rows: list[dict]) -> None:
+def _compute_rowspans(rows: list[HeatmapRow]) -> None:
     """Compute lib_rowspan / lang_rowspan for Library → Language hierarchy."""
     for row in rows:
-        row["lang_rowspan"] = 0
-        row["lib_rowspan"] = 0
-    for _, lib_group in groupby(rows, key=lambda r: r["lib_display"]):
+        row.lang_rowspan = 0
+        row.lib_rowspan = 0
+    for _, lib_group in groupby(rows, key=lambda row: row.lib_display):
         lib_rows = list(lib_group)
-        lib_rows[0]["lib_rowspan"] = len(lib_rows)
+        lib_rows[0].lib_rowspan = len(lib_rows)
         lang_offset = 0
-        for _, lang_group in groupby(lib_rows, key=lambda r: r["language"]):
+        for _, lang_group in groupby(lib_rows, key=lambda row: row.language):
             lang_rows = list(lang_group)
-            lib_rows[lang_offset]["lang_rowspan"] = len(lang_rows)
+            lib_rows[lang_offset].lang_rowspan = len(lang_rows)
             lang_offset += len(lang_rows)
 
 
@@ -107,71 +150,67 @@ def _language_order(language: str) -> int:
     return _LANGUAGE_ORDER.get(language.lower(), 99)
 
 
-def _heatmap_sort_key(entry: dict) -> tuple[str, int, str]:
+def _test_entry_sort_key(entry: TestDataEntry) -> tuple[str, int, str]:
     return (
-        entry.get("library", "").lower(),
-        _language_order(entry.get("language", "")),
-        entry.get("ecosystem", "").lower(),
+        entry.library_display.lower(),
+        _language_order(entry.language_display),
+        entry.ecosystem_display.lower(),
     )
 
 
 def _build_heatmap(
     label: str,
-    columns: list[dict],
-    entries: list[dict],
+    columns: list[HeatmapColumn],
+    entries: list[TestDataEntry],
     details_available: bool,
-    cell_builder,
-    column_groups: list[dict] | None = None,
-) -> dict | None:
+    status_extractor: Callable[[TestDataEntry], dict[str, str]],
+    deprecated_attrs: set[str] | None = None,
+    column_groups: list[HeatmapGroup] | None = None,
+) -> HeatmapView | None:
     if not entries or not columns:
         return None
 
-    rows = []
-    for entry in sorted(entries, key=_heatmap_sort_key):
-        rows.append({
-            "test_name": entry.get("test_name", ""),
-            "has_details": details_available,
-            "lib_display": entry.get("library", ""),
-            "language": entry.get("language", ""),
-            "eco_display": entry.get("ecosystem", ""),
-            "instrumentation_version": extract_version_from_deps(
-                entry["_lang"],
-                entry["_lib"],
-                entry["_eco"],
+    rows: list[HeatmapRow] = []
+    for entry in sorted(entries, key=_test_entry_sort_key):
+        rows.append(HeatmapRow(
+            test_name=entry.test_name,
+            has_details=details_available,
+            lib_display=entry.library_display,
+            language=entry.language_display,
+            eco_display=entry.ecosystem_display,
+            instrumentation_version=extract_version_from_deps(
+                entry.lang,
+                entry.library,
+                entry.ecosystem,
             ),
-            "cells": cell_builder(entry),
-        })
+            cells=_build_status_cells(columns, status_extractor(entry), deprecated_attrs),
+        ))
 
     _compute_rowspans(rows)
-    return {
-        "label": label,
-        "columns": columns,
-        "column_groups": column_groups or [],
-        "rows": rows,
-    }
+    return HeatmapView(label, columns, column_groups or [], rows)
 
 
 def _build_status_cells(
-    columns: list[dict],
+    columns: list[HeatmapColumn],
     statuses: dict[str, str],
     deprecated_attrs: set[str] | None = None,
-) -> list[dict]:
+) -> list[StatusCell]:
     deprecated = deprecated_attrs or set()
-    cells = []
+    cells: list[StatusCell] = []
     for col in columns:
-        name = col["header_text"]
-        is_group_start = col["is_group_start"]
+        name = col.header_text
+        is_group_start = col.is_group_start
         present = statuses.get(name) == "present"
         cls = ("deprecated" if name in deprecated else "present") if present else "absent"
         if is_group_start:
             cls += " group-start"
-        cells.append({"cls": cls, "symbol": "\u2713" if present else ""})
+        cells.append(StatusCell(cls, "\u2713" if present else ""))
     return cells
 
 
-def _signal_columns(signal_names: list[str]) -> list[dict[str, object]]:
+def _signal_columns(signal_names: list[str]) -> list[HeatmapColumn]:
     return [
-        {"header_text": name, "is_group_start": i == 0}
+        HeatmapColumn(header_text=name, is_group_start=i == 0)
         for i, name in enumerate(signal_names)
     ]
 
@@ -195,27 +234,27 @@ def _entity_summary(result: TestResult) -> str:
     return ""
 
 
-def _build_span_sections(result: TestResult) -> list[dict]:
-    sections = []
-    for span_type_key in relevant_span_type_keys(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS):
+def _build_span_sections(result: TestResult) -> list[SpanSectionView]:
+    sections: list[SpanSectionView] = []
+    for span_type_key in relevant_span_type_keys(result):
         spec = SPAN_TYPE_SPECS[span_type_key]
-        groups = []
+        groups: list[DetailGroupView] = []
         for group_spec in span_type_attribute_groups(spec):
-            type_present = span_type_present_attributes(result, span_type_key, group_spec["key"])
-            attrs = []
-            for attr in group_spec["attrs"]:
+            type_present = span_type_present_attributes(result, span_type_key, group_spec.key)
+            attrs: list[DetailAttributeView] = []
+            for attr in group_spec.attrs:
                 if attr in type_present:
                     count = result.observed.attrs.get(attr, result.observed.non_registry_attrs.get(attr, 0))
-                    attrs.append({"name": attr, "present": True, "count": count})
+                    attrs.append(DetailAttributeView(attr, True, count))
                 else:
-                    attrs.append({"name": attr, "present": False, "count": 0})
-            groups.append({"label": group_spec["label"], "attrs": attrs})
-        sections.append({"label": spec["label"], "groups": groups})
+                    attrs.append(DetailAttributeView(attr, False, 0))
+            groups.append(DetailGroupView(group_spec.label, attrs))
+        sections.append(SpanSectionView(spec.label, groups))
     return sections
 
 
-def _sorted_count_items(counts: dict[str, int]) -> list[dict[str, int | str]]:
-    return [{"name": name, "count": count} for name, count in sorted(counts.items())]
+def _sorted_count_items(counts: dict[str, int]) -> list[CountItemView]:
+    return [CountItemView(name, count) for name, count in sorted(counts.items())]
 
 
 def _build_detail(
@@ -226,45 +265,48 @@ def _build_detail(
     ecosystem: str,
     language: str,
     result: TestResult | None,
-) -> dict:
-    detail: dict = {
-        "test_name": anchor_id,
-        "label": label,
-        "has_local_run": result is not None,
-        "has_data": result is not None and result.observed.has_data,
-        "has_empty_run": result is not None and result.statistics is not None and not result.observed.has_data,
-        "violation_count": result.violation_count if result else 0,
-        "instrumentation_version": extract_version_from_deps(lang_slug, library, ecosystem),
-        "repo": _detail_repo(lang_slug, library, ecosystem, language),
-        "entity_summary": _entity_summary(result) if result else "",
-        "span_sections": [],
-        "non_registry_attrs": [],
-        "events": [],
-        "metrics": [],
-        "violation_messages": result.violation_messages if result and result.violation_messages else [],
-    }
+) -> DetailView:
+    span_sections: list[SpanSectionView] = []
+    non_registry_attrs: list[CountItemView] = []
+    events: list[CountItemView] = []
+    metrics: list[CountItemView] = []
 
     if result and result.observed.has_data:
-        detail["span_sections"] = _build_span_sections(result)
+        span_sections = _build_span_sections(result)
 
         if result.observed.non_registry_attrs:
-            detail["non_registry_attrs"] = _sorted_count_items(result.observed.non_registry_attrs)
+            non_registry_attrs = _sorted_count_items(result.observed.non_registry_attrs)
 
         merged_events = merge_signal_counts(result.observed.events, result.detected.events)
         if merged_events:
-            detail["events"] = _sorted_count_items(merged_events)
+            events = _sorted_count_items(merged_events)
 
         merged_metrics = merge_signal_counts(result.observed.metrics, result.detected.metrics)
         if merged_metrics:
-            detail["metrics"] = _sorted_count_items(merged_metrics)
+            metrics = _sorted_count_items(merged_metrics)
 
-    return detail
+    return DetailView(
+        test_name=anchor_id,
+        label=label,
+        has_local_run=result is not None,
+        has_data=result is not None and result.observed.has_data,
+        has_empty_run=result is not None and result.statistics is not None and not result.observed.has_data,
+        violation_count=result.violation_count if result else 0,
+        instrumentation_version=extract_version_from_deps(lang_slug, library, ecosystem),
+        repo=_detail_repo(lang_slug, library, ecosystem, language),
+        entity_summary=_entity_summary(result) if result else "",
+        span_sections=span_sections,
+        non_registry_attrs=non_registry_attrs,
+        events=events,
+        metrics=metrics,
+        violation_messages=result.violation_messages if result and result.violation_messages else [],
+    )
 
 
 def _prepare_details(
     results: dict[str, TestResult],
-    test_data_entries: list[dict],
-) -> list[dict]:
+    test_data_entries: list[TestDataEntry],
+) -> list[DetailView]:
     """Prepare detailed result data for the template.
 
     Every known test (from committed data-*.json files) gets an anchor.
@@ -276,53 +318,47 @@ def _prepare_details(
         anchor_id = make_anchor_id(result.language, result.library, result.ecosystem)
         result_by_id[anchor_id] = result
 
-    sorted_entries = sorted(test_data_entries, key=_heatmap_sort_key)
-    seen_ids = {entry["test_name"] for entry in sorted_entries}
+    sorted_entries = sorted(test_data_entries, key=_test_entry_sort_key)
+    seen_ids = {entry.test_name for entry in sorted_entries}
 
     # Build synthetic entries for results without a committed data file.
-    extra_entries = []
+    extra_entries: list[TestDataEntry] = []
     for result in results.values():
         anchor_id = make_anchor_id(result.language, result.library, result.ecosystem)
         if anchor_id not in seen_ids:
-            lang_slug = LANGUAGE_SLUGS.get(result.language, result.language.lower())
-            extra_entries.append({
-                "test_name": anchor_id,
-                "_lang": lang_slug,
-                "_lib": result.library,
-                "_eco": result.ecosystem,
-                "library": library_display_name(result.library),
-                "language": result.language,
-                "ecosystem": ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem),
-            })
-    extra_entries.sort(key=_heatmap_sort_key)
+            extra_entries.append(TestDataEntry.from_result(result))
+    extra_entries.sort(key=_test_entry_sort_key)
 
-    details = []
+    details: list[DetailView] = []
     for entry in sorted_entries + extra_entries:
-        lang = entry["_lang"]
-        lib = entry["_lib"]
-        eco = entry["_eco"]
-        language = entry.get("language", LANGUAGE_DISPLAY_NAMES.get(lang, lang))
-        lib_display = entry.get("library", library_display_name(lib))
-        eco_display = entry.get("ecosystem", ECOSYSTEM_DISPLAY.get(eco, eco))
-        label = f"{lib_display} ({language}) \u2014 {eco_display}"
-        result = result_by_id.get(entry["test_name"])
-        details.append(_build_detail(entry["test_name"], label, lang, lib, eco, language, result))
+        result = result_by_id.get(entry.test_name)
+        details.append(
+            _build_detail(
+                entry.test_name,
+                entry.label,
+                entry.lang,
+                entry.library,
+                entry.ecosystem,
+                entry.language_display,
+                result,
+            )
+        )
 
     return details
 
 
 def _prepare_heatmaps_from_data(
-    test_data_entries: list[dict],
+    test_data_entries: list[TestDataEntry],
     details_available: bool,
-) -> list[dict]:
+) -> list[HeatmapView]:
     """Build per-span-type heatmap data from loaded data-*.json entries."""
-    heatmaps = []
+    heatmaps: list[HeatmapView] = []
     for st_key in SPAN_TYPE_ORDER:
         spec = SPAN_TYPE_SPECS[st_key]
-        st_label = spec["label"]
+        st_label = spec.label
 
         # Collect entries that have this span type.
-        relevant = [e for e in test_data_entries if st_key in e.get("spans", {})]
+        relevant = [entry for entry in test_data_entries if st_key in entry.spans]
         if not relevant:
             continue
 
@@ -332,19 +368,13 @@ def _prepare_heatmaps_from_data(
         if not columns:
             continue
 
-        def build_cells(entry: dict, _key=st_key, _cols=columns) -> list[dict]:
-            return _build_status_cells(
-                _cols,
-                entry["spans"][_key],
-                deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
-            )
-
         heatmap = _build_heatmap(
             st_label,
             columns,
             relevant,
             details_available,
-            build_cells,
+            lambda entry, _key=st_key: entry.spans[_key],
+            deprecated_attrs=set(DISPLAY_DEPRECATED_ATTRS.values()),
             column_groups=column_groups,
         )
         if heatmap is not None:
@@ -354,21 +384,18 @@ def _prepare_heatmaps_from_data(
 
 
 def _prepare_signal_heatmap(
-    test_data_entries: list[dict],
+    test_data_entries: list[TestDataEntry],
     signal_names: list[str],
     label: str,
-    data_key: str,
+    status_extractor: Callable[[TestDataEntry], dict[str, str]],
     details_available: bool = True,
-) -> dict | None:
+) -> HeatmapView | None:
     """Build an event or metric heatmap from committed data-*.json entries."""
-    relevant = [e for e in test_data_entries if data_key in e]
+    relevant = [entry for entry in test_data_entries if status_extractor(entry)]
 
     columns = _signal_columns(signal_names)
 
-    def build_cells(entry: dict) -> list[dict]:
-        return _build_status_cells(columns, entry.get(data_key, {}))
-
-    return _build_heatmap(label, columns, relevant, details_available, build_cells)
+    return _build_heatmap(label, columns, relevant, details_available, status_extractor)
 
 
 def _has_result_directories() -> bool:
@@ -392,7 +419,7 @@ def _render_template(template_name: str, **context: object) -> str:
     return template.render(css=css, **context)
 
 
-def generate_dashboard_html(test_data_entries: list[dict], details_available: bool) -> str:
+def generate_dashboard_html(test_data_entries: list[TestDataEntry], details_available: bool) -> str:
     """Generate the dashboard HTML with span heatmap tables.
 
     All dashboard heatmaps come from committed data-*.json files.
@@ -404,14 +431,14 @@ def generate_dashboard_html(test_data_entries: list[dict], details_available: bo
         test_data_entries,
         GENAI_EVENT_TYPES,
         "GenAI Events",
-        "events",
+        lambda entry: entry.events,
         details_available,
     )
     metric_heatmap = _prepare_signal_heatmap(
         test_data_entries,
         GENAI_METRIC_TYPES,
         "GenAI Metrics",
-        "metrics",
+        lambda entry: entry.metrics,
         details_available,
     )
 
@@ -427,7 +454,7 @@ def generate_dashboard_html(test_data_entries: list[dict], details_available: bo
 
 def generate_details_html(
     results: dict[str, TestResult],
-    test_data_entries: list[dict],
+    test_data_entries: list[TestDataEntry],
 ) -> str:
     """Generate the details HTML from Weaver results."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -450,7 +477,7 @@ def main() -> None:
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    results = parse_results()
+    results = parse_all_results()
     if _has_result_directories() and not results:
         raise RuntimeError(
             "Found local Weaver result directories, but no parsable results. "

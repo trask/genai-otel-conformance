@@ -2,16 +2,47 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from dataclasses import dataclass
 
 from genai_otel_conformance.results import TestResult
-from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS
+from genai_otel_conformance.specs import (
+    DISPLAY_DEPRECATED_ATTRS,
+    RequirementLevel,
+    SPAN_TYPE_ORDER,
+    SPAN_TYPE_SPECS,
+    SpanTypeSpec,
+)
 
 
-class SpanTypeLevel(NamedTuple):
-    key: str
+@dataclass(frozen=True)
+class RequirementLevelInfo:
+    key: RequirementLevel
     label: str
     description: str
+
+
+@dataclass(frozen=True)
+class SpanTypeAttributeGroup:
+    key: RequirementLevel
+    label: str
+    description: str
+    attrs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HeatmapColumn:
+    header_text: str
+    is_group_start: bool
+    group_key: RequirementLevel | str = ""
+    group_label: str = ""
+
+
+@dataclass(frozen=True)
+class HeatmapGroup:
+    key: RequirementLevel
+    label: str
+    description: str
+    colspan: int
 
 
 def merge_signal_counts(
@@ -33,66 +64,61 @@ def present_attributes(result: TestResult) -> set[str]:
 
 
 _SPAN_TYPE_LEVELS = (
-    SpanTypeLevel("required", "Required", "Must be present for spans of this type."),
-    SpanTypeLevel(
-        "conditionally_required",
+    RequirementLevelInfo(RequirementLevel.REQUIRED, "Required", "Must be present for spans of this type."),
+    RequirementLevelInfo(
+        RequirementLevel.CONDITIONALLY_REQUIRED,
         "Conditionally Required",
         "Required only when the span matches the relevant condition.",
     ),
-    SpanTypeLevel("recommended", "Recommended", "Expected when the library exposes the signal."),
-    SpanTypeLevel("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
+    RequirementLevelInfo(RequirementLevel.RECOMMENDED, "Recommended", "Expected when the library exposes the signal."),
+    RequirementLevelInfo(RequirementLevel.OPT_IN, "Opt-In", "Captured only when the user explicitly enables it."),
 )
 
 
-def _display_attrs_for_group(spec: dict, level: str) -> list[str]:
+def _display_attrs_for_group(spec: SpanTypeSpec, level: RequirementLevel) -> tuple[str, ...]:
     """Return attrs for one visual group, including deprecated predecessors."""
     display_attrs: list[str] = []
-    for attr in sorted(spec.get(level, [])):
+    for attr in sorted(spec.attrs_for_requirement_level(level)):
         display_attrs.append(attr)
         deprecated_attr = DISPLAY_DEPRECATED_ATTRS.get(attr)
         if deprecated_attr is not None:
             display_attrs.append(deprecated_attr)
-    return display_attrs
+    return tuple(display_attrs)
 
 
-def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
+def span_type_attribute_groups(spec: SpanTypeSpec) -> list[SpanTypeAttributeGroup]:
     """Return ordered attribute groups for a span-type specification."""
-    groups: list[dict[str, object]] = []
+    groups: list[SpanTypeAttributeGroup] = []
     for level in _SPAN_TYPE_LEVELS:
         attrs = _display_attrs_for_group(spec, level.key)
         if attrs:
-            groups.append({
-                "key": level.key,
-                "label": level.label,
-                "description": level.description,
-                "attrs": attrs,
-            })
+            groups.append(SpanTypeAttributeGroup(level.key, level.label, level.description, attrs))
     return groups
 
 
-def span_type_heatmap_columns(spec: dict) -> list[dict[str, object]]:
+def span_type_heatmap_columns(spec: SpanTypeSpec) -> list[HeatmapColumn]:
     """Return ordered heatmap columns for a span-type specification."""
     return [
-        {
-            "header_text": attr,
-            "is_group_start": i == 0,
-            "group_key": group["key"],
-            "group_label": group["label"],
-        }
+        HeatmapColumn(
+            header_text=attr,
+            is_group_start=i == 0,
+            group_key=group.key,
+            group_label=group.label,
+        )
         for group in span_type_attribute_groups(spec)
-        for i, attr in enumerate(group["attrs"])
+        for i, attr in enumerate(group.attrs)
     ]
 
 
-def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
+def span_type_heatmap_groups(spec: SpanTypeSpec) -> list[HeatmapGroup]:
     """Return grouped header metadata for a span-type heatmap."""
     return [
-        {
-            "key": group["key"],
-            "label": group["label"],
-            "description": group["description"],
-            "colspan": len(group["attrs"]),
-        }
+        HeatmapGroup(
+            key=group.key,
+            label=group.label,
+            description=group.description,
+            colspan=len(group.attrs),
+        )
         for group in span_type_attribute_groups(spec)
     ]
 
@@ -100,28 +126,28 @@ def span_type_heatmap_groups(spec: dict) -> list[dict[str, object]]:
 def span_type_present_attributes(
     result: TestResult,
     span_type_key: str,
-    level: str,
+    level: RequirementLevel,
 ) -> set[str]:
     """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
-    if level == "required":
+    if level is RequirementLevel.REQUIRED:
         return result.spans.per_type_attrs.get(span_type_key, all_present)
     return result.spans.per_type_any_attrs.get(span_type_key, all_present)
 
 
-def _expected_span_type_attributes(spec: dict) -> list[str]:
+def _expected_span_type_attributes(spec: SpanTypeSpec) -> list[str]:
     attrs: list[str] = []
     for group in span_type_attribute_groups(spec):
-        attrs.extend(group["attrs"])
+        attrs.extend(group.attrs)
     return attrs
 
 
 def _is_relevant_span_type(
     result: TestResult,
     span_type_key: str,
-    spec: dict,
+    spec: SpanTypeSpec,
 ) -> bool:
-    if spec.get("discriminator_attrs"):
+    if spec.discriminator_attrs:
         return span_type_key in result.spans.detected_types
 
     all_present = present_attributes(result)
@@ -131,15 +157,11 @@ def _is_relevant_span_type(
     return False
 
 
-def relevant_span_type_keys(
-    result: TestResult,
-    span_type_order: list[str],
-    span_type_specs: dict[str, dict],
-) -> list[str]:
+def relevant_span_type_keys(result: TestResult) -> list[str]:
     """Return span-type keys that are relevant for this result."""
     relevant: list[str] = []
-    for span_type_key in span_type_order:
-        spec = span_type_specs[span_type_key]
+    for span_type_key in SPAN_TYPE_ORDER:
+        spec = SPAN_TYPE_SPECS[span_type_key]
         if not _expected_span_type_attributes(spec):
             continue
         if _is_relevant_span_type(result, span_type_key, spec):
@@ -147,18 +169,18 @@ def relevant_span_type_keys(
     return relevant
 
 
-def build_present_signal_entries(
+def build_present_signal_names(
     signal_names: list[str],
     statistics_counts: dict[str, int],
     detected_counts: dict[str, int],
-) -> dict[str, list[str]]:
-    """Return sparse per-signal attribute lists for observed signals."""
+) -> list[str]:
+    """Return the ordered names of observed signals."""
     merged_counts = merge_signal_counts(statistics_counts, detected_counts)
-    return {
-        name: []
+    return [
+        name
         for name in signal_names
         if merged_counts.get(name, 0) > 0
-    }
+    ]
 
 
 def build_statuses_from_present_names(
@@ -173,20 +195,16 @@ def build_statuses_from_present_names(
     }
 
 
-def build_span_type_present_names(
-    result: TestResult,
-    span_type_order: list[str],
-    span_type_specs: dict[str, dict],
-) -> dict[str, list[str]]:
+def build_span_type_present_names(result: TestResult) -> dict[str, list[str]]:
     """Return sparse per-span-type attribute lists for relevant span types."""
     sparse: dict[str, list[str]] = {}
-    for span_type_key in relevant_span_type_keys(result, span_type_order, span_type_specs):
-        spec = span_type_specs[span_type_key]
+    for span_type_key in relevant_span_type_keys(result):
+        spec = SPAN_TYPE_SPECS[span_type_key]
         present_names: list[str] = []
         for group in span_type_attribute_groups(spec):
-            type_present = span_type_present_attributes(result, span_type_key, group["key"])
+            type_present = span_type_present_attributes(result, span_type_key, group.key)
             present_names.extend(
-                attr for attr in group["attrs"]
+                attr for attr in group.attrs
                 if attr in type_present
             )
         sparse[span_type_key] = present_names
