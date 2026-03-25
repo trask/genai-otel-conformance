@@ -12,7 +12,6 @@ script also generates details.html and local-only event/metric heatmaps.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from datetime import datetime, timezone
 from itertools import groupby
@@ -29,7 +28,6 @@ from genai_otel_conformance.metadata import (
     library_display_name,
 )
 from genai_otel_conformance.statuses import (
-    build_statuses_from_present_names,
     merge_signal_counts,
     relevant_span_type_keys,
     span_type_attribute_groups,
@@ -49,24 +47,14 @@ from genai_otel_conformance.specs import (
     SPAN_TYPE_SPECS,
 )
 from genai_otel_conformance.locations import TestLocation
+from genai_otel_conformance.test_data import (
+    load_test_data_files,
+    make_anchor_id,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
-
-def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
-    """Build an anchor ID in library-language-ecosystem order.
-
-    This matches the dashboard's visual hierarchy: group by library,
-    then by language, then by ecosystem.
-
-    Args:
-        language: Display language name (e.g. "Python", "JS").
-        library: Library slug (e.g. "openai").
-        ecosystem: Ecosystem slug (e.g. "otelcontrib").
-    """
-    lang_slug = LANGUAGE_SLUGS.get(language, language.lower())
-    return f"{library}-{lang_slug}-{ecosystem}"
 
 # ── Data structures ──────────────────────────────────────────────────
 
@@ -285,7 +273,7 @@ def _prepare_details(
     """
     result_by_id: dict[str, TestResult] = {}
     for result in results.values():
-        anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
+        anchor_id = make_anchor_id(result.language, result.library, result.ecosystem)
         result_by_id[anchor_id] = result
 
     sorted_entries = sorted(test_data_entries, key=_heatmap_sort_key)
@@ -294,7 +282,7 @@ def _prepare_details(
     # Build synthetic entries for results without a committed data file.
     extra_entries = []
     for result in results.values():
-        anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
+        anchor_id = make_anchor_id(result.language, result.library, result.ecosystem)
         if anchor_id not in seen_ids:
             lang_slug = LANGUAGE_SLUGS.get(result.language, result.language.lower())
             extra_entries.append({
@@ -321,75 +309,6 @@ def _prepare_details(
         details.append(_build_detail(entry["test_name"], label, lang, lib, eco, language, result))
 
     return details
-
-
-def _load_test_data_files() -> list[dict]:
-    """Discover and load committed data-*.json files from tests/.
-
-    Only files in the canonical tests/<lang>/<lib>/data-<ecosystem>.json layout
-    are considered. This avoids pulling in copied workspace artifacts such as
-    tests/js/node_modules/*/data-*.json.
-
-    Returns a list of loaded data dicts (each augmented with the file path).
-    """
-    entries: list[dict] = []
-    if not TESTS_DIR.is_dir():
-        return entries
-    for data_file in sorted(TESTS_DIR.glob("*/*/data-*.json")):
-        data = json.loads(data_file.read_text(encoding="utf-8"))
-        location = TestLocation.from_data_file(data_file, TESTS_DIR)
-        data.setdefault("library", library_display_name(location.library))
-        data.setdefault("language", LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang))
-        data.setdefault(
-            "ecosystem",
-            ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
-        )
-        data["test_name"] = _make_anchor_id(data["language"], location.library, location.ecosystem)
-        data["_lang"] = location.lang
-        data["_lib"] = location.library
-        data["_eco"] = location.ecosystem
-        entries.append(_normalize_test_data_entry(data))
-    return entries
-
-
-def _normalize_signal_data(
-    value: object,
-    signal_names: list[str],
-) -> dict[str, str]:
-    present = [name for name in value if isinstance(name, str)] if isinstance(value, (dict, list)) else []
-    return build_statuses_from_present_names(signal_names, present)
-
-
-def _normalize_span_type_data(value: object) -> dict[str, dict[str, str]]:
-    if not isinstance(value, dict):
-        return {}
-
-    normalized: dict[str, dict[str, str]] = {}
-    for span_type_key, spec in SPAN_TYPE_SPECS.items():
-        if span_type_key not in value:
-            continue
-
-        expected_names = [column["header_text"] for column in span_type_heatmap_columns(spec)]
-        raw = value[span_type_key]
-        present_names = [name for name in raw if isinstance(name, str)] if isinstance(raw, (dict, list)) else []
-        normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
-
-    return normalized
-
-
-def _raw_spans(entry: dict) -> object:
-    if "spans" in entry:
-        return entry.get("spans")
-    return entry.get("span_types")
-
-
-def _normalize_test_data_entry(entry: dict) -> dict:
-    normalized = dict(entry)
-    normalized["events"] = _normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES)
-    normalized["metrics"] = _normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES)
-    normalized["spans"] = _normalize_span_type_data(_raw_spans(entry))
-    normalized.pop("span_types", None)
-    return normalized
 
 
 def _prepare_heatmaps_from_data(
@@ -539,7 +458,7 @@ def main() -> None:
             "generating the dashboard."
         )
 
-    test_data_entries = _load_test_data_files()
+    test_data_entries = load_test_data_files()
     # Details page has an anchor for every known test; entries without local
     # Weaver output show "Results not yet available."
     details_available = bool(test_data_entries)
