@@ -51,10 +51,8 @@ from genai_otel_conformance.language_adapters import (
     run_test_cmd,
 )
 from genai_otel_conformance.locations import TestLocation
-from genai_otel_conformance.results import (
-    parse_result_dir,
-    split_test_name,
-)
+from genai_otel_conformance.locations import TestLocation
+from genai_otel_conformance.results import parse_result_dir
 from genai_otel_conformance.test_data import (
     GeneratedTestData,
     generate_single_test_data,
@@ -375,14 +373,15 @@ def main() -> None:
     print(f"Test: {test_name}")
 
     try:
-        lang, lib, eco = split_test_name(test_name)
+        location = TestLocation.from_test_name(test_name)
     except ValueError:
         print(f"ERROR: Invalid test name '{test_name}'", file=sys.stderr)
         print("Expected format: <lang>-<library>-<ecosystem>", file=sys.stderr)
         _print_available_tests()
         sys.exit(1)
 
-    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, eco)
+    lang, lib = location.lang, location.library
+    LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
 
     weaver_port, admin_port = _allocate_free_tcp_ports(2)
     registry = _ensure_semconv_registry()

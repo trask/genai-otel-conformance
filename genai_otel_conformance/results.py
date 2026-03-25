@@ -12,6 +12,12 @@ from genai_otel_conformance.metadata import LANGUAGE_DISPLAY_NAMES
 from genai_otel_conformance.locations import TestLocation
 
 
+def _validate_test_lang(location: TestLocation) -> None:
+    """Raise ValueError if the test location uses an unknown language."""
+    if location.lang not in LANGUAGE_DISPLAY_NAMES:
+        raise ValueError(f"Invalid test name: {location.test_name}")
+
+
 @dataclass
 class SpanClassification:
     detected_types: set[str] = field(default_factory=set)
@@ -56,19 +62,6 @@ class TestResult:
             or bool(self.detected.events)
             or bool(self.detected.metrics)
         )
-
-
-def split_test_name(name: str) -> tuple[str, str, str]:
-    """Parse a test name into language/library/ecosystem slugs."""
-    try:
-        location = TestLocation.from_test_name(name)
-    except ValueError as exc:
-        raise ValueError(f"Invalid test name: {name}") from exc
-
-    if location.lang not in LANGUAGE_DISPLAY_NAMES or not location.library or not location.ecosystem:
-        raise ValueError(f"Invalid test name: {name}")
-
-    return location.lang, location.library, location.ecosystem
 
 
 def try_parse_json(content: str) -> list[dict]:
@@ -344,8 +337,9 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     if statistics:
         entity_counts = statistics.get("total_entities_by_type", {})
 
-    lang, library, ecosystem = split_test_name(test_name)
-    language = LANGUAGE_DISPLAY_NAMES[lang]
+    location = TestLocation.from_test_name(test_name)
+    _validate_test_lang(location)
+    language = LANGUAGE_DISPLAY_NAMES[location.lang]
 
     has_data = False
     if statistics and statistics.get("total_entities", 0) > 0:
@@ -365,8 +359,8 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
 
     return TestResult(
         language=language,
-        library=library,
-        ecosystem=ecosystem,
+        library=location.library,
+        ecosystem=location.ecosystem,
         statistics=statistics,
         violation_count=violation_count,
         violation_messages=violation_messages,
