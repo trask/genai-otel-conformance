@@ -257,6 +257,113 @@ def _print_available_tests() -> None:
 # ── Main ────────────────────────────────────────────────────────────
 
 
+def _run_test_pipeline(
+    test_name: str,
+    lang: str,
+    lib: str,
+    extra_weaver_args: list[str],
+    mock_url: str,
+    weaver_port: int,
+    admin_port: int,
+    registry: str,
+    mock_proc: subprocess.Popen | None,
+) -> tuple[subprocess.Popen | None, subprocess.Popen | None]:
+    """Run the test pipeline: mock server, pre-build, weaver, test, collect results.
+
+    Returns (mock_proc, weaver_proc) so the caller can clean them up.
+    """
+    if mock_proc is None:
+        mock_proc = _start_mock_server(mock_url)
+
+    # ── Pre-build (compile before starting weaver) ──────────────
+    # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
+    # can cause it to shut down before the test sends any data.
+
+    LANGUAGE_ADAPTERS[lang].prebuild_test(lib)
+
+    # ── Start weaver ────────────────────────────────────────────
+
+    test_results_dir = _results_dir_from_test_name(test_name).resolve()
+    _prepare_results_dir(test_results_dir)
+
+    print(f"=== Starting weaver live-check for: {test_name} (ports {weaver_port}/{admin_port}) ===")
+    weaver_bin = ensure_weaver()
+    weaver_cmd = _build_weaver_command(
+        weaver_bin,
+        registry,
+        test_results_dir,
+        weaver_port,
+        admin_port,
+        extra_weaver_args,
+    )
+
+    weaver_proc = subprocess.Popen(weaver_cmd)
+
+    print("Waiting for weaver to be ready...")
+    wait_for_health(f"http://localhost:{admin_port}/health", 60, "Weaver", weaver_proc)
+
+    test_env = _build_test_environment(mock_url, weaver_port)
+    print(f"=== Running test: {test_name} ===")
+
+    test_run = run_test_cmd(test_name, test_env)
+    if not test_run.found:
+        print(f"ERROR: Could not find test '{test_name}'", file=sys.stderr)
+        _print_available_tests()
+        sys.exit(1)
+
+    # ── Stop weaver ─────────────────────────────────────────────
+
+    weaver_exit = _stop_weaver(admin_port, weaver_proc)
+    print(f"=== Weaver exit code: {weaver_exit} ===")
+    print(f"=== Results in: {test_results_dir} ===")
+
+    if test_run.exit_code != 0:
+        print(
+            f"ERROR: Test command exited with code {test_run.exit_code}.",
+            file=sys.stderr,
+        )
+        sys.exit(test_run.exit_code or 1)
+
+    fresh_result = parse_result_dir(test_results_dir, test_name)
+    has_weaver_output = _has_weaver_output(test_results_dir)
+    has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
+
+    if not has_weaver_output:
+        print(
+            f"ERROR: Weaver produced no JSON output for test: {test_name}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if weaver_exit != 0 and not has_weaver_stats:
+        print(
+            "ERROR: Weaver exited non-zero before writing statistics.",
+            file=sys.stderr,
+        )
+        sys.exit(weaver_exit or 1)
+    if weaver_exit != 0:
+        print(
+            "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
+            file=sys.stderr,
+        )
+
+    # ── Update the per-test data file ───────────────────────────
+
+    print("=== Updating test data file ===")
+    result = _write_generated_test_data(test_name)
+    if result is None:
+        print(f"ERROR: Could not parse Weaver results for test: {test_name}", file=sys.stderr)
+        sys.exit(1)
+    if not result.has_relevant_data:
+        print(
+            f"ERROR: No relevant data for test: {test_name}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return mock_proc, weaver_proc
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python run_test.py <test-name> [weaver-args...]", file=sys.stderr)
@@ -266,8 +373,6 @@ def main() -> None:
     extra_weaver_args = sys.argv[2:]
 
     print(f"Test: {test_name}")
-
-    # ── Configuration from environment ──────────────────────────────
 
     try:
         lang, lib, eco = split_test_name(test_name)
@@ -281,102 +386,16 @@ def main() -> None:
 
     weaver_port, admin_port = _allocate_free_tcp_ports(2)
     registry = _ensure_semconv_registry()
-
-    # ── Mock server ─────────────────────────────────────────────────
-
     mock_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
+
     mock_proc: subprocess.Popen | None = None
     weaver_proc: subprocess.Popen | None = None
 
     try:
-        mock_proc = _start_mock_server(mock_url)
-
-        # ── Pre-build (compile before starting weaver) ──────────────
-        # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
-        # can cause it to shut down before the test sends any data.
-
-        LANGUAGE_ADAPTERS[lang].prebuild_test(lib)
-
-        # ── Start weaver ────────────────────────────────────────────
-
-        test_results_dir = _results_dir_from_test_name(test_name).resolve()
-        _prepare_results_dir(test_results_dir)
-
-        print(f"=== Starting weaver live-check for: {test_name} (ports {weaver_port}/{admin_port}) ===")
-        weaver_bin = ensure_weaver()
-        weaver_cmd = _build_weaver_command(
-            weaver_bin,
-            registry,
-            test_results_dir,
-            weaver_port,
-            admin_port,
-            extra_weaver_args,
+        mock_proc, weaver_proc = _run_test_pipeline(
+            test_name, lang, lib, extra_weaver_args,
+            mock_url, weaver_port, admin_port, registry, mock_proc,
         )
-
-        weaver_proc = subprocess.Popen(weaver_cmd)
-
-        print("Waiting for weaver to be ready...")
-        wait_for_health(f"http://localhost:{admin_port}/health", 60, "Weaver", weaver_proc)
-
-        test_env = _build_test_environment(mock_url, weaver_port)
-        print(f"=== Running test: {test_name} ===")
-
-        test_run = run_test_cmd(test_name, test_env)
-        if not test_run.found:
-            print(f"ERROR: Could not find test '{test_name}'", file=sys.stderr)
-            _print_available_tests()
-            sys.exit(1)
-
-        # ── Stop weaver ─────────────────────────────────────────────
-
-        weaver_exit = _stop_weaver(admin_port, weaver_proc)
-        print(f"=== Weaver exit code: {weaver_exit} ===")
-        print(f"=== Results in: {test_results_dir} ===")
-
-        if test_run.exit_code != 0:
-            print(
-                f"ERROR: Test command exited with code {test_run.exit_code}.",
-                file=sys.stderr,
-            )
-            sys.exit(test_run.exit_code or 1)
-
-        fresh_result = parse_result_dir(test_results_dir, test_name)
-        has_weaver_output = _has_weaver_output(test_results_dir)
-        has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
-
-        if not has_weaver_output:
-            print(
-                f"ERROR: Weaver produced no JSON output for test: {test_name}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        if weaver_exit != 0 and not has_weaver_stats:
-            print(
-                "ERROR: Weaver exited non-zero before writing statistics.",
-                file=sys.stderr,
-            )
-            sys.exit(weaver_exit or 1)
-        if weaver_exit != 0:
-            print(
-                "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
-                file=sys.stderr,
-            )
-
-        # ── Update the per-test data file ───────────────────────────
-
-        print("=== Updating test data file ===")
-        result = _write_generated_test_data(test_name)
-        if result is None:
-            print(f"ERROR: Could not parse Weaver results for test: {test_name}", file=sys.stderr)
-            sys.exit(1)
-        if not result.has_relevant_data:
-            print(
-                f"ERROR: No relevant data for test: {test_name}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
     finally:
         _stop_process(weaver_proc, "weaver")
         _stop_process(mock_proc, "mock server")
