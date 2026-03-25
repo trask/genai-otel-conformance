@@ -6,6 +6,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.metadata import LANGUAGE_DISPLAY_NAMES
 from genai_otel_conformance.locations import TestLocation
@@ -97,97 +98,92 @@ def try_parse_json(content: str) -> list[dict]:
     return objects
 
 
-def _has_any_attr(span_attrs: dict[str, object], *names: str) -> bool:
-    return any(span_attrs.get(name) for name in names)
+def _has_any_attr(attrs: dict[str, object], *names: str) -> bool:
+    return any(attrs.get(name) for name in names)
 
 
-def _has_all_attrs(span_attrs: dict[str, object], *names: str) -> bool:
-    return all(span_attrs.get(name) is not None for name in names)
+def _has_all_attrs(attrs: dict[str, object], *names: str) -> bool:
+    return all(attrs.get(name) is not None for name in names)
 
 
-def _is_embeddings_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+class SpanInfo(NamedTuple):
+    """Pre-extracted span fields passed to each classifier."""
+    name_lower: str
+    op_name: str
+    oi_kind: str
+    llm_type: str
+    attrs: dict[str, object]
+
+
+def _is_embeddings_span(ctx: SpanInfo) -> bool:
     return (
-        "embed" in name_lower
-        or _has_any_attr(span_attrs, "embedding.model_name")
-        or oi_kind == "EMBEDDING"
-        or llm_type in ("embedding", "embeddings")
-        or op_name in ("embedding", "embeddings")
+        "embed" in ctx.name_lower
+        or _has_any_attr(ctx.attrs, "embedding.model_name")
+        or ctx.oi_kind == "EMBEDDING"
+        or ctx.llm_type in ("embedding", "embeddings")
+        or ctx.op_name in ("embedding", "embeddings")
     )
 
 
-def _is_inference_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+def _is_inference_span(ctx: SpanInfo) -> bool:
     return (
-        op_name == "chat"
-        or oi_kind == "LLM"
-        or llm_type in ("chat", "completion")
-        or op_name == "generate_content"
-        or _has_all_attrs(span_attrs, "gen_ai.usage.output_tokens", "gen_ai.response.finish_reasons")
-        or _has_all_attrs(span_attrs, "llm.response.model", "llm.usage.completion_tokens")
+        ctx.op_name == "chat"
+        or ctx.oi_kind == "LLM"
+        or ctx.llm_type in ("chat", "completion")
+        or ctx.op_name == "generate_content"
+        or _has_all_attrs(ctx.attrs, "gen_ai.usage.output_tokens", "gen_ai.response.finish_reasons")
+        or _has_all_attrs(ctx.attrs, "llm.response.model", "llm.usage.completion_tokens")
     )
 
 
-def _is_create_agent_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
-    return op_name == "create_agent"
+def _is_create_agent_span(ctx: SpanInfo) -> bool:
+    return ctx.op_name == "create_agent"
 
 
-def _is_invoke_agent_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
     return (
-        oi_kind == "AGENT"
-        or op_name == "invoke_agent"
+        ctx.oi_kind == "AGENT"
+        or ctx.op_name == "invoke_agent"
         or (
-            _has_any_attr(span_attrs, "gen_ai.agent.name", "gen_ai.agent.id")
-            and op_name != "create_agent"
+            _has_any_attr(ctx.attrs, "gen_ai.agent.name", "gen_ai.agent.id")
+            and ctx.op_name != "create_agent"
         )
-        or _has_any_attr(span_attrs, "crewai.agent.id", "crewai.agent.role")
+        or _has_any_attr(ctx.attrs, "crewai.agent.id", "crewai.agent.role")
         or (
-            str(span_attrs.get("rpc.service", "")).lower() == "bedrockagentruntime"
-            and str(span_attrs.get("rpc.method", "")).lower() == "invokeagent"
+            str(ctx.attrs.get("rpc.service", "")).lower() == "bedrockagentruntime"
+            and str(ctx.attrs.get("rpc.method", "")).lower() == "invokeagent"
         )
-        or ("agentsclient" in name_lower and ("run" in name_lower or "process" in name_lower))
-        or ("threads" in name_lower and "run" in name_lower and "thread.run" not in name_lower)
+        or ("agentsclient" in ctx.name_lower and ("run" in ctx.name_lower or "process" in ctx.name_lower))
+        or ("threads" in ctx.name_lower and "run" in ctx.name_lower and "thread.run" not in ctx.name_lower)
     )
 
 
-def _is_execute_tool_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+def _is_execute_tool_span(ctx: SpanInfo) -> bool:
     return (
-        op_name == "execute_tool"
-        or oi_kind == "TOOL"
-        or _has_any_attr(span_attrs, "gen_ai.tool.name", "gen_ai.tool.call.id")
+        ctx.op_name == "execute_tool"
+        or ctx.oi_kind == "TOOL"
+        or _has_any_attr(ctx.attrs, "gen_ai.tool.name", "gen_ai.tool.call.id")
     )
 
 
-def _is_invoke_workflow_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+def _is_invoke_workflow_span(ctx: SpanInfo) -> bool:
     return (
-        op_name == "invoke_workflow"
-        or _has_any_attr(span_attrs, "traceloop.workflow.name")
-        or name_lower == "crewai.workflow"
-        or _has_any_attr(span_attrs, "crewai.crew.id")
+        ctx.op_name == "invoke_workflow"
+        or _has_any_attr(ctx.attrs, "traceloop.workflow.name")
+        or ctx.name_lower == "crewai.workflow"
+        or _has_any_attr(ctx.attrs, "crewai.crew.id")
     )
 
 
-def _is_retrieval_span(
-    name_lower: str, op_name: str, oi_kind: str, llm_type: str, span_attrs: dict[str, object],
-) -> bool:
+def _is_retrieval_span(ctx: SpanInfo) -> bool:
     return (
-        op_name == "retrieval"
-        or oi_kind == "RETRIEVER"
-        or _has_any_attr(span_attrs, "gen_ai.data_source.id")
+        ctx.op_name == "retrieval"
+        or ctx.oi_kind == "RETRIEVER"
+        or _has_any_attr(ctx.attrs, "gen_ai.data_source.id")
     )
 
 
-_SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[..., bool]]] = [
+_SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[[SpanInfo], bool]]] = [
     ("embeddings", _is_embeddings_span),
     ("inference", _is_inference_span),
     ("create_agent", _is_create_agent_span),
@@ -200,15 +196,18 @@ _SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[..., bool]]] = [
 
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     """Classify a span into span types using heuristics on individual span data."""
-    name_lower = span_name.lower()
-    op_name = str(span_attrs.get("gen_ai.operation.name", "")).lower()
-    oi_kind = str(span_attrs.get("openinference.span.kind", "")).upper()
-    llm_type = str(span_attrs.get("llm.request.type", "")).lower()
+    ctx = SpanInfo(
+        name_lower=span_name.lower(),
+        op_name=str(span_attrs.get("gen_ai.operation.name", "")).lower(),
+        oi_kind=str(span_attrs.get("openinference.span.kind", "")).upper(),
+        llm_type=str(span_attrs.get("llm.request.type", "")).lower(),
+        attrs=span_attrs,
+    )
 
     return {
         span_type
         for span_type, predicate in _SPAN_TYPE_CLASSIFIERS
-        if predicate(name_lower, op_name, oi_kind, llm_type, span_attrs)
+        if predicate(ctx)
     }
 
 
