@@ -436,8 +436,8 @@ def _prepare_heatmaps_from_data(
         if not columns:
             continue
 
-        def build_cells(entry: dict) -> list[dict]:
-            return _build_span_type_cells(entry, st_key, columns)
+        def build_cells(entry: dict, _key=st_key, _cols=columns) -> list[dict]:
+            return _build_span_type_cells(entry, _key, _cols)
 
         heatmap = _build_heatmap(
             st_label,
