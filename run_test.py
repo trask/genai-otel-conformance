@@ -51,7 +51,6 @@ from genai_otel_conformance.language_adapters import (
     run_test_cmd,
 )
 from genai_otel_conformance.locations import TestLocation
-from genai_otel_conformance.locations import TestLocation
 from genai_otel_conformance.results import parse_result_dir
 from genai_otel_conformance.test_data import (
     GeneratedTestData,
