@@ -91,12 +91,9 @@ def _allocate_free_tcp_ports(count: int) -> list[int]:
             sock.close()
 
 
-GeneratedTestPayload = dict[str, object]
-
-
 class GeneratedTestData(NamedTuple):
     path: Path
-    data: GeneratedTestPayload
+    data: dict[str, object]
     has_relevant_data: bool
 
 
@@ -141,7 +138,7 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
     spans = build_span_type_present_names(result, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS)
     path = _data_path_from_test_name(test_name)
 
-    data: GeneratedTestPayload = {
+    data: dict[str, object] = {
         "events": event_entries,
         "metrics": metric_entries,
     }
@@ -155,9 +152,9 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
     )
 
 
-def _normalize_generated_test_payload(data: GeneratedTestPayload) -> GeneratedTestPayload:
+def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, object]:
     """Drop empty top-level objects and sort span attribute names alphabetically."""
-    normalized: GeneratedTestPayload = {}
+    normalized: dict[str, object] = {}
     if spans := data.get("spans"):
         cleaned = {
             span_type: sorted(attrs)
