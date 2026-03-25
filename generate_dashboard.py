@@ -52,9 +52,7 @@ from genai_otel_conformance.locations import TestLocation
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = SCRIPT_DIR / "templates"
 
-_LANG_SLUG: dict[str, str] = {}
-for _slug, _display in LANGUAGE_DISPLAY_NAMES.items():
-    _LANG_SLUG[_display] = _slug
+_LANG_SLUG = {display: slug for slug, display in LANGUAGE_DISPLAY_NAMES.items()}
 
 
 def _make_anchor_id(language: str, library: str, ecosystem: str) -> str:
@@ -85,10 +83,7 @@ def parse_results() -> dict[str, TestResult]:
         print(f"Tests directory not found: {TESTS_DIR}", file=sys.stderr)
         return results
 
-    result_dirs = []
-    for path in TESTS_DIR.glob("*/*/results/*"):
-        if path.is_dir():
-            result_dirs.append(path)
+    result_dirs = [p for p in TESTS_DIR.glob("*/*/results/*") if p.is_dir()]
 
     for result_dir in sorted(result_dirs):
         location = TestLocation.from_results_dir(result_dir, TESTS_DIR)
@@ -214,10 +209,7 @@ def _signal_columns(signal_names: list[str]) -> list[dict[str, object]]:
 
 
 def _column_definitions(columns: list[dict]) -> list[tuple[str, bool]]:
-    definitions: list[tuple[str, bool]] = []
-    for column in columns:
-        definitions.append((column["header_text"], column["is_group_start"]))
-    return definitions
+    return [(col["header_text"], col["is_group_start"]) for col in columns]
 
 
 def _extra_result_sort_key(result: TestResult) -> tuple[str, str, str]:
@@ -481,20 +473,11 @@ def _build_signal_cells(
 
 
 def _entries_with_span_type(test_data_entries: list[dict], span_type_key: str) -> list[dict]:
-    entries: list[dict] = []
-    for entry in test_data_entries:
-        spans = entry.get("spans", {})
-        if span_type_key in spans:
-            entries.append(entry)
-    return entries
+    return [e for e in test_data_entries if span_type_key in e.get("spans", {})]
 
 
 def _entries_with_key(test_data_entries: list[dict], data_key: str) -> list[dict]:
-    entries: list[dict] = []
-    for entry in test_data_entries:
-        if data_key in entry:
-            entries.append(entry)
-    return entries
+    return [e for e in test_data_entries if data_key in e]
 
 
 def _prepare_heatmaps_from_data(
