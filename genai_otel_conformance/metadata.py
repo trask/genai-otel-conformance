@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
-from genai_otel_conformance import REPO_ROOT, TESTS_DIR
+from genai_otel_conformance import TESTS_DIR
 
 LANGUAGE_DISPLAY_NAMES = {"python": "Python", "java": "Java", "js": "JS", "dotnet": "C#"}
 LANGUAGE_SLUGS = {display: slug for slug, display in LANGUAGE_DISPLAY_NAMES.items()}

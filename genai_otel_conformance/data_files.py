@@ -76,12 +76,14 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
     """Drop empty top-level objects and sort span attribute names alphabetically."""
     normalized: dict[str, object] = {}
     for key in ("events", "metrics"):
-        if value := data.get(key):
+        value = data.get(key)
+        if value:
             normalized[key] = {
                 name: []
                 for name in _present_signal_names(value)
             }
-    if spans := data.get("spans"):
+    spans = data.get("spans")
+    if spans:
         cleaned = {
             span_type: sorted(attrs)
             for span_type, attrs in spans.items()
@@ -182,15 +184,13 @@ def _signal_names_from_committed_data(
             f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
         )
 
-    signal_names: list[str] = []
     for name, payload in value.items():
         if not isinstance(name, str) or not isinstance(payload, list):
             raise ValueError(
                 f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
             )
-        signal_names.append(name)
 
-    return sorted(signal_names)
+    return _present_signal_names(value)
 
 
 def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
