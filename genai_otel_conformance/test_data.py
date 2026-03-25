@@ -144,9 +144,7 @@ def _normalize_test_data_entry(entry: dict) -> dict:
     normalized = dict(entry)
     normalized["events"] = _normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES)
     normalized["metrics"] = _normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES)
-    raw_spans = entry.get("spans") or entry.get("span_types")
-    normalized["spans"] = _normalize_span_type_data(raw_spans)
-    normalized.pop("span_types", None)
+    normalized["spans"] = _normalize_span_type_data(entry.get("spans"))
     return normalized
 
 
