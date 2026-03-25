@@ -137,43 +137,44 @@ def _supplement_detected_from_statistics(
     return merged
 
 
-def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
-    """Parse a single test's Weaver output directory into a TestResult."""
-    if not result_dir.is_dir():
-        return None
-
+def _load_result_objects(result_dir: Path) -> list[dict]:
+    """Load and parse all JSON result objects from a Weaver result directory."""
     all_objects: list[dict] = []
     for json_file in sorted(result_dir.glob("**/*.json")):
         all_objects.extend(try_parse_json(json_file.read_text(encoding="utf-8")))
+    return all_objects
 
-    statistics = _extract_statistics(all_objects)
 
-    seen_attrs = _non_zero_counts(statistics, "seen_registry_attributes")
-    seen_non_registry_attrs = _non_zero_counts(statistics, "seen_non_registry_attributes")
+def _observed_telemetry_from_statistics(statistics: dict | None) -> ObservedTelemetry:
+    """Build observed telemetry counts from Weaver summary statistics."""
     seen_events = _non_zero_counts(statistics, "seen_registry_events")
     seen_events.update(_non_zero_counts(statistics, "seen_non_registry_events"))
+
     seen_metrics = _non_zero_counts(statistics, "seen_registry_metrics")
     seen_metrics.update(_non_zero_counts(statistics, "seen_non_registry_metrics"))
 
-    violation_count = 0
-    if statistics:
-        violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
-
-    violation_messages = _violation_messages(statistics)
-
     entity_counts: dict[str, int] = {}
+    has_data = False
     if statistics:
         entity_counts = statistics.get("total_entities_by_type", {})
+        has_data = statistics.get("total_entities", 0) > 0
 
-    location = TestLocation.from_test_name(test_name)
-    _validate_test_lang(location)
-    language = LANGUAGE_DISPLAY_NAMES[location.lang]
+    return ObservedTelemetry(
+        attrs=_non_zero_counts(statistics, "seen_registry_attributes"),
+        non_registry_attrs=_non_zero_counts(statistics, "seen_non_registry_attributes"),
+        events=seen_events,
+        metrics=seen_metrics,
+        entity_counts=entity_counts,
+        has_data=has_data,
+    )
 
-    has_data = False
-    if statistics and statistics.get("total_entities", 0) > 0:
-        has_data = True
+
+def _detected_signals_from_samples(
+    all_objects: list[dict],
+    statistics: dict | None,
+) -> tuple[SpanClassification, DetectedSignals]:
+    """Classify spans and supplement detected signal counts from statistics."""
     span_classification, detected = summarize_samples(all_objects)
-
     detected.events = _supplement_detected_from_statistics(
         detected.events,
         statistics,
@@ -184,6 +185,22 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         statistics,
         "seen_non_registry_metrics",
     )
+    return span_classification, detected
+
+
+def _build_test_result(
+    location: TestLocation,
+    statistics: dict | None,
+    observed: ObservedTelemetry,
+    spans: SpanClassification,
+    detected: DetectedSignals,
+) -> TestResult:
+    """Assemble the final parsed test result model."""
+    _validate_test_lang(location)
+    language = LANGUAGE_DISPLAY_NAMES[location.lang]
+    violation_count = 0
+    if statistics:
+        violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
 
     return TestResult(
         language=language,
@@ -191,18 +208,24 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
         ecosystem=location.ecosystem,
         statistics=statistics,
         violation_count=violation_count,
-        violation_messages=violation_messages,
-        observed=ObservedTelemetry(
-            attrs=seen_attrs,
-            non_registry_attrs=seen_non_registry_attrs,
-            events=seen_events,
-            metrics=seen_metrics,
-            entity_counts=entity_counts,
-            has_data=has_data,
-        ),
-        spans=span_classification,
+        violation_messages=_violation_messages(statistics),
+        observed=observed,
+        spans=spans,
         detected=detected,
     )
+
+
+def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
+    """Parse a single test's Weaver output directory into a TestResult."""
+    if not result_dir.is_dir():
+        return None
+
+    all_objects = _load_result_objects(result_dir)
+    statistics = _extract_statistics(all_objects)
+    location = TestLocation.from_test_name(test_name)
+    observed = _observed_telemetry_from_statistics(statistics)
+    span_classification, detected = _detected_signals_from_samples(all_objects, statistics)
+    return _build_test_result(location, statistics, observed, span_classification, detected)
 
 
 def parse_all_results() -> dict[str, TestResult]:
