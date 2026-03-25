@@ -77,7 +77,10 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
     normalized: dict[str, object] = {}
     for key in ("events", "metrics"):
         if value := data.get(key):
-            normalized[key] = _present_signal_names(value)
+            normalized[key] = {
+                name: []
+                for name in _present_signal_names(value)
+            }
     if spans := data.get("spans"):
         cleaned = {
             span_type: sorted(attrs)
@@ -150,16 +153,44 @@ def make_anchor_id(language: str, library: str, ecosystem: str) -> str:
 
 
 def _normalize_signal_data(
-    value: dict | list | None,
+    value: object,
     signal_names: list[str],
+    field_name: str,
+    test_name: str,
 ) -> dict[str, str]:
-    return build_statuses_from_present_names(signal_names, _present_signal_names(value))
+    return build_statuses_from_present_names(
+        signal_names,
+        _signal_names_from_committed_data(value, field_name, test_name),
+    )
 
 
 def _present_signal_names(value: dict | list | None) -> list[str]:
     if not isinstance(value, (dict, list)):
         return []
     return sorted(name for name in value if isinstance(name, str))
+
+
+def _signal_names_from_committed_data(
+    value: object,
+    field_name: str,
+    test_name: str,
+) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
+        )
+
+    signal_names: list[str] = []
+    for name, payload in value.items():
+        if not isinstance(name, str) or not isinstance(payload, list):
+            raise ValueError(
+                f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
+            )
+        signal_names.append(name)
+
+    return sorted(signal_names)
 
 
 def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
@@ -188,8 +219,9 @@ def _normalize_test_data_entry(entry: dict[str, object], location: TestLocation)
         entry.get("language"),
         LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang),
     )
+    test_name = make_anchor_id(language_display, location.library, location.ecosystem)
     return TestDataEntry(
-        test_name=make_anchor_id(language_display, location.library, location.ecosystem),
+        test_name=test_name,
         lang=location.lang,
         library=location.library,
         ecosystem=location.ecosystem,
@@ -199,8 +231,8 @@ def _normalize_test_data_entry(entry: dict[str, object], location: TestLocation)
             entry.get("ecosystem"),
             ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
         ),
-        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES),
-        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES),
+        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES, "events", test_name),
+        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES, "metrics", test_name),
         spans=_normalize_span_type_data(entry.get("spans")),
     )
 
