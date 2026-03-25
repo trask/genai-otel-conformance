@@ -32,6 +32,9 @@ class GeneratedTestData(NamedTuple):
 def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, object]:
     """Drop empty top-level objects and sort span attribute names alphabetically."""
     normalized: dict[str, object] = {}
+    for key in ("events", "metrics"):
+        if value := data.get(key):
+            normalized[key] = dict(sorted(value.items()))
     if spans := data.get("spans"):
         cleaned = {
             span_type: sorted(attrs)
@@ -40,9 +43,6 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
         }
         if cleaned:
             normalized["spans"] = cleaned
-    for key in ("events", "metrics"):
-        if value := data.get(key):
-            normalized[key] = dict(sorted(value.items()))
     return normalized
 
 
