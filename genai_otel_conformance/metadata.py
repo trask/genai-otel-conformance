@@ -20,8 +20,6 @@ def _load_ecosystems() -> tuple[
 ]:
     """Load ecosystem definitions from tests/ecosystems.json."""
     eco_file = TESTS_DIR / "ecosystems.json"
-    if not eco_file.is_file():
-        return {}, {}
     data = json.loads(eco_file.read_text(encoding="utf-8"))
     display: dict[str, str] = {}
     repos: dict[tuple[str, str], str] = {}
@@ -56,10 +54,7 @@ def _discover_library_metadata() -> tuple[
             meta = lib_dir / "metadata.json"
             if not meta.is_file():
                 continue
-            try:
-                data = json.loads(meta.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+            data = json.loads(meta.read_text(encoding="utf-8"))
             if slug not in names and "display_name" in data:
                 names[slug] = data["display_name"]
             if "repo" in data:
@@ -81,10 +76,7 @@ def _load_test_metadata(lang: str, library: str) -> dict:
     meta_file = TESTS_DIR / lang / library / "metadata.json"
     if not meta_file.is_file():
         return {}
-    try:
-        return json.loads(meta_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    return json.loads(meta_file.read_text(encoding="utf-8"))
 
 
 def _version_package_from_metadata(lang: str, library: str, ecosystem: str) -> str:
@@ -114,10 +106,7 @@ def _read_js_dependency_versions(test_dir: Path, _ecosystem: str) -> dict[str, s
     pkg_file = test_dir / "package.json"
     if not pkg_file.exists():
         return {}
-    try:
-        data = json.loads(pkg_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    data = json.loads(pkg_file.read_text(encoding="utf-8"))
     return dict(data.get("dependencies", {}))
 
 

@@ -336,22 +336,19 @@ def _load_test_data_files() -> list[dict]:
     if not TESTS_DIR.is_dir():
         return entries
     for data_file in sorted(TESTS_DIR.glob("*/*/data-*.json")):
-        try:
-            data = json.loads(data_file.read_text(encoding="utf-8"))
-            location = TestLocation.from_data_file(data_file, TESTS_DIR)
-            data.setdefault("library", library_display_name(location.library))
-            data.setdefault("language", LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang))
-            data.setdefault(
-                "ecosystem",
-                ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
-            )
-            data["test_name"] = _make_anchor_id(data["language"], location.library, location.ecosystem)
-            data["_lang"] = location.lang
-            data["_lib"] = location.library
-            data["_eco"] = location.ecosystem
-            entries.append(_normalize_test_data_entry(data))
-        except (OSError, ValueError, json.JSONDecodeError) as e:
-            print(f"Warning: Could not load {data_file}: {e}", file=sys.stderr)
+        data = json.loads(data_file.read_text(encoding="utf-8"))
+        location = TestLocation.from_data_file(data_file, TESTS_DIR)
+        data.setdefault("library", library_display_name(location.library))
+        data.setdefault("language", LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang))
+        data.setdefault(
+            "ecosystem",
+            ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
+        )
+        data["test_name"] = _make_anchor_id(data["language"], location.library, location.ecosystem)
+        data["_lang"] = location.lang
+        data["_lib"] = location.library
+        data["_eco"] = location.ecosystem
+        entries.append(_normalize_test_data_entry(data))
     return entries
 
 

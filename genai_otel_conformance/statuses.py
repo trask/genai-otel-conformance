@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from genai_otel_conformance.results import TestResult
 from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS
+
+
+class SpanTypeLevel(NamedTuple):
+    key: str
+    label: str
+    description: str
 
 
 def merge_signal_counts(
@@ -25,14 +33,14 @@ def present_attributes(result: TestResult) -> set[str]:
 
 
 _SPAN_TYPE_LEVELS = (
-    ("required", "Required", "Must be present for spans of this type."),
-    (
+    SpanTypeLevel("required", "Required", "Must be present for spans of this type."),
+    SpanTypeLevel(
         "conditionally_required",
         "Conditionally Required",
         "Required only when the span matches the relevant condition.",
     ),
-    ("recommended", "Recommended", "Expected when the library exposes the signal."),
-    ("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
+    SpanTypeLevel("recommended", "Recommended", "Expected when the library exposes the signal."),
+    SpanTypeLevel("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
 )
 
 
@@ -50,13 +58,13 @@ def _display_attrs_for_group(spec: dict, level: str) -> list[str]:
 def span_type_attribute_groups(spec: dict) -> list[dict[str, object]]:
     """Return ordered attribute groups for a span-type specification."""
     groups: list[dict[str, object]] = []
-    for level, label, description in _SPAN_TYPE_LEVELS:
-        attrs = _display_attrs_for_group(spec, level)
+    for level in _SPAN_TYPE_LEVELS:
+        attrs = _display_attrs_for_group(spec, level.key)
         if attrs:
             groups.append({
-                "key": level,
-                "label": label,
-                "description": description,
+                "key": level.key,
+                "label": level.label,
+                "description": level.description,
                 "attrs": attrs,
             })
     return groups

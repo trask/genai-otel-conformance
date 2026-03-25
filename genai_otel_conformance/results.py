@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from genai_otel_conformance import TESTS_DIR
@@ -319,10 +318,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
 
     all_objects: list[dict] = []
     for json_file in sorted(result_dir.glob("**/*.json")):
-        try:
-            all_objects.extend(try_parse_json(json_file.read_text(encoding="utf-8")))
-        except (OSError, ValueError) as exc:
-            print(f"Warning: Could not parse {json_file}: {exc}", file=sys.stderr)
+        all_objects.extend(try_parse_json(json_file.read_text(encoding="utf-8")))
 
     statistics = _extract_statistics(all_objects)
 
@@ -349,11 +345,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     if statistics:
         entity_counts = statistics.get("total_entities_by_type", {})
 
-    try:
-        lang, library, ecosystem = split_test_name(test_name)
-    except ValueError:
-        print(f"Warning: Could not parse test name: {test_name}", file=sys.stderr)
-        return None
+    lang, library, ecosystem = split_test_name(test_name)
     language = LANGUAGE_DISPLAY_NAMES[lang]
 
     has_data = False
