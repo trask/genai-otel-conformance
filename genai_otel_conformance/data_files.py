@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -35,6 +36,40 @@ class GeneratedTestData(NamedTuple):
     path: Path
     data: dict[str, object]
     has_relevant_data: bool
+
+
+@dataclass(frozen=True)
+class TestDataEntry:
+    test_name: str
+    lang: str
+    library: str
+    ecosystem: str
+    library_display: str
+    language_display: str
+    ecosystem_display: str
+    events: dict[str, str]
+    metrics: dict[str, str]
+    spans: dict[str, dict[str, str]]
+
+    @property
+    def label(self) -> str:
+        return f"{self.library_display} ({self.language_display}) — {self.ecosystem_display}"
+
+    @classmethod
+    def from_result(cls, result: TestResult) -> TestDataEntry:
+        language_display = result.language
+        return cls(
+            test_name=make_anchor_id(language_display, result.library, result.ecosystem),
+            lang=LANGUAGE_SLUGS.get(language_display, language_display.lower()),
+            library=result.library,
+            ecosystem=result.ecosystem,
+            library_display=library_display_name(result.library),
+            language_display=language_display,
+            ecosystem_display=ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem),
+            events={},
+            metrics={},
+            spans={},
+        )
 
 
 def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, object]:
@@ -131,7 +166,7 @@ def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
         if span_type_key not in value:
             continue
 
-        expected_names = [column["header_text"] for column in span_type_heatmap_columns(spec)]
+        expected_names = [column.header_text for column in span_type_heatmap_columns(spec)]
         raw = value[span_type_key]
         present_names = [name for name in raw if isinstance(name, str)] if isinstance(raw, (dict, list)) else []
         normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
@@ -139,38 +174,46 @@ def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
     return normalized
 
 
-def _normalize_test_data_entry(entry: dict) -> dict:
-    normalized = dict(entry)
-    normalized["events"] = _normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES)
-    normalized["metrics"] = _normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES)
-    normalized["spans"] = _normalize_span_type_data(entry.get("spans"))
-    return normalized
+def _display_value(value: object, default: str) -> str:
+    return value if isinstance(value, str) else default
 
 
-def load_test_data_files() -> list[dict]:
+def _normalize_test_data_entry(entry: dict[str, object], location: TestLocation) -> TestDataEntry:
+    language_display = _display_value(
+        entry.get("language"),
+        LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang),
+    )
+    return TestDataEntry(
+        test_name=make_anchor_id(language_display, location.library, location.ecosystem),
+        lang=location.lang,
+        library=location.library,
+        ecosystem=location.ecosystem,
+        library_display=_display_value(entry.get("library"), library_display_name(location.library)),
+        language_display=language_display,
+        ecosystem_display=_display_value(
+            entry.get("ecosystem"),
+            ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
+        ),
+        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES),
+        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES),
+        spans=_normalize_span_type_data(entry.get("spans")),
+    )
+
+
+def load_test_data_files() -> list[TestDataEntry]:
     """Discover and load committed data-*.json files from tests/.
 
     Only files in the canonical tests/<lang>/<lib>/data-<ecosystem>.json layout
     are considered. This avoids pulling in copied workspace artifacts such as
     tests/js/node_modules/*/data-*.json.
 
-    Returns a list of loaded data dicts (each augmented with the file path).
+    Returns normalized typed entries for dashboard generation.
     """
-    entries: list[dict] = []
+    entries: list[TestDataEntry] = []
     if not TESTS_DIR.is_dir():
         return entries
     for data_file in sorted(TESTS_DIR.glob("*/*/data-*.json")):
         data = json.loads(data_file.read_text(encoding="utf-8"))
         location = TestLocation.from_data_file(data_file, TESTS_DIR)
-        data.setdefault("library", library_display_name(location.library))
-        data.setdefault("language", LANGUAGE_DISPLAY_NAMES.get(location.lang, location.lang))
-        data.setdefault(
-            "ecosystem",
-            ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
-        )
-        data["test_name"] = make_anchor_id(data["language"], location.library, location.ecosystem)
-        data["_lang"] = location.lang
-        data["_lib"] = location.library
-        data["_eco"] = location.ecosystem
-        entries.append(_normalize_test_data_entry(data))
+        entries.append(_normalize_test_data_entry(data, location))
     return entries

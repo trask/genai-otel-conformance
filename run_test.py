@@ -66,6 +66,22 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 MOCK_SERVER_PORT = 8080
 
 
+@dataclass(frozen=True)
+class RunTestError(Exception):
+    message: str
+    exit_code: int = 1
+    show_available_tests: bool = False
+
+    def __str__(self) -> str:
+        return self.message
+
+
+@dataclass
+class PipelineState:
+    mock_proc: subprocess.Popen | None = None
+    weaver_proc: subprocess.Popen | None = None
+
+
 def _allocate_free_tcp_ports(count: int) -> list[int]:
     """Ask the OS for unused loopback TCP ports to reduce collisions in CI."""
     sockets: list[socket.socket] = []
@@ -78,11 +94,6 @@ def _allocate_free_tcp_ports(count: int) -> list[int]:
     finally:
         for sock in sockets:
             sock.close()
-
-
-def _results_dir_from_test_name(test_name: str) -> Path:
-    """Compute the results directory path from a test name."""
-    return TestLocation.from_test_name(test_name).results_dir(TESTS_DIR)
 
 
 def _prepare_results_dir(result_dir: Path) -> None:
@@ -114,22 +125,20 @@ def wait_for_health(url: str, timeout: int, label: str, proc: subprocess.Popen |
             print(f"{label} ready after {i}s")
             return
         if proc and proc.poll() is not None:
-            print(f"ERROR: {label} process died during startup", file=sys.stderr)
-            sys.exit(1)
+            raise RunTestError(f"{label} process died during startup")
         time.sleep(1)
-    print(f"ERROR: {label} failed to become ready after {timeout}s", file=sys.stderr)
-    sys.exit(1)
+    raise RunTestError(f"{label} failed to become ready after {timeout}s")
 
 
-def _start_mock_server(mock_url: str) -> subprocess.Popen | None:
+def _start_mock_server(mock_url: str, state: PipelineState) -> None:
     health_url = f"{mock_url}/health"
     if is_healthy(health_url):
         print(f"Mock server already running on port {MOCK_SERVER_PORT}")
-        return None
+        return
 
     install_with_uv("-e", "tests/mock-server", label="shared mock server dependencies")
     print(f"=== Starting mock server on port {MOCK_SERVER_PORT} ===")
-    mock_proc = subprocess.Popen(
+    state.mock_proc = subprocess.Popen(
         [
             sys.executable,
             str(SCRIPT_DIR / "tests" / "mock-server" / "mock_server" / "server.py"),
@@ -139,8 +148,7 @@ def _start_mock_server(mock_url: str) -> subprocess.Popen | None:
             str(MOCK_SERVER_PORT),
         ],
     )
-    wait_for_health(health_url, 30, "Mock server", mock_proc)
-    return mock_proc
+    wait_for_health(health_url, 30, "Mock server", state.mock_proc)
 
 
 def _build_weaver_command(
@@ -233,16 +241,13 @@ class PipelineConfig:
 
 def _run_test_pipeline(
     config: PipelineConfig,
-    mock_proc: subprocess.Popen | None,
-) -> tuple[subprocess.Popen | None, subprocess.Popen | None]:
-    """Run the test pipeline: mock server, pre-build, weaver, test, collect results.
-
-    Returns (mock_proc, weaver_proc) so the caller can clean them up.
-    """
+    state: PipelineState,
+) -> None:
+    """Run the test pipeline: mock server, pre-build, weaver, test, collect results."""
     location = TestLocation.from_test_name(config.test_name)
 
-    if mock_proc is None:
-        mock_proc = _start_mock_server(config.mock_url)
+    if state.mock_proc is None:
+        _start_mock_server(config.mock_url, state)
 
     # ── Pre-build (compile before starting weaver) ──────────────
     # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
@@ -252,7 +257,7 @@ def _run_test_pipeline(
 
     # ── Start weaver ────────────────────────────────────────────
 
-    test_results_dir = _results_dir_from_test_name(config.test_name).resolve()
+    test_results_dir = location.results_dir(TESTS_DIR).resolve()
     _prepare_results_dir(test_results_dir)
 
     print(f"=== Starting weaver live-check for: {config.test_name} (ports {config.weaver_port}/{config.admin_port}) ===")
@@ -266,50 +271,51 @@ def _run_test_pipeline(
         config.extra_weaver_args,
     )
 
-    weaver_proc = subprocess.Popen(weaver_cmd)
+    state.weaver_proc = subprocess.Popen(weaver_cmd)
 
     print("Waiting for weaver to be ready...")
-    wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", weaver_proc)
+    wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", state.weaver_proc)
 
     test_env = _build_test_environment(config.mock_url, config.weaver_port)
     print(f"=== Running test: {config.test_name} ===")
 
     test_run = run_test_cmd(config.test_name, test_env)
     if not test_run.found:
-        print(f"ERROR: Could not find test '{config.test_name}'", file=sys.stderr)
-        _print_available_tests()
-        sys.exit(1)
+        raise RunTestError(
+            f"Could not find test '{config.test_name}'",
+            show_available_tests=True,
+        )
 
     # ── Stop weaver ─────────────────────────────────────────────
 
-    weaver_exit = _stop_weaver(config.admin_port, weaver_proc)
+    if state.weaver_proc is None:
+        raise RunTestError("Weaver process was not started")
+
+    weaver_exit = _stop_weaver(config.admin_port, state.weaver_proc)
+    state.weaver_proc = None
     print(f"=== Weaver exit code: {weaver_exit} ===")
     print(f"=== Results in: {test_results_dir} ===")
 
     if test_run.exit_code != 0:
-        print(
-            f"ERROR: Test command exited with code {test_run.exit_code}.",
-            file=sys.stderr,
+        raise RunTestError(
+            f"Test command exited with code {test_run.exit_code}.",
+            exit_code=test_run.exit_code or 1,
         )
-        sys.exit(test_run.exit_code or 1)
 
     fresh_result = parse_result_dir(test_results_dir, config.test_name)
     has_weaver_output = _has_weaver_output(test_results_dir)
     has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
 
     if not has_weaver_output:
-        print(
-            f"ERROR: Weaver produced no JSON output for test: {config.test_name}",
-            file=sys.stderr,
+        raise RunTestError(
+            f"Weaver produced no JSON output for test: {config.test_name}",
         )
-        sys.exit(1)
 
     if weaver_exit != 0 and not has_weaver_stats:
-        print(
-            "ERROR: Weaver exited non-zero before writing statistics.",
-            file=sys.stderr,
+        raise RunTestError(
+            "Weaver exited non-zero before writing statistics.",
+            exit_code=weaver_exit or 1,
         )
-        sys.exit(weaver_exit or 1)
     if weaver_exit != 0:
         print(
             "Note: Weaver returned a non-zero exit code because violations were reported; continuing with captured statistics.",
@@ -321,22 +327,15 @@ def _run_test_pipeline(
     print("=== Updating test data file ===")
     result = _write_generated_test_data(config.test_name)
     if result is None:
-        print(f"ERROR: Could not parse Weaver results for test: {config.test_name}", file=sys.stderr)
-        sys.exit(1)
+        raise RunTestError(f"Could not parse Weaver results for test: {config.test_name}")
     if not result.has_relevant_data:
-        print(
-            f"ERROR: No relevant data for test: {config.test_name}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    return mock_proc, weaver_proc
+        raise RunTestError(f"No relevant data for test: {config.test_name}")
 
 
-def main() -> None:
+def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python run_test.py <test-name> [weaver-args...]", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     test_name = sys.argv[1]
     extra_weaver_args = sys.argv[2:]
@@ -349,7 +348,7 @@ def main() -> None:
         print(f"ERROR: Invalid test name '{test_name}'", file=sys.stderr)
         print("Expected format: <lang>-<library>-<ecosystem>", file=sys.stderr)
         _print_available_tests()
-        sys.exit(1)
+        return 1
 
     lang, lib = location.lang, location.library
     LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
@@ -367,15 +366,21 @@ def main() -> None:
         registry=registry,
     )
 
-    mock_proc: subprocess.Popen | None = None
-    weaver_proc: subprocess.Popen | None = None
+    state = PipelineState()
 
     try:
-        mock_proc, weaver_proc = _run_test_pipeline(config, mock_proc)
+        _run_test_pipeline(config, state)
+    except RunTestError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        if exc.show_available_tests:
+            _print_available_tests()
+        return exc.exit_code
     finally:
-        _stop_process(weaver_proc, "weaver")
-        _stop_process(mock_proc, "mock server")
+        _stop_process(state.weaver_proc, "weaver")
+        _stop_process(state.mock_proc, "mock server")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
