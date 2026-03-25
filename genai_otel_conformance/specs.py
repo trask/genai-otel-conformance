@@ -3,28 +3,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class RequirementLevel(StrEnum):
+    REQUIRED = "required"
+    CONDITIONALLY_REQUIRED = "conditionally_required"
+    RECOMMENDED = "recommended"
+    OPT_IN = "opt_in"
 
 
 @dataclass(frozen=True)
 class SpanTypeSpec:
     label: str
-    expected_kind: str
     discriminator_attrs: frozenset[str]
     required: tuple[str, ...]
     conditionally_required: tuple[str, ...]
     recommended: tuple[str, ...]
     opt_in: tuple[str, ...]
 
-    def attrs_for_level(self, level: str) -> tuple[str, ...]:
-        if level == "required":
+    def attrs_for_requirement_level(self, level: RequirementLevel) -> tuple[str, ...]:
+        if level is RequirementLevel.REQUIRED:
             return self.required
-        if level == "conditionally_required":
+        if level is RequirementLevel.CONDITIONALLY_REQUIRED:
             return self.conditionally_required
-        if level == "recommended":
+        if level is RequirementLevel.RECOMMENDED:
             return self.recommended
-        if level == "opt_in":
+        if level is RequirementLevel.OPT_IN:
             return self.opt_in
-        raise KeyError(f"Unknown span type level: {level}")
+        raise KeyError(f"Unknown requirement level: {level}")
 
 _COMMON_REQUIRED = ["gen_ai.operation.name"]
 _PROVIDER_REQUIRED = ["gen_ai.provider.name"]
@@ -67,7 +74,6 @@ _INFERENCE_OPT_IN = [
 SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     "inference": SpanTypeSpec(
         label="Inference",
-        expected_kind="client",
         discriminator_attrs=frozenset({
             "gen_ai.response.finish_reasons",
             "gen_ai.response.id",
@@ -84,7 +90,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "embeddings": SpanTypeSpec(
         label="Embeddings",
-        expected_kind="client",
         discriminator_attrs=frozenset({
             "gen_ai.embeddings.dimension.count",
             "gen_ai.request.encoding_formats",
@@ -101,7 +106,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "retrieval": SpanTypeSpec(
         label="Retrieval",
-        expected_kind="client",
         discriminator_attrs=frozenset({"gen_ai.data_source.id"}),
         required=tuple(_COMMON_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + [
@@ -116,7 +120,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "execute_tool": SpanTypeSpec(
         label="Execute Tool",
-        expected_kind="internal",
         discriminator_attrs=frozenset({
             "gen_ai.tool.call.id",
             "gen_ai.tool.name",
@@ -137,7 +140,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "create_agent": SpanTypeSpec(
         label="Create Agent",
-        expected_kind="client",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + [
@@ -151,7 +153,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "invoke_agent": SpanTypeSpec(
         label="Invoke Agent",
-        expected_kind="client",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED + [
@@ -166,7 +167,6 @@ SPAN_TYPE_SPECS: dict[str, SpanTypeSpec] = {
     ),
     "invoke_workflow": SpanTypeSpec(
         label="Invoke Workflow",
-        expected_kind="internal",
         discriminator_attrs=frozenset({"gen_ai.workflow.name"}),
         required=tuple(_COMMON_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + ["gen_ai.workflow.name"]),

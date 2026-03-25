@@ -47,12 +47,13 @@ from pathlib import Path
 from genai_otel_conformance import TESTS_DIR
 from genai_otel_conformance.language_adapters import (
     LANGUAGE_ADAPTERS,
+    TestCommandResult,
     install_with_uv,
     list_available_tests,
     run_test_cmd,
 )
 from genai_otel_conformance.locations import TestLocation
-from genai_otel_conformance.results import parse_result_dir
+from genai_otel_conformance.results import TestResult, parse_result_dir
 from genai_otel_conformance.data_files import (
     GeneratedTestData,
     generate_single_test_data,
@@ -239,24 +240,19 @@ class PipelineConfig:
     registry: str
 
 
-def _run_test_pipeline(
-    config: PipelineConfig,
-    state: PipelineState,
-) -> None:
-    """Run the test pipeline: mock server, pre-build, weaver, test, collect results."""
-    location = TestLocation.from_test_name(config.test_name)
-
-    if state.mock_proc is None:
-        _start_mock_server(config.mock_url, state)
-
-    # ── Pre-build (compile before starting weaver) ──────────────
+def _prebuild_test(location: TestLocation) -> None:
+    """Compile the test before starting Weaver."""
     # Weaver uses an inactivity timeout; long builds (e.g. Gradle)
     # can cause it to shut down before the test sends any data.
-
     LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
 
-    # ── Start weaver ────────────────────────────────────────────
 
+def _start_weaver_live_check(
+    config: PipelineConfig,
+    state: PipelineState,
+    location: TestLocation,
+) -> Path:
+    """Start Weaver live-check and return the result directory."""
     test_results_dir = location.results_dir(TESTS_DIR).resolve()
     _prepare_results_dir(test_results_dir)
 
@@ -275,7 +271,11 @@ def _run_test_pipeline(
 
     print("Waiting for weaver to be ready...")
     wait_for_health(f"http://localhost:{config.admin_port}/health", 60, "Weaver", state.weaver_proc)
+    return test_results_dir
 
+
+def _run_configured_test(config: PipelineConfig) -> TestCommandResult:
+    """Run the configured test command against the active Weaver instance."""
     test_env = _build_test_environment(config.mock_url, config.weaver_port)
     print(f"=== Running test: {config.test_name} ===")
 
@@ -285,9 +285,15 @@ def _run_test_pipeline(
             f"Could not find test '{config.test_name}'",
             show_available_tests=True,
         )
+    return test_run
 
-    # ── Stop weaver ─────────────────────────────────────────────
 
+def _finish_weaver_run(
+    config: PipelineConfig,
+    state: PipelineState,
+    test_results_dir: Path,
+) -> tuple[int, TestResult | None]:
+    """Stop Weaver and load the fresh parsed result, if any."""
     if state.weaver_proc is None:
         raise RunTestError("Weaver process was not started")
 
@@ -295,14 +301,25 @@ def _run_test_pipeline(
     state.weaver_proc = None
     print(f"=== Weaver exit code: {weaver_exit} ===")
     print(f"=== Results in: {test_results_dir} ===")
+    return weaver_exit, parse_result_dir(test_results_dir, config.test_name)
 
+
+def _validate_test_run(test_run: TestCommandResult) -> None:
+    """Raise if the test command itself failed."""
     if test_run.exit_code != 0:
         raise RunTestError(
             f"Test command exited with code {test_run.exit_code}.",
             exit_code=test_run.exit_code or 1,
         )
 
-    fresh_result = parse_result_dir(test_results_dir, config.test_name)
+
+def _validate_weaver_output(
+    config: PipelineConfig,
+    test_results_dir: Path,
+    weaver_exit: int,
+    fresh_result: TestResult | None,
+) -> None:
+    """Raise if Weaver output is missing or unusable."""
     has_weaver_output = _has_weaver_output(test_results_dir)
     has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
 
@@ -322,14 +339,34 @@ def _run_test_pipeline(
             file=sys.stderr,
         )
 
-    # ── Update the per-test data file ───────────────────────────
 
+def _update_generated_test_data_or_raise(test_name: str) -> None:
+    """Write the generated test data file and validate that it contains useful data."""
     print("=== Updating test data file ===")
-    result = _write_generated_test_data(config.test_name)
+    result = _write_generated_test_data(test_name)
     if result is None:
-        raise RunTestError(f"Could not parse Weaver results for test: {config.test_name}")
+        raise RunTestError(f"Could not parse Weaver results for test: {test_name}")
     if not result.has_relevant_data:
-        raise RunTestError(f"No relevant data for test: {config.test_name}")
+        raise RunTestError(f"No relevant data for test: {test_name}")
+
+
+def _run_test_pipeline(
+    config: PipelineConfig,
+    state: PipelineState,
+) -> None:
+    """Run the test pipeline: mock server, pre-build, weaver, test, collect results."""
+    location = TestLocation.from_test_name(config.test_name)
+
+    if state.mock_proc is None:
+        _start_mock_server(config.mock_url, state)
+
+    _prebuild_test(location)
+    test_results_dir = _start_weaver_live_check(config, state, location)
+    test_run = _run_configured_test(config)
+    weaver_exit, fresh_result = _finish_weaver_run(config, state, test_results_dir)
+    _validate_test_run(test_run)
+    _validate_weaver_output(config, test_results_dir, weaver_exit, fresh_result)
+    _update_generated_test_data_or_raise(config.test_name)
 
 
 def main() -> int:

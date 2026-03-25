@@ -25,7 +25,7 @@ from genai_otel_conformance.specs import (
     SPAN_TYPE_SPECS,
 )
 from genai_otel_conformance.statuses import (
-    build_present_signal_entries,
+    build_present_signal_names,
     build_span_type_present_names,
     build_statuses_from_present_names,
     span_type_heatmap_columns,
@@ -77,7 +77,7 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
     normalized: dict[str, object] = {}
     for key in ("events", "metrics"):
         if value := data.get(key):
-            normalized[key] = dict(sorted(value.items()))
+            normalized[key] = _present_signal_names(value)
     if spans := data.get("spans"):
         cleaned = {
             span_type: sorted(attrs)
@@ -91,23 +91,23 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
 
 def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTestData:
     """Build committed dashboard data from a parsed Weaver result."""
-    event_entries = build_present_signal_entries(
+    event_names = build_present_signal_names(
         GENAI_EVENT_TYPES,
         result.observed.events,
         result.detected.events,
     )
-    metric_entries = build_present_signal_entries(
+    metric_names = build_present_signal_names(
         GENAI_METRIC_TYPES,
         result.observed.metrics,
         result.detected.metrics,
     )
-    has_genai_signals = bool(event_entries) or bool(metric_entries)
+    has_genai_signals = bool(event_names) or bool(metric_names)
     spans = build_span_type_present_names(result)
     path = TestLocation.from_test_name(test_name).data_file(TESTS_DIR)
 
     data: dict[str, object] = {
-        "events": event_entries,
-        "metrics": metric_entries,
+        "events": event_names,
+        "metrics": metric_names,
     }
     if spans:
         data["spans"] = spans
@@ -153,8 +153,13 @@ def _normalize_signal_data(
     value: dict | list | None,
     signal_names: list[str],
 ) -> dict[str, str]:
-    present = [name for name in value if isinstance(name, str)] if isinstance(value, (dict, list)) else []
-    return build_statuses_from_present_names(signal_names, present)
+    return build_statuses_from_present_names(signal_names, _present_signal_names(value))
+
+
+def _present_signal_names(value: dict | list | None) -> list[str]:
+    if not isinstance(value, (dict, list)):
+        return []
+    return sorted(name for name in value if isinstance(name, str))
 
 
 def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:

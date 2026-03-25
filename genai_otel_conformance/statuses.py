@@ -5,19 +5,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from genai_otel_conformance.results import TestResult
-from genai_otel_conformance.specs import DISPLAY_DEPRECATED_ATTRS, SPAN_TYPE_ORDER, SPAN_TYPE_SPECS, SpanTypeSpec
+from genai_otel_conformance.specs import (
+    DISPLAY_DEPRECATED_ATTRS,
+    RequirementLevel,
+    SPAN_TYPE_ORDER,
+    SPAN_TYPE_SPECS,
+    SpanTypeSpec,
+)
 
 
 @dataclass(frozen=True)
-class SpanTypeLevel:
-    key: str
+class RequirementLevelInfo:
+    key: RequirementLevel
     label: str
     description: str
 
 
 @dataclass(frozen=True)
 class SpanTypeAttributeGroup:
-    key: str
+    key: RequirementLevel
     label: str
     description: str
     attrs: tuple[str, ...]
@@ -27,13 +33,13 @@ class SpanTypeAttributeGroup:
 class HeatmapColumn:
     header_text: str
     is_group_start: bool
-    group_key: str = ""
+    group_key: RequirementLevel | str = ""
     group_label: str = ""
 
 
 @dataclass(frozen=True)
 class HeatmapGroup:
-    key: str
+    key: RequirementLevel
     label: str
     description: str
     colspan: int
@@ -58,21 +64,21 @@ def present_attributes(result: TestResult) -> set[str]:
 
 
 _SPAN_TYPE_LEVELS = (
-    SpanTypeLevel("required", "Required", "Must be present for spans of this type."),
-    SpanTypeLevel(
-        "conditionally_required",
+    RequirementLevelInfo(RequirementLevel.REQUIRED, "Required", "Must be present for spans of this type."),
+    RequirementLevelInfo(
+        RequirementLevel.CONDITIONALLY_REQUIRED,
         "Conditionally Required",
         "Required only when the span matches the relevant condition.",
     ),
-    SpanTypeLevel("recommended", "Recommended", "Expected when the library exposes the signal."),
-    SpanTypeLevel("opt_in", "Opt-In", "Captured only when the user explicitly enables it."),
+    RequirementLevelInfo(RequirementLevel.RECOMMENDED, "Recommended", "Expected when the library exposes the signal."),
+    RequirementLevelInfo(RequirementLevel.OPT_IN, "Opt-In", "Captured only when the user explicitly enables it."),
 )
 
 
-def _display_attrs_for_group(spec: SpanTypeSpec, level: str) -> tuple[str, ...]:
+def _display_attrs_for_group(spec: SpanTypeSpec, level: RequirementLevel) -> tuple[str, ...]:
     """Return attrs for one visual group, including deprecated predecessors."""
     display_attrs: list[str] = []
-    for attr in sorted(spec.attrs_for_level(level)):
+    for attr in sorted(spec.attrs_for_requirement_level(level)):
         display_attrs.append(attr)
         deprecated_attr = DISPLAY_DEPRECATED_ATTRS.get(attr)
         if deprecated_attr is not None:
@@ -120,11 +126,11 @@ def span_type_heatmap_groups(spec: SpanTypeSpec) -> list[HeatmapGroup]:
 def span_type_present_attributes(
     result: TestResult,
     span_type_key: str,
-    level: str,
+    level: RequirementLevel,
 ) -> set[str]:
     """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
-    if level == "required":
+    if level is RequirementLevel.REQUIRED:
         return result.spans.per_type_attrs.get(span_type_key, all_present)
     return result.spans.per_type_any_attrs.get(span_type_key, all_present)
 
@@ -163,18 +169,18 @@ def relevant_span_type_keys(result: TestResult) -> list[str]:
     return relevant
 
 
-def build_present_signal_entries(
+def build_present_signal_names(
     signal_names: list[str],
     statistics_counts: dict[str, int],
     detected_counts: dict[str, int],
-) -> dict[str, list[str]]:
-    """Return sparse per-signal attribute lists for observed signals."""
+) -> list[str]:
+    """Return the ordered names of observed signals."""
     merged_counts = merge_signal_counts(statistics_counts, detected_counts)
-    return {
-        name: []
+    return [
+        name
         for name in signal_names
         if merged_counts.get(name, 0) > 0
-    }
+    ]
 
 
 def build_statuses_from_present_names(
