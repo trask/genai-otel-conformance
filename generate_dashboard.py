@@ -415,14 +415,6 @@ def _build_signal_cells(
     return _build_status_cells(columns, entry.get(data_key, {}))
 
 
-def _entries_with_span_type(test_data_entries: list[dict], span_type_key: str) -> list[dict]:
-    return [e for e in test_data_entries if span_type_key in e.get("spans", {})]
-
-
-def _entries_with_key(test_data_entries: list[dict], data_key: str) -> list[dict]:
-    return [e for e in test_data_entries if data_key in e]
-
-
 def _prepare_heatmaps_from_data(
     test_data_entries: list[dict],
     details_available: bool,
@@ -434,7 +426,7 @@ def _prepare_heatmaps_from_data(
         st_label = spec["label"]
 
         # Collect entries that have this span type.
-        relevant = _entries_with_span_type(test_data_entries, st_key)
+        relevant = [e for e in test_data_entries if st_key in e.get("spans", {})]
         if not relevant:
             continue
 
@@ -469,7 +461,7 @@ def _prepare_signal_heatmap(
     details_available: bool = True,
 ) -> dict | None:
     """Build an event or metric heatmap from committed data-*.json entries."""
-    relevant = _entries_with_key(test_data_entries, data_key)
+    relevant = [e for e in test_data_entries if data_key in e]
 
     columns = _signal_columns(signal_names)
 
