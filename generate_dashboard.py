@@ -190,14 +190,6 @@ def _column_definitions(columns: list[dict]) -> list[tuple[str, bool]]:
     return [(col["header_text"], col["is_group_start"]) for col in columns]
 
 
-def _extra_result_sort_key(result: TestResult) -> tuple[str, str, str]:
-    return (
-        library_display_name(result.library).lower(),
-        result.language.lower(),
-        result.ecosystem.lower(),
-    )
-
-
 def _detail_repo(lang_slug: str, library: str, ecosystem: str, language: str) -> str:
     if ecosystem == "native":
         return NATIVE_REPOS.get((lang_slug, library), "")
@@ -291,6 +283,7 @@ def _prepare_details(
 
     Every known test (from committed data-*.json files) gets an anchor.
     Entries without local Weaver output show "Results not yet available."
+    Results without a corresponding data file are appended at the end.
     """
     result_by_id: dict[str, TestResult] = {}
     for result in results.values():
@@ -298,22 +291,27 @@ def _prepare_details(
         result_by_id[anchor_id] = result
 
     sorted_entries = sorted(test_data_entries, key=_heatmap_sort_key)
+    seen_ids = {entry["test_name"] for entry in sorted_entries}
 
-    # Also include any results that have no corresponding data file.
-    seen_ids: set[str] = set()
-    for entry in sorted_entries:
-        seen_ids.add(entry["test_name"])
-
-    extra_results: list[TestResult] = []
+    # Build synthetic entries for results without a committed data file.
+    extra_entries = []
     for result in results.values():
         anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
         if anchor_id not in seen_ids:
-            extra_results.append(result)
-    extra_results.sort(key=_extra_result_sort_key)
+            lang_slug = LANGUAGE_SLUGS.get(result.language, result.language.lower())
+            extra_entries.append({
+                "test_name": anchor_id,
+                "_lang": lang_slug,
+                "_lib": result.library,
+                "_eco": result.ecosystem,
+                "library": library_display_name(result.library),
+                "language": result.language,
+                "ecosystem": ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem),
+            })
+    extra_entries.sort(key=_heatmap_sort_key)
 
     details = []
-
-    for entry in sorted_entries:
+    for entry in sorted_entries + extra_entries:
         lang = entry["_lang"]
         lib = entry["_lib"]
         eco = entry["_eco"]
@@ -323,24 +321,6 @@ def _prepare_details(
         label = f"{lib_display} ({language}) \u2014 {eco_display}"
         result = result_by_id.get(entry["test_name"])
         details.append(_build_detail(entry["test_name"], label, lang, lib, eco, language, result))
-
-    for result in extra_results:
-        lang_slug = LANGUAGE_SLUGS.get(result.language, result.language.lower())
-        anchor_id = _make_anchor_id(result.language, result.library, result.ecosystem)
-        lib_display = library_display_name(result.library)
-        eco_display = ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem)
-        label = f"{lib_display} ({result.language}) \u2014 {eco_display}"
-        details.append(
-            _build_detail(
-                anchor_id,
-                label,
-                lang_slug,
-                result.library,
-                result.ecosystem,
-                result.language,
-                result,
-            )
-        )
 
     return details
 
