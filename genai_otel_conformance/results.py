@@ -119,6 +119,17 @@ def _violation_messages(statistics: dict | None) -> list[str]:
     return sorted(messages)
 
 
+def merge_signal_counts(
+    statistics_counts: dict[str, int],
+    detected_counts: dict[str, int],
+) -> dict[str, int]:
+    """Merge statistic-derived and sample-derived signal counts."""
+    merged = dict(statistics_counts)
+    for name, count in detected_counts.items():
+        merged[name] = max(merged.get(name, 0), count)
+    return merged
+
+
 def _supplement_detected_from_statistics(
     detected_counts: dict[str, int],
     statistics: dict | None,

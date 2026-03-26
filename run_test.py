@@ -63,7 +63,6 @@ from genai_otel_conformance.weaver import (
     ensure_weaver,
 )
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 MOCK_SERVER_PORT = 8080
 
 
@@ -86,6 +85,16 @@ class PipelineState:
     weaver_proc: subprocess.Popen | None = None
 
 
+@dataclass(frozen=True)
+class PipelineConfig:
+    test_name: str
+    extra_weaver_args: list[str]
+    mock_url: str
+    weaver_port: int
+    admin_port: int
+    registry: str
+
+
 def _allocate_free_tcp_ports(count: int) -> list[int]:
     """Ask the OS for unused loopback TCP ports to reduce collisions in CI."""
     sockets: list[socket.socket] = []
@@ -105,11 +114,6 @@ def _prepare_results_dir(result_dir: Path) -> None:
     if result_dir.exists():
         shutil.rmtree(result_dir)
     result_dir.mkdir(parents=True, exist_ok=True)
-
-
-def _has_weaver_output(result_dir: Path) -> bool:
-    """Return whether Weaver wrote any JSON output files for this run."""
-    return any(result_dir.glob("**/*.json"))
 
 
 # ── Health check helper ─────────────────────────────────────────────
@@ -145,7 +149,7 @@ def _start_mock_server(mock_url: str, state: PipelineState) -> None:
     state.mock_proc = subprocess.Popen(
         [
             sys.executable,
-            str(SCRIPT_DIR / "tests" / "mock-server" / "mock_server" / "server.py"),
+            str(TESTS_DIR / "mock-server" / "mock_server" / "server.py"),
             "--host",
             "127.0.0.1",
             "--port",
@@ -156,16 +160,13 @@ def _start_mock_server(mock_url: str, state: PipelineState) -> None:
 
 
 def _build_weaver_command(
+    config: PipelineConfig,
     weaver_bin: Path,
-    registry: str,
     result_dir: Path,
-    weaver_port: int,
-    admin_port: int,
-    extra_weaver_args: list[str],
 ) -> list[str]:
     command = [str(weaver_bin), "registry", "live-check"]
-    if registry:
-        command.extend(["-r", registry])
+    if config.registry:
+        command.extend(["-r", config.registry])
     command.extend(
         [
             "--format",
@@ -173,14 +174,14 @@ def _build_weaver_command(
             "--output",
             str(result_dir),
             "--otlp-grpc-port",
-            str(weaver_port),
+            str(config.weaver_port),
             "--admin-port",
-            str(admin_port),
+            str(config.admin_port),
             "--inactivity-timeout",
             "30",
         ]
     )
-    command.extend(extra_weaver_args)
+    command.extend(config.extra_weaver_args)
     return command
 
 
@@ -233,16 +234,6 @@ def _print_available_tests() -> None:
 # ── Main ────────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class PipelineConfig:
-    test_name: str
-    extra_weaver_args: list[str]
-    mock_url: str
-    weaver_port: int
-    admin_port: int
-    registry: str
-
-
 def _start_weaver_live_check(
     config: PipelineConfig,
     state: PipelineState,
@@ -254,14 +245,7 @@ def _start_weaver_live_check(
 
     print(f"=== Starting weaver live-check for: {config.test_name} (ports {config.weaver_port}/{config.admin_port}) ===")
     weaver_bin = ensure_weaver()
-    weaver_cmd = _build_weaver_command(
-        weaver_bin,
-        config.registry,
-        test_results_dir,
-        config.weaver_port,
-        config.admin_port,
-        config.extra_weaver_args,
-    )
+    weaver_cmd = _build_weaver_command(config, weaver_bin, test_results_dir)
 
     state.weaver_proc = subprocess.Popen(weaver_cmd)
 
@@ -293,10 +277,9 @@ def _validate_weaver_output(
     fresh_result: TestResult | None,
 ) -> None:
     """Raise if Weaver output is missing or unusable."""
-    has_weaver_output = _has_weaver_output(test_results_dir)
     has_weaver_stats = fresh_result is not None and fresh_result.statistics is not None
 
-    if not has_weaver_output:
+    if not any(test_results_dir.glob("**/*.json")):
         raise RunTestError(
             f"Weaver produced no JSON output for test: {config.test_name}",
         )
@@ -377,8 +360,7 @@ def main() -> int:
     state = PipelineState()
 
     try:
-        lang, lib = location.lang, location.library
-        LANGUAGE_ADAPTERS[lang].install_dependencies(lib, location.ecosystem)
+        LANGUAGE_ADAPTERS[location.lang].install_dependencies(location.library, location.ecosystem)
 
         weaver_port, admin_port = _allocate_free_tcp_ports(2)
         registry = ensure_semconv_registry()
