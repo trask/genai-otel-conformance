@@ -116,7 +116,7 @@ table.matrix td.nodata { background: var(--nodata); color: #999; }
 .heatmap td.library-cell { vertical-align: top; background: var(--meta-library-cell-bg); }
 .heatmap td.lang-cell { vertical-align: top; font-weight: 600; background: var(--meta-lang-cell-bg); }
 .heatmap td.instrumentation-cell { background: var(--meta-instrumentation-cell-bg); }
-.heatmap tr.lang-group-start td { border-top: 2px solid #c7ced6; }
+.heatmap tr.lang-group-start td { border-top: 2px solid var(--group-separator); }
 
 /* Version display */
 .version { font-size: 0.7rem; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; display: block; }

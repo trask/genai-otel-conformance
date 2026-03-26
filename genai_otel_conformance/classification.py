@@ -28,6 +28,10 @@ def _has_all_attrs(attrs: dict[str, object], *names: str) -> bool:
     return all(attrs.get(name) is not None for name in names)
 
 
+def _has_attr_prefix(attrs: dict[str, object], prefix: str) -> bool:
+    return any(name == prefix or name.startswith(f"{prefix}.") for name in attrs)
+
+
 class SpanInfo(NamedTuple):
     """Pre-extracted span fields passed to each classifier."""
     name_lower: str
@@ -83,8 +87,9 @@ def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
 def _is_execute_tool_span(ctx: SpanInfo) -> bool:
     return (
         ctx.op_name == "execute_tool"
-        or ctx.oi_kind == "TOOL"
         or _has_any_attr(ctx.attrs, "gen_ai.tool.name", "gen_ai.tool.call.id")
+        or _has_any_attr(ctx.attrs, "tool.name", "tool.id")
+        or (ctx.oi_kind == "TOOL" and "tool" in ctx.name_lower)
     )
 
 
@@ -120,7 +125,7 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     """Classify a span into span types using heuristics on individual span data."""
     ctx = SpanInfo(
         name_lower=span_name.lower(),
-        op_name=str(span_attrs.get("gen_ai.operation.name", "")).lower(),
+        op_name=_infer_operation_name(span_name, span_attrs),
         oi_kind=str(span_attrs.get("openinference.span.kind", "")).upper(),
         llm_type=str(span_attrs.get("llm.request.type", "")).lower(),
         attrs=span_attrs,
@@ -131,6 +136,30 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         for span_type, predicate in _SPAN_TYPE_CLASSIFIERS
         if predicate(ctx)
     }
+
+
+def _infer_operation_name(span_name: str, attrs: dict[str, object]) -> str:
+    """Infer span operation name for classification without rewriting raw attrs."""
+    op_name = str(attrs.get("gen_ai.operation.name", "")).lower()
+    if op_name:
+        return op_name
+
+    name_lower = span_name.lower()
+    oi_kind = str(attrs.get("openinference.span.kind", "")).upper()
+
+    if _has_attr_prefix(attrs, "llm.input_messages") or "chat" in name_lower:
+        return "chat"
+    if "embedding" in name_lower or attrs.get("embedding.model_name") is not None:
+        return "embeddings"
+    if oi_kind == "AGENT":
+        return "invoke_agent"
+    if oi_kind == "RETRIEVER":
+        return "retrieval"
+    if oi_kind == "TOOL" and (
+        attrs.get("tool.name") is not None or attrs.get("tool.id") is not None or "tool" in name_lower
+    ):
+        return "execute_tool"
+    return ""
 
 
 def _span_attributes(span: dict[str, object]) -> dict[str, object]:

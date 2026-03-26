@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:openllmetry": "tsx test_openllmetry.ts"
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:reference": "tsx test_reference.ts"
   },
   "dependencies": {
     "cohere-ai": "7.20.0",

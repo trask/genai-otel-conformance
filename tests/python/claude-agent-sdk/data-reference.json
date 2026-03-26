@@ -1,0 +1,8 @@
+{
+  "spans": {
+    "inference": [
+      "gen_ai.operation.name",
+      "gen_ai.provider.name"
+    ]
+  }
+}

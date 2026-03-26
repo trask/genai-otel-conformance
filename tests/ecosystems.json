@@ -24,5 +24,8 @@
   },
   "native": {
     "display_name": "Native"
+  },
+  "reference": {
+    "display_name": "Reference"
   }
 }

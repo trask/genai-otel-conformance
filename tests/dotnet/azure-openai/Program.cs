@@ -2,9 +2,11 @@
 //
 // Exercises: chat completion, streaming chat completion.
 // Points at a mock Azure OpenAI server.
+// Supports "native" and "reference" ecosystems via CONFORMANCE_ECOSYSTEM.
 
 using System;
 using System.ClientModel;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -18,6 +20,16 @@ using OpenTelemetry.Trace;
 class Program
 {
     static async Task Main(string[] args)
+    {
+        var ecosystem = Environment.GetEnvironmentVariable("CONFORMANCE_ECOSYSTEM") ?? "native";
+
+        if (ecosystem == "reference")
+            await RunReference();
+        else
+            await RunNative();
+    }
+
+    static async Task RunNative()
     {
         var mockBaseUrl = Environment.GetEnvironmentVariable("MOCK_LLM_URL")!;
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")!;
@@ -79,6 +91,95 @@ class Program
         tracerProvider.ForceFlush();
         meterProvider.ForceFlush();
         loggerFactory.Dispose();
+        Console.WriteLine("Done.");
+    }
+
+    static async Task RunReference()
+    {
+        var mockBaseUrl = Environment.GetEnvironmentVariable("MOCK_LLM_URL")!;
+        var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")!;
+
+        Console.WriteLine("=== Reference: Azure OpenAI Conformance Test ===");
+
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService("azure-openai-conformance-test");
+
+        var activitySource = new ActivitySource("gen_ai.reference");
+
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddSource("gen_ai.reference")
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
+            .Build();
+
+        // Create Azure OpenAI client pointing at mock server - NO Extensions.AI wrapper
+        var modelId = "gpt-4o-mini";
+        var azureClient = new AzureOpenAIClient(
+            new Uri(mockBaseUrl),
+            new ApiKeyCredential("mock-key"));
+        var chatClient = azureClient.GetChatClient(modelId);
+
+        // Scenario: basic chat
+        Console.WriteLine("  [chat] basic chat completion");
+        using (var activity = activitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            OpenAI.Chat.ChatCompletion completion = await chatClient.CompleteChatAsync(
+                new OpenAI.Chat.UserChatMessage("Say hello."));
+
+            activity?.SetTag("gen_ai.response.id", completion.Id);
+            activity?.SetTag("gen_ai.response.model", completion.Model);
+            activity?.SetTag("gen_ai.response.finish_reasons",
+                new[] { completion.FinishReason.ToString() });
+            if (completion.Usage != null)
+            {
+                activity?.SetTag("gen_ai.usage.input_tokens", completion.Usage.InputTokenCount);
+                activity?.SetTag("gen_ai.usage.output_tokens", completion.Usage.OutputTokenCount);
+            }
+
+            var content = completion.Content[0].Text;
+            Console.WriteLine($"    -> {content[..Math.Min(60, content.Length)]}");
+        }
+
+        // Scenario: streaming chat
+        Console.WriteLine("  [chat_streaming] streaming chat completion");
+        using (var activity = activitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            var text = "";
+
+            await foreach (var update in chatClient.CompleteChatStreamingAsync(
+                new OpenAI.Chat.UserChatMessage("Tell me a joke.")))
+            {
+                foreach (var part in update.ContentUpdate)
+                    text += part.Text;
+                if (update.FinishReason != null)
+                    activity?.SetTag("gen_ai.response.finish_reasons",
+                        new[] { update.FinishReason.ToString() });
+                if (update.Usage != null)
+                {
+                    activity?.SetTag("gen_ai.usage.input_tokens", update.Usage.InputTokenCount);
+                    activity?.SetTag("gen_ai.usage.output_tokens", update.Usage.OutputTokenCount);
+                }
+            }
+
+            Console.WriteLine($"    -> {text[..Math.Min(60, text.Length)]}");
+        }
+
+        Console.WriteLine("Flushing telemetry...");
+        tracerProvider.ForceFlush();
         Console.WriteLine("Done.");
     }
 }

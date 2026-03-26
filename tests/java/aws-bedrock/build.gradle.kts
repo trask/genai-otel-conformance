@@ -35,3 +35,10 @@ tasks.register<JavaExec>("runOtelcontrib") {
     mainClass.set("com.example.bedrocktest.AwsBedrockOtelContribTest")
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }
+
+tasks.register<JavaExec>("runReference") {
+    group = "application"
+    classpath = mainSourceSet.runtimeClasspath
+    mainClass.set("com.example.bedrocktest.AwsBedrockReferenceTest")
+    jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
+}

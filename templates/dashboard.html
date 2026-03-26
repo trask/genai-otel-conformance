@@ -47,7 +47,7 @@
 </thead>
 <tbody>
 {% for row in heatmap.rows -%}
-<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+<tr{% if row.lang_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
 <td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
@@ -93,7 +93,7 @@
 </tr></thead>
 <tbody>
 {% for row in metric_heatmap.rows -%}
-<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+<tr{% if row.lang_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
 <td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
@@ -139,7 +139,7 @@
 </tr></thead>
 <tbody>
 {% for row in event_heatmap.rows -%}
-<tr{% if row.lib_rowspan > 0 %} class="lang-group-start"{% endif %}>
+<tr{% if row.lang_rowspan > 0 %} class="lang-group-start"{% endif %}>
 {% if row.lib_rowspan > 0 -%}
 <td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
 {% endif -%}
