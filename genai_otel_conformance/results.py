@@ -108,18 +108,6 @@ def _extract_statistics(all_objects: list[dict]) -> dict | None:
     return statistics
 
 
-def _violation_messages(statistics: dict | None) -> list[str]:
-    if not statistics:
-        return []
-
-    messages: set[str] = set()
-    for message in statistics.get("advice_message_counts", {}):
-        if "not stable" in message.lower():
-            continue
-        messages.add(message)
-    return sorted(messages)
-
-
 def merge_signal_counts(
     statistics_counts: dict[str, int],
     detected_counts: dict[str, int],
@@ -160,15 +148,56 @@ def _load_result_objects(result_dir: Path) -> list[dict]:
 _PRESENCE_BLOCKING_ADVICE_IDS = {"type_mismatch"}
 
 
-def _attribute_blocks_presence(attribute: dict[str, object]) -> bool:
+def _iter_attribute_advice(attribute: dict[str, object]) -> Iterable[dict[str, object]]:
     live_check_result = attribute.get("live_check_result")
     if not isinstance(live_check_result, dict):
-        return False
+        return
 
     for advice in live_check_result.get("all_advice", []):
-        if not isinstance(advice, dict):
-            continue
+        if isinstance(advice, dict):
+            yield advice
+
+
+def _type_mismatch_types(
+    attribute: dict[str, object],
+    advice: dict[str, object],
+) -> tuple[str | None, str | None]:
+    context = advice.get("context")
+    actual_type: str | None = None
+    expected_type: str | None = None
+    if isinstance(context, dict):
+        actual_type = context.get("actual_type") or context.get("attribute_type")
+        expected_type = context.get("expected_type") or context.get("expected")
+
+    if not isinstance(actual_type, str):
+        attribute_type = attribute.get("type")
+        actual_type = attribute_type if isinstance(attribute_type, str) else None
+    if not isinstance(expected_type, str):
+        expected_type = None
+
+    return actual_type, expected_type
+
+
+def _is_compatible_js_number_mismatch(
+    location: TestLocation,
+    attribute: dict[str, object],
+    advice: dict[str, object],
+) -> bool:
+    if location.lang != "js" or advice.get("id") != "type_mismatch":
+        return False
+
+    actual_type, expected_type = _type_mismatch_types(attribute, advice)
+    return actual_type == "int" and expected_type == "double"
+
+
+def _attribute_blocks_presence(
+    attribute: dict[str, object],
+    location: TestLocation,
+) -> bool:
+    for advice in _iter_attribute_advice(attribute):
         if advice.get("id") == "not_stable":
+            continue
+        if _is_compatible_js_number_mismatch(location, attribute, advice):
             continue
         if advice.get("id") in _PRESENCE_BLOCKING_ADVICE_IDS:
             return True
@@ -176,8 +205,11 @@ def _attribute_blocks_presence(attribute: dict[str, object]) -> bool:
     return False
 
 
-def _attribute_counts_as_present(attribute: dict[str, object]) -> bool:
-    return not _attribute_blocks_presence(attribute)
+def _attribute_counts_as_present(
+    attribute: dict[str, object],
+    location: TestLocation,
+) -> bool:
+    return not _attribute_blocks_presence(attribute, location)
 
 
 def _iter_attribute_records(node: object) -> Iterable[dict[str, object]]:
@@ -198,7 +230,10 @@ def _iter_attribute_records(node: object) -> Iterable[dict[str, object]]:
                 yield from _iter_attribute_records(value)
 
 
-def _observed_registry_attribute_counts_from_samples(all_objects: list[dict]) -> dict[str, int]:
+def _observed_registry_attribute_counts_from_samples(
+    all_objects: list[dict],
+    location: TestLocation,
+) -> dict[str, int]:
     counts: dict[str, int] = {}
     for obj in all_objects:
         if not isinstance(obj, dict):
@@ -208,7 +243,7 @@ def _observed_registry_attribute_counts_from_samples(all_objects: list[dict]) ->
                 name = attr.get("name")
                 if not isinstance(name, str) or not name:
                     continue
-                if not _attribute_counts_as_present(attr):
+                if not _attribute_counts_as_present(attr, location):
                     continue
                 counts[name] = counts.get(name, 0) + 1
     return counts
@@ -217,6 +252,7 @@ def _observed_registry_attribute_counts_from_samples(all_objects: list[dict]) ->
 def _observed_telemetry_from_statistics(
     statistics: dict | None,
     all_objects: list[dict],
+    location: TestLocation,
 ) -> ObservedTelemetry:
     """Build observed telemetry counts from Weaver summary statistics."""
     seen_events = _non_zero_counts(statistics, "seen_registry_events")
@@ -226,7 +262,7 @@ def _observed_telemetry_from_statistics(
     seen_metrics.update(_non_zero_counts(statistics, "seen_non_registry_metrics"))
 
     seen_registry_attrs = _non_zero_counts(statistics, "seen_registry_attributes")
-    sample_registry_attrs = _observed_registry_attribute_counts_from_samples(all_objects)
+    sample_registry_attrs = _observed_registry_attribute_counts_from_samples(all_objects, location)
     if sample_registry_attrs:
         if seen_registry_attrs:
             seen_registry_attrs = {
@@ -260,11 +296,12 @@ def _observed_telemetry_from_statistics(
 def _detected_signals_from_samples(
     all_objects: list[dict],
     statistics: dict | None,
+    location: TestLocation,
 ) -> tuple[SpanClassification, DetectedSignals]:
     """Classify spans and supplement detected signal counts from statistics."""
     span_classification, detected = summarize_samples(
         all_objects,
-        include_attr=_attribute_counts_as_present,
+        include_attr=lambda attr: _attribute_counts_as_present(attr, location),
     )
     detected.events = _supplement_detected_from_statistics(
         detected.events,
@@ -279,27 +316,78 @@ def _detected_signals_from_samples(
     return span_classification, detected
 
 
+def _ignored_compatible_violation_info(
+    all_objects: list[dict],
+    location: TestLocation,
+) -> tuple[int, set[str]]:
+    ignored_count = 0
+    ignored_messages: set[str] = set()
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        for sample in obj.get("samples", []):
+            for attribute in _iter_attribute_records(sample):
+                for advice in _iter_attribute_advice(attribute):
+                    if not _is_compatible_js_number_mismatch(location, attribute, advice):
+                        continue
+                    ignored_count += 1
+                    message = advice.get("message")
+                    if isinstance(message, str) and message:
+                        ignored_messages.add(message)
+    return ignored_count, ignored_messages
+
+
+def _violation_count(
+    statistics: dict | None,
+    ignored_count: int,
+) -> int:
+    if not statistics:
+        return 0
+
+    base_count = statistics.get("advice_level_counts", {}).get("violation", 0)
+    if ignored_count <= 0:
+        return base_count
+
+    return max(0, base_count - ignored_count)
+
+
+def _violation_messages(
+    statistics: dict | None,
+    ignored_messages: set[str] | None = None,
+) -> list[str]:
+    if not statistics:
+        return []
+
+    ignored = ignored_messages or set()
+    messages: set[str] = set()
+    for message in statistics.get("advice_message_counts", {}):
+        if message in ignored:
+            continue
+        if "not stable" in message.lower():
+            continue
+        messages.add(message)
+    return sorted(messages)
+
+
 def _build_test_result(
     location: TestLocation,
     statistics: dict | None,
     observed: ObservedTelemetry,
     spans: SpanClassification,
     detected: DetectedSignals,
+    ignored_violation_count: int,
+    ignored_violation_messages: set[str],
 ) -> TestResult:
     """Assemble the final parsed test result model."""
     _validate_test_lang(location)
     language = LANGUAGE_DISPLAY_NAMES[location.lang]
-    violation_count = 0
-    if statistics:
-        violation_count = statistics.get("advice_level_counts", {}).get("violation", 0)
-
     return TestResult(
         language=language,
         library=location.library,
         ecosystem=location.ecosystem,
         statistics=statistics,
-        violation_count=violation_count,
-        violation_messages=_violation_messages(statistics),
+        violation_count=_violation_count(statistics, ignored_violation_count),
+        violation_messages=_violation_messages(statistics, ignored_violation_messages),
         observed=observed,
         spans=spans,
         detected=detected,
@@ -314,9 +402,21 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     all_objects = _load_result_objects(result_dir)
     statistics = _extract_statistics(all_objects)
     location = TestLocation.from_test_name(test_name)
-    observed = _observed_telemetry_from_statistics(statistics, all_objects)
-    span_classification, detected = _detected_signals_from_samples(all_objects, statistics)
-    return _build_test_result(location, statistics, observed, span_classification, detected)
+    ignored_violation_count, ignored_violation_messages = _ignored_compatible_violation_info(
+        all_objects,
+        location,
+    )
+    observed = _observed_telemetry_from_statistics(statistics, all_objects, location)
+    span_classification, detected = _detected_signals_from_samples(all_objects, statistics, location)
+    return _build_test_result(
+        location,
+        statistics,
+        observed,
+        span_classification,
+        detected,
+        ignored_violation_count,
+        ignored_violation_messages,
+    )
 
 
 def parse_all_results() -> dict[str, TestResult]:
