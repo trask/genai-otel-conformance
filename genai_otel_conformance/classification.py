@@ -134,8 +134,19 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
 
 
 def _span_attributes(span: dict[str, object]) -> dict[str, object]:
+    return _span_attributes_filtered(span)
+
+
+def _span_attributes_filtered(
+    span: dict[str, object],
+    include_attr: Callable[[dict[str, object]], bool] | None = None,
+) -> dict[str, object]:
     attrs: dict[str, object] = {}
     for attr in span.get("attributes", []):
+        if not isinstance(attr, dict):
+            continue
+        if include_attr is not None and not include_attr(attr):
+            continue
         attrs[attr.get("name", "")] = attr.get("value")
     return attrs
 
@@ -170,7 +181,7 @@ def summarize_samples(
         for sample in obj.get("samples", []):
             span = sample.get("span")
             if span:
-                attrs = _span_attributes(span)
+                attrs = _span_attributes_filtered(span, include_attr)
                 classified = _classify_span(span.get("name", ""), attrs)
                 spans.detected_types.update(classified)
                 attr_names = _span_attribute_names(span, include_attr)
