@@ -1,1 +1,7 @@
-{}
+{
+  "spans": {
+    "inference": [
+      "gen_ai.system"
+    ]
+  }
+}

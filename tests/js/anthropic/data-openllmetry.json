@@ -3,7 +3,8 @@
     "inference": [
       "gen_ai.request.max_tokens",
       "gen_ai.request.model",
-      "gen_ai.response.model"
+      "gen_ai.response.model",
+      "gen_ai.system"
     ]
   }
 }

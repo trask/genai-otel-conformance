@@ -3,7 +3,8 @@
     "create_agent": [
       "gen_ai.agent.description",
       "gen_ai.agent.name",
-      "gen_ai.operation.name"
+      "gen_ai.operation.name",
+      "gen_ai.system"
     ]
   }
 }

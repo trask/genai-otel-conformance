@@ -172,8 +172,6 @@ def _attribute_blocks_presence(attribute: dict[str, object]) -> bool:
             continue
         if advice.get("id") in _PRESENCE_BLOCKING_ADVICE_IDS:
             return True
-        if advice.get("level") == "violation":
-            return True
 
     return False
 

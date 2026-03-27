@@ -1,7 +1,8 @@
 {
   "spans": {
     "inference": [
-      "gen_ai.request.model"
+      "gen_ai.request.model",
+      "gen_ai.system"
     ]
   }
 }

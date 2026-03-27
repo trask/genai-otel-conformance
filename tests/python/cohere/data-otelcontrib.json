@@ -3,10 +3,12 @@
     "inference": [
       "gen_ai.request.model",
       "gen_ai.response.finish_reasons",
-      "gen_ai.response.id"
+      "gen_ai.response.id",
+      "gen_ai.system"
     ],
     "embeddings": [
-      "gen_ai.request.model"
+      "gen_ai.request.model",
+      "gen_ai.system"
     ]
   }
 }
