@@ -6,7 +6,6 @@
       "gen_ai.response.finish_reasons",
       "gen_ai.response.id",
       "gen_ai.response.model",
-      "gen_ai.system",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens",
       "server.address",
