@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 import json
 import sys
 from dataclasses import dataclass, field
@@ -156,13 +157,89 @@ def _load_result_objects(result_dir: Path) -> list[dict]:
     return all_objects
 
 
-def _observed_telemetry_from_statistics(statistics: dict | None) -> ObservedTelemetry:
+_PRESENCE_BLOCKING_ADVICE_IDS = {"type_mismatch"}
+
+
+def _attribute_blocks_presence(attribute: dict[str, object]) -> bool:
+    live_check_result = attribute.get("live_check_result")
+    if not isinstance(live_check_result, dict):
+        return False
+
+    for advice in live_check_result.get("all_advice", []):
+        if not isinstance(advice, dict):
+            continue
+        if advice.get("id") == "not_stable":
+            continue
+        if advice.get("id") in _PRESENCE_BLOCKING_ADVICE_IDS:
+            return True
+
+    return False
+
+
+def _attribute_counts_as_present(attribute: dict[str, object]) -> bool:
+    return not _attribute_blocks_presence(attribute)
+
+
+def _iter_attribute_records(node: object) -> Iterable[dict[str, object]]:
+    if isinstance(node, dict):
+        attrs = node.get("attributes")
+        if isinstance(attrs, list):
+            for attr in attrs:
+                if isinstance(attr, dict):
+                    yield attr
+        for value in node.values():
+            if isinstance(value, (dict, list)):
+                yield from _iter_attribute_records(value)
+        return
+
+    if isinstance(node, list):
+        for value in node:
+            if isinstance(value, (dict, list)):
+                yield from _iter_attribute_records(value)
+
+
+def _observed_registry_attribute_counts_from_samples(all_objects: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for obj in all_objects:
+        if not isinstance(obj, dict):
+            continue
+        for sample in obj.get("samples", []):
+            for attr in _iter_attribute_records(sample):
+                name = attr.get("name")
+                if not isinstance(name, str) or not name:
+                    continue
+                if not _attribute_counts_as_present(attr):
+                    continue
+                counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def _observed_telemetry_from_statistics(
+    statistics: dict | None,
+    all_objects: list[dict],
+) -> ObservedTelemetry:
     """Build observed telemetry counts from Weaver summary statistics."""
     seen_events = _non_zero_counts(statistics, "seen_registry_events")
     seen_events.update(_non_zero_counts(statistics, "seen_non_registry_events"))
 
     seen_metrics = _non_zero_counts(statistics, "seen_registry_metrics")
     seen_metrics.update(_non_zero_counts(statistics, "seen_non_registry_metrics"))
+
+    seen_registry_attrs = _non_zero_counts(statistics, "seen_registry_attributes")
+    sample_registry_attrs = _observed_registry_attribute_counts_from_samples(all_objects)
+    if sample_registry_attrs:
+        if seen_registry_attrs:
+            seen_registry_attrs = {
+                name: sample_registry_attrs.get(name, 0)
+                for name in seen_registry_attrs
+                if sample_registry_attrs.get(name, 0) > 0
+            }
+        else:
+            seen_registry_attrs = {
+                name: count
+                for name, count in sample_registry_attrs.items()
+                if count > 0
+            }
 
     entity_counts: dict[str, int] = {}
     has_data = False
@@ -171,7 +248,7 @@ def _observed_telemetry_from_statistics(statistics: dict | None) -> ObservedTele
         has_data = statistics.get("total_entities", 0) > 0
 
     return ObservedTelemetry(
-        attrs=_non_zero_counts(statistics, "seen_registry_attributes"),
+        attrs=seen_registry_attrs,
         non_registry_attrs=_non_zero_counts(statistics, "seen_non_registry_attributes"),
         events=seen_events,
         metrics=seen_metrics,
@@ -185,7 +262,10 @@ def _detected_signals_from_samples(
     statistics: dict | None,
 ) -> tuple[SpanClassification, DetectedSignals]:
     """Classify spans and supplement detected signal counts from statistics."""
-    span_classification, detected = summarize_samples(all_objects)
+    span_classification, detected = summarize_samples(
+        all_objects,
+        include_attr=_attribute_counts_as_present,
+    )
     detected.events = _supplement_detected_from_statistics(
         detected.events,
         statistics,
@@ -234,7 +314,7 @@ def parse_result_dir(result_dir: Path, test_name: str) -> TestResult | None:
     all_objects = _load_result_objects(result_dir)
     statistics = _extract_statistics(all_objects)
     location = TestLocation.from_test_name(test_name)
-    observed = _observed_telemetry_from_statistics(statistics)
+    observed = _observed_telemetry_from_statistics(statistics, all_objects)
     span_classification, detected = _detected_signals_from_samples(all_objects, statistics)
     return _build_test_result(location, statistics, observed, span_classification, detected)
 

@@ -2,7 +2,6 @@
   "spans": {
     "inference": [
       "gen_ai.request.model",
-      "gen_ai.request.top_p",
       "gen_ai.response.model",
       "gen_ai.system"
     ]

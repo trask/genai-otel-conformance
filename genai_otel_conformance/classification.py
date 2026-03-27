@@ -140,8 +140,26 @@ def _span_attributes(span: dict[str, object]) -> dict[str, object]:
     return attrs
 
 
+def _span_attribute_names(
+    span: dict[str, object],
+    include_attr: Callable[[dict[str, object]], bool] | None = None,
+) -> set[str]:
+    names: set[str] = set()
+    for attr in span.get("attributes", []):
+        if not isinstance(attr, dict):
+            continue
+        name = attr.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        if include_attr is not None and not include_attr(attr):
+            continue
+        names.add(name)
+    return names
+
+
 def summarize_samples(
     all_objects: list[dict],
+    include_attr: Callable[[dict[str, object]], bool] | None = None,
 ) -> tuple[SpanClassification, DetectedSignals]:
     """Scan sample payloads once and collect detected spans, events, and metrics."""
     spans = SpanClassification()
@@ -155,7 +173,7 @@ def summarize_samples(
                 attrs = _span_attributes(span)
                 classified = _classify_span(span.get("name", ""), attrs)
                 spans.detected_types.update(classified)
-                attr_names = set(attrs.keys())
+                attr_names = _span_attribute_names(span, include_attr)
                 for span_type in classified:
                     if span_type not in spans.per_type_attrs:
                         spans.per_type_attrs[span_type] = set(attr_names)
