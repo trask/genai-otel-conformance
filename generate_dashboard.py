@@ -85,7 +85,7 @@ def _test_entry_sort_key(entry: TestDataEntry) -> tuple[str, int, int, str]:
     return (
         entry.library_display.lower(),
         _LANGUAGE_ORDER.get(entry.language_display.lower(), 99),
-        0 if entry.ecosystem == "reference" else 1 if entry.ecosystem == "otelcontrib" else 2,
+        0 if entry.ecosystem == "prototype" else 1 if entry.ecosystem == "otelcontrib" else 2,
         entry.ecosystem_display.lower(),
     )
 

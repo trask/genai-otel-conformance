@@ -35,9 +35,9 @@ tasks.register<JavaExec>("runOtelcontrib") {
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }
 
-tasks.register<JavaExec>("runReference") {
+tasks.register<JavaExec>("runPrototype") {
     group = "application"
     classpath = mainSourceSet.runtimeClasspath
-    mainClass.set("com.example.openaitest.OpenAiReferenceTest")
+    mainClass.set("com.example.openaitest.OpenAiPrototypeTest")
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }

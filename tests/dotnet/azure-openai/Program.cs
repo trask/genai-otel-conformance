@@ -2,7 +2,7 @@
 //
 // Exercises: chat completion, streaming chat completion.
 // Points at a mock Azure OpenAI server.
-// Supports "native" and "reference" ecosystems via CONFORMANCE_ECOSYSTEM.
+// Supports "native" and "prototype" ecosystems via CONFORMANCE_ECOSYSTEM.
 
 using System;
 using System.ClientModel;
@@ -23,8 +23,8 @@ class Program
     {
         var ecosystem = Environment.GetEnvironmentVariable("CONFORMANCE_ECOSYSTEM") ?? "native";
 
-        if (ecosystem == "reference")
-            await RunReference();
+        if (ecosystem == "prototype")
+            await RunPrototype();
         else
             await RunNative();
     }
@@ -94,21 +94,21 @@ class Program
         Console.WriteLine("Done.");
     }
 
-    static async Task RunReference()
+    static async Task RunPrototype()
     {
         var mockBaseUrl = Environment.GetEnvironmentVariable("MOCK_LLM_URL")!;
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")!;
 
-        Console.WriteLine("=== Reference: Azure OpenAI Conformance Test ===");
+        Console.WriteLine("=== Prototype: Azure OpenAI Conformance Test ===");
 
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService("azure-openai-conformance-test");
 
-        var activitySource = new ActivitySource("gen_ai.reference");
+        var activitySource = new ActivitySource("gen_ai.prototype");
 
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .SetResourceBuilder(resourceBuilder)
-            .AddSource("gen_ai.reference")
+            .AddSource("gen_ai.prototype")
             .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
             .Build();
 

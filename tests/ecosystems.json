@@ -25,7 +25,7 @@
   "native": {
     "display_name": "Native"
   },
-  "reference": {
-    "display_name": "Reference"
+  "prototype": {
+    "display_name": "Prototype"
   }
 }

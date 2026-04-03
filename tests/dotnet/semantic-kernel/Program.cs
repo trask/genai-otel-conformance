@@ -2,7 +2,7 @@
 //
 // Exercises: chat completion, streaming chat, agent with tool calling.
 // Points at a mock OpenAI server.
-// Supports "native" and "reference" ecosystems via CONFORMANCE_ECOSYSTEM.
+// Supports "native" and "prototype" ecosystems via CONFORMANCE_ECOSYSTEM.
 //
 // NOTE: The [agent] scenario exercises agent-style automatic function calling
 // via FunctionChoiceBehavior.Auto() with a WeatherPlugin tool. However,
@@ -30,14 +30,14 @@ using OpenTelemetry.Trace;
 
 class Program
 {
-    internal static readonly ActivitySource s_manualActivitySource = new("gen_ai.reference");
+    internal static readonly ActivitySource s_manualActivitySource = new("gen_ai.prototype");
 
     static async Task Main(string[] args)
     {
         var ecosystem = Environment.GetEnvironmentVariable("CONFORMANCE_ECOSYSTEM") ?? "native";
 
-        if (ecosystem == "reference")
-            await RunReference();
+        if (ecosystem == "prototype")
+            await RunPrototype();
         else
             await RunNative();
     }
@@ -128,19 +128,19 @@ class Program
         Console.WriteLine("Done.");
     }
 
-    static async Task RunReference()
+    static async Task RunPrototype()
     {
         var mockBaseUrl = Environment.GetEnvironmentVariable("MOCK_LLM_URL")! + "/v1";
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")!;
 
-        Console.WriteLine("=== Reference: Semantic Kernel Conformance Test ===");
+        Console.WriteLine("=== Prototype: Semantic Kernel Conformance Test ===");
 
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService("semantic-kernel-conformance-test");
 
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .SetResourceBuilder(resourceBuilder)
-            .AddSource("gen_ai.reference")
+            .AddSource("gen_ai.prototype")
             .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
             .Build();
 
@@ -232,7 +232,7 @@ class Program
 
         // Scenario: agent with auto function calling
         Console.WriteLine("  [agent] agent with tool calling");
-        kernel.ImportPluginFromType<ReferenceWeatherPlugin>();
+        kernel.ImportPluginFromType<PrototypeWeatherPlugin>();
         using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
         {
             var endpoint = new Uri(mockBaseUrl);
@@ -284,7 +284,7 @@ class WeatherPlugin
     public string GetWeather(string location) => "Sunny, 72°F";
 }
 
-class ReferenceWeatherPlugin
+class PrototypeWeatherPlugin
 {
     [KernelFunction, Description("Get the current weather for a location")]
     public string GetWeather(string location)
