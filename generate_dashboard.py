@@ -81,10 +81,11 @@ def _compute_rowspans(rows: list[HeatmapRow]) -> None:
 _LANGUAGE_ORDER = {"python": 0, "js": 1, "java": 2, "c#": 3}
 
 
-def _test_entry_sort_key(entry: TestDataEntry) -> tuple[str, int, str]:
+def _test_entry_sort_key(entry: TestDataEntry) -> tuple[str, int, int, str]:
     return (
         entry.library_display.lower(),
         _LANGUAGE_ORDER.get(entry.language_display.lower(), 99),
+        0 if entry.ecosystem == "prototype" else 1 if entry.ecosystem == "otelcontrib" else 2,
         entry.ecosystem_display.lower(),
     )
 

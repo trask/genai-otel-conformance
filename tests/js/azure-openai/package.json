@@ -5,7 +5,8 @@
   "scripts": {
     "test:openllmetry": "tsx test_openllmetry.ts",
     "test:openinference": "tsx test_openinference.ts",
-    "test:otelcontrib": "tsx test_otelcontrib.ts"
+    "test:otelcontrib": "tsx test_otelcontrib.ts",
+    "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
     "openai": "6.29.0",

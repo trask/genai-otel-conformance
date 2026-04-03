@@ -62,33 +62,74 @@ def _uv_cmd() -> str:
     )
 
 
-def install_with_uv(*install_args: str, label: str) -> None:
-    """Install Python dependencies into the current interpreter using uv."""
+def _python_executable_for_env(env_dir: Path) -> Path:
+    if sys.platform == "win32":
+        return env_dir / "Scripts" / "python.exe"
+    return env_dir / "bin" / "python"
+
+
+def install_with_uv_for_python(python_executable: Path | str, *install_args: str, label: str) -> None:
+    """Install Python dependencies into the provided interpreter using uv."""
     print(f"=== Installing {label} ===")
     subprocess.run(
-        [_uv_cmd(), "pip", "install", "--python", sys.executable, *install_args],
+        [_uv_cmd(), "pip", "install", "--python", str(python_executable), *install_args],
         cwd=REPO_ROOT,
         check=True,
     )
+
+
+def install_with_uv(*install_args: str, label: str) -> None:
+    """Install Python dependencies into the current interpreter using uv."""
+    install_with_uv_for_python(sys.executable, *install_args, label=label)
+
+
+def _python_test_env_dir(lib: str, ecosystem: str) -> Path:
+    return REPO_ROOT / ".cache" / "python-test-envs" / f"{lib}-{ecosystem}"
+
+
+def _ensure_python_test_env(lib: str, ecosystem: str) -> Path:
+    """Create and populate an isolated Python env for one conformance test."""
+    env_dir = _python_test_env_dir(lib, ecosystem)
+    python_executable = _python_executable_for_env(env_dir)
+    if not python_executable.is_file():
+        print(f"=== Creating isolated Python env: {env_dir} ===")
+        env_dir.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [_uv_cmd(), "venv", "--python", sys.executable, str(env_dir)],
+            cwd=REPO_ROOT,
+            check=True,
+        )
+
+    install_with_uv_for_python(
+        python_executable,
+        "-e",
+        "tests/python",
+        label=f"shared Python test support in {env_dir.name}",
+    )
+    install_with_uv_for_python(
+        python_executable,
+        "-r",
+        f"tests/python/{lib}/requirements-{ecosystem}.txt",
+        label=f"Python test dependencies for {lib}/{ecosystem} in {env_dir.name}",
+    )
+    return python_executable
 
 
 # ── Python adapter ──────────────────────────────────────────────────
 
 
 def _python_install_dependencies(lib: str, ecosystem: str) -> None:
-    install_with_uv("-e", "tests/python", label="shared Python test support")
-    install_with_uv(
-        "-r",
-        f"tests/python/{lib}/requirements-{ecosystem}.txt",
-        label=f"Python test dependencies for {lib}/{ecosystem}",
-    )
+    _ensure_python_test_env(lib, ecosystem)
 
 
 def _python_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
     test_file = TESTS_DIR / "python" / lib / f"test_{ecosystem}.py"
     if not test_file.is_file():
         return TestCommandResult(False, 0)
-    proc = subprocess.run([sys.executable, str(test_file)], env=env)
+    python_executable = _python_executable_for_env(_python_test_env_dir(lib, ecosystem))
+    if not python_executable.is_file():
+        python_executable = _ensure_python_test_env(lib, ecosystem)
+    proc = subprocess.run([str(python_executable), str(test_file)], env=env)
     return TestCommandResult(True, proc.returncode)
 
 
@@ -185,19 +226,23 @@ def _dotnet_prebuild_test(lib: str) -> None:
     subprocess.run(["dotnet", "build"], cwd=test_dir, check=True)
 
 
-def _dotnet_run_test(lib: str, _ecosystem: str, env: dict[str, str]) -> TestCommandResult:
+def _dotnet_run_test(lib: str, ecosystem: str, env: dict[str, str]) -> TestCommandResult:
     test_dir = TESTS_DIR / "dotnet" / lib
     if not test_dir.is_dir():
         return TestCommandResult(False, 0)
-    proc = subprocess.run(["dotnet", "run"], cwd=test_dir, env=env)
+    data_file = test_dir / f"data-{ecosystem}.json"
+    if not data_file.is_file():
+        return TestCommandResult(False, 0)
+    run_env = {**env, "CONFORMANCE_ECOSYSTEM": ecosystem}
+    proc = subprocess.run(["dotnet", "run"], cwd=test_dir, env=run_env)
     return TestCommandResult(True, proc.returncode)
 
 
 def _dotnet_list_tests() -> list[str]:
     return _list_tests_from_matches(
         "dotnet",
-        "*/*.csproj",
-        lambda _path: "native",
+        "*/data-*.json",
+        lambda path: path.stem.removeprefix("data-"),
         lambda path: path.parent.name,
     )
 

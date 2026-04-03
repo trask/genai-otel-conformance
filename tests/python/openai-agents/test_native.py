@@ -73,7 +73,7 @@ class OTelBridgeExporter(TracingExporter):
         return type(span_data).__name__
 
     def _build_parent_ctx(self, agent_span):
-        """Build an OTel Context that carries the parent span reference."""
+        """Build an OTel Context that carries the parent span prototype."""
         if not agent_span.parent_id:
             return None
         # The SDK prefixes IDs with "trace_" and "span_" — strip those.

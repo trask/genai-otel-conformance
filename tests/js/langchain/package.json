@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "test:openllmetry": "tsx test_openllmetry.ts",
-    "test:openinference": "tsx test_openinference.ts"
+    "test:openinference": "tsx test_openinference.ts",
+    "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
     "@arizeai/openinference-instrumentation-langchain": "4.0.6",

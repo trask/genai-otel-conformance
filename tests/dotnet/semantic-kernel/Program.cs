@@ -2,6 +2,7 @@
 //
 // Exercises: chat completion, streaming chat, agent with tool calling.
 // Points at a mock OpenAI server.
+// Supports "native" and "prototype" ecosystems via CONFORMANCE_ECOSYSTEM.
 //
 // NOTE: The [agent] scenario exercises agent-style automatic function calling
 // via FunctionChoiceBehavior.Auto() with a WeatherPlugin tool. However,
@@ -14,6 +15,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,7 +30,19 @@ using OpenTelemetry.Trace;
 
 class Program
 {
+    internal static readonly ActivitySource s_manualActivitySource = new("gen_ai.prototype");
+
     static async Task Main(string[] args)
+    {
+        var ecosystem = Environment.GetEnvironmentVariable("CONFORMANCE_ECOSYSTEM") ?? "native";
+
+        if (ecosystem == "prototype")
+            await RunPrototype();
+        else
+            await RunNative();
+    }
+
+    static async Task RunNative()
     {
         AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnostics", true);
         AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
@@ -113,10 +127,175 @@ class Program
         meterProvider.ForceFlush();
         Console.WriteLine("Done.");
     }
+
+    static async Task RunPrototype()
+    {
+        var mockBaseUrl = Environment.GetEnvironmentVariable("MOCK_LLM_URL")! + "/v1";
+        var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")!;
+
+        Console.WriteLine("=== Prototype: Semantic Kernel Conformance Test ===");
+
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService("semantic-kernel-conformance-test");
+
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddSource("gen_ai.prototype")
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
+            .Build();
+
+        // Build kernel pointing at mock server - NO OTel diagnostic switches
+        var builder = Kernel.CreateBuilder();
+        var modelId = "gpt-4o-mini";
+        builder.AddOpenAIChatCompletion(
+            modelId: modelId,
+            apiKey: "mock-key",
+            httpClient: new System.Net.Http.HttpClient { BaseAddress = new Uri(mockBaseUrl) }
+        );
+
+        var kernel = builder.Build();
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+
+        // Scenario: basic chat
+        Console.WriteLine("  [chat] basic chat completion");
+        using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            var history = new ChatHistory();
+            history.AddUserMessage("Say hello.");
+            var result = await chatService.GetChatMessageContentsAsync(history);
+
+            var msg = result[0];
+            if (msg.ModelId != null) activity?.SetTag("gen_ai.response.model", msg.ModelId);
+            var metadata = msg.Metadata;
+            if (metadata != null)
+            {
+                if (metadata.TryGetValue("Id", out var id) && id != null)
+                    activity?.SetTag("gen_ai.response.id", id.ToString());
+                if (metadata.TryGetValue("FinishReason", out var fr) && fr != null)
+                    activity?.SetTag("gen_ai.response.finish_reasons",
+                        new[] { fr.ToString() });
+                if (metadata.TryGetValue("Usage", out var usageObj) &&
+                    usageObj is OpenAI.Chat.ChatTokenUsage usage)
+                {
+                    activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
+                    activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                }
+            }
+
+            Console.WriteLine($"    -> {msg.Content?[..Math.Min(60, msg.Content?.Length ?? 0)]}");
+        }
+
+        // Scenario: streaming chat
+        Console.WriteLine("  [chat_streaming] streaming chat completion");
+        using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            var history = new ChatHistory();
+            history.AddUserMessage("Tell me a joke.");
+            var text = "";
+            await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(history))
+            {
+                text += chunk.Content;
+                if (chunk.ModelId != null) activity?.SetTag("gen_ai.response.model", chunk.ModelId);
+                var metadata = chunk.Metadata;
+                if (metadata != null)
+                {
+                    if (metadata.TryGetValue("Id", out var id) && id != null)
+                        activity?.SetTag("gen_ai.response.id", id.ToString());
+                    if (metadata.TryGetValue("FinishReason", out var fr) && fr != null)
+                        activity?.SetTag("gen_ai.response.finish_reasons",
+                            new[] { fr.ToString() });
+                    if (metadata.TryGetValue("Usage", out var usageObj) &&
+                        usageObj is OpenAI.Chat.ChatTokenUsage usage)
+                    {
+                        activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
+                        activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                    }
+                }
+            }
+
+            Console.WriteLine($"    -> {text[..Math.Min(60, text.Length)]}");
+        }
+
+        // Scenario: agent with auto function calling
+        Console.WriteLine("  [agent] agent with tool calling");
+        kernel.ImportPluginFromType<PrototypeWeatherPlugin>();
+        using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            var agentSettings = new OpenAIPromptExecutionSettings
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+            };
+            var agentHistory = new ChatHistory();
+            agentHistory.AddUserMessage("What's the weather in Seattle?");
+            var agentResult = await chatService.GetChatMessageContentsAsync(
+                agentHistory, agentSettings, kernel);
+
+            var lastMsg = agentResult[^1];
+            if (lastMsg.ModelId != null) activity?.SetTag("gen_ai.response.model", lastMsg.ModelId);
+            var metadata = lastMsg.Metadata;
+            if (metadata != null)
+            {
+                if (metadata.TryGetValue("Id", out var id) && id != null)
+                    activity?.SetTag("gen_ai.response.id", id.ToString());
+                if (metadata.TryGetValue("FinishReason", out var fr) && fr != null)
+                    activity?.SetTag("gen_ai.response.finish_reasons",
+                        new[] { fr.ToString() });
+                if (metadata.TryGetValue("Usage", out var usageObj) &&
+                    usageObj is OpenAI.Chat.ChatTokenUsage usage)
+                {
+                    activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
+                    activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                }
+            }
+
+            Console.WriteLine($"    -> {lastMsg.Content?[..Math.Min(60, lastMsg.Content?.Length ?? 0)]}");
+        }
+
+        Console.WriteLine("Flushing telemetry...");
+        tracerProvider.ForceFlush();
+        Console.WriteLine("Done.");
+    }
 }
 
 class WeatherPlugin
 {
     [KernelFunction, Description("Get the current weather for a location")]
     public string GetWeather(string location) => "Sunny, 72°F";
+}
+
+class PrototypeWeatherPlugin
+{
+    [KernelFunction, Description("Get the current weather for a location")]
+    public string GetWeather(string location)
+    {
+        using var activity = Program.s_manualActivitySource.StartActivity("execute_tool get_weather");
+        activity?.SetTag("gen_ai.operation.name", "execute_tool");
+        activity?.SetTag("gen_ai.tool.name", "get_weather");
+        activity?.SetTag("gen_ai.tool.description", "Get the current weather for a location");
+        activity?.SetTag("gen_ai.tool.call.arguments", $"{{\"location\":\"{location}\"}}");
+        var result = "Sunny, 72°F";
+        activity?.SetTag("gen_ai.tool.call.result", result);
+        return result;
+    }
 }

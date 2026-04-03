@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:openllmetry": "tsx test_openllmetry.ts"
+    "test:openllmetry": "tsx test_openllmetry.ts",
+    "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
     "@google-cloud/vertexai": "1.10.0",

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "test:native": "tsx test_native.ts",
-    "test:openinference": "tsx test_openinference.ts"
+    "test:openinference": "tsx test_openinference.ts",
+    "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
     "ai": "6.0.116",

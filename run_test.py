@@ -64,6 +64,7 @@ from genai_otel_conformance.weaver import (
 )
 
 MOCK_SERVER_PORT = 8080
+WEAVER_INACTIVITY_TIMEOUT_SECONDS = 60
 
 
 class RunTestError(Exception):
@@ -178,7 +179,7 @@ def _build_weaver_command(
             "--admin-port",
             str(config.admin_port),
             "--inactivity-timeout",
-            "30",
+            str(WEAVER_INACTIVITY_TIMEOUT_SECONDS),
         ]
     )
     command.extend(config.extra_weaver_args)

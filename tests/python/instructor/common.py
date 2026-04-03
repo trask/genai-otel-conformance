@@ -34,9 +34,9 @@ def run(title, instrument_fn, scenarios):
     instrument_fn()
 
     import openai
-    import instructor
+    from instructor.core.client import from_openai
 
-    client = instructor.from_openai(
+    client = from_openai(
         openai.OpenAI(base_url=MOCK_BASE_URL, api_key="mock-key"),
     )
 

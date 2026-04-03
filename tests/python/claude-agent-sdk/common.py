@@ -4,10 +4,12 @@ import os
 
 from otel_setup import setup_otel, flush_and_shutdown
 
-# Path to the mock CLI script bundled alongside this file.
-# The script has a #!/usr/bin/env python3 shebang and must be marked
-# executable (chmod +x) so the SDK can spawn it directly.
-MOCK_CLI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock_cli.py")
+# Path to the mock CLI launcher bundled alongside this file.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MOCK_CLI_PATH = os.path.join(
+    _SCRIPT_DIR,
+    "mock_cli.cmd" if os.name == "nt" else "mock_cli.py",
+)
 
 
 async def run_agent_query():
@@ -22,8 +24,9 @@ async def run_agent_query():
 
     print("  [agent_query] basic query via mock CLI")
 
-    # Git checkouts in CI may drop the executable bit on this helper script.
-    os.chmod(MOCK_CLI_PATH, os.stat(MOCK_CLI_PATH).st_mode | 0o111)
+    # Git checkouts in CI may drop the executable bit on the Unix helper script.
+    if os.name != "nt":
+        os.chmod(MOCK_CLI_PATH, os.stat(MOCK_CLI_PATH).st_mode | 0o111)
 
     # Skip version check since mock_cli.py doesn't support -v
     os.environ["CLAUDE_AGENT_SDK_SKIP_VERSION_CHECK"] = "1"
