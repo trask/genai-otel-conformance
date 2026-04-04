@@ -27,9 +27,9 @@ from genai_otel_conformance.statuses import (
     HeatmapColumn,
     HeatmapGroup,
     relevant_span_type_keys,
-    span_type_attribute_groups,
-    span_type_heatmap_columns,
-    span_type_heatmap_groups,
+    signal_type_attribute_groups,
+    signal_type_heatmap_columns,
+    signal_type_heatmap_groups,
     span_type_present_attributes,
 )
 from genai_otel_conformance.results import (
@@ -163,7 +163,7 @@ def _build_span_sections(result: TestResult) -> list[SpanSectionView]:
     for span_type_key in relevant_span_type_keys(result):
         spec = SPAN_TYPE_SPECS[span_type_key]
         groups: list[DetailGroupView] = []
-        for group_spec in span_type_attribute_groups(spec):
+        for group_spec in signal_type_attribute_groups(spec):
             type_present = span_type_present_attributes(result, span_type_key, group_spec.level.key)
             attrs: list[DetailAttributeView] = []
             for attr in group_spec.attrs:
@@ -187,8 +187,8 @@ def _build_detail(
 ) -> DetailView:
     span_sections: list[SpanSectionView] = []
     non_registry_attrs: list[CountItemView] = []
-    events: list[CountItemView] = []
     metrics: list[CountItemView] = []
+    events: list[CountItemView] = []
 
     if result and result.observed.has_data:
         span_sections = _build_span_sections(result)
@@ -196,13 +196,13 @@ def _build_detail(
         if result.observed.non_registry_attrs:
             non_registry_attrs = _sorted_count_items(result.observed.non_registry_attrs)
 
-        merged_events = merge_signal_counts(result.observed.events, result.detected.events)
-        if merged_events:
-            events = _sorted_count_items(merged_events)
-
         merged_metrics = merge_signal_counts(result.observed.metrics, result.detected.metrics)
         if merged_metrics:
             metrics = _sorted_count_items(merged_metrics)
+
+        merged_events = merge_signal_counts(result.observed.events, result.detected.events)
+        if merged_events:
+            events = _sorted_count_items(merged_events)
 
     return DetailView(
         test_name=entry.test_name,
@@ -216,8 +216,8 @@ def _build_detail(
         entity_summary=_entity_summary(result) if result else "",
         span_sections=span_sections,
         non_registry_attrs=non_registry_attrs,
-        events=events,
         metrics=metrics,
+        events=events,
         violation_messages=result.violation_messages if result else [],
     )
 
@@ -270,8 +270,8 @@ def _prepare_heatmaps_from_data(
         if not relevant:
             continue
 
-        columns = span_type_heatmap_columns(spec)
-        column_groups = span_type_heatmap_groups(spec)
+        columns = signal_type_heatmap_columns(spec)
+        column_groups = signal_type_heatmap_groups(spec)
 
         if not columns:
             continue

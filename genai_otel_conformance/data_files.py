@@ -28,7 +28,7 @@ from genai_otel_conformance.statuses import (
     build_present_signal_names,
     build_span_type_present_names,
     build_statuses_from_present_names,
-    span_type_heatmap_columns,
+    signal_type_heatmap_columns,
 )
 
 
@@ -47,9 +47,9 @@ class TestDataEntry:
     library_display: str
     language_display: str
     ecosystem_display: str
-    events: dict[str, str]
-    metrics: dict[str, str]
     spans: dict[str, dict[str, str]]
+    metrics: dict[str, str]
+    events: dict[str, str]
 
     @property
     def label(self) -> str:
@@ -66,9 +66,9 @@ class TestDataEntry:
             library_display=library_display_name(result.library),
             language_display=language_display,
             ecosystem_display=ECOSYSTEM_DISPLAY.get(result.ecosystem, result.ecosystem),
-            events={},
-            metrics={},
             spans={},
+            metrics={},
+            events={},
         )
 
 
@@ -202,7 +202,7 @@ def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
         if span_type_key not in value:
             continue
 
-        expected_names = [column.header_text for column in span_type_heatmap_columns(spec)]
+        expected_names = [column.header_text for column in signal_type_heatmap_columns(spec)]
         raw = value[span_type_key]
         present_names = [name for name in raw if isinstance(name, str)] if isinstance(raw, (dict, list)) else []
         normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
@@ -231,9 +231,9 @@ def _normalize_test_data_entry(entry: dict[str, object], location: TestLocation)
             entry.get("ecosystem"),
             ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
         ),
-        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES, "events", test_name),
-        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES, "metrics", test_name),
         spans=_normalize_span_type_data(entry.get("spans")),
+        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES, "metrics", test_name),
+        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES, "events", test_name),
     )
 
 

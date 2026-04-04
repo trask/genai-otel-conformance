@@ -8,9 +8,9 @@ from genai_otel_conformance.results import TestResult, merge_signal_counts
 from genai_otel_conformance.specs import (
     DISPLAY_DEPRECATED_ATTRS,
     RequirementLevel,
+    SignalTypeSpec,
     SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
-    SpanTypeSpec,
 )
 
 
@@ -22,7 +22,7 @@ class RequirementLevelInfo:
 
 
 @dataclass(frozen=True)
-class SpanTypeAttributeGroup:
+class SignalTypeAttributeGroup:
     level: RequirementLevelInfo
     attrs: tuple[str, ...]
 
@@ -50,7 +50,7 @@ def present_attributes(result: TestResult) -> set[str]:
     return attrs
 
 
-_SPAN_TYPE_LEVELS = (
+_SIGNAL_TYPE_LEVELS = (
     RequirementLevelInfo(RequirementLevel.REQUIRED, "Required", "Must be present for spans of this type."),
     RequirementLevelInfo(
         RequirementLevel.CONDITIONALLY_REQUIRED,
@@ -62,7 +62,7 @@ _SPAN_TYPE_LEVELS = (
 )
 
 
-def _display_attrs_for_group(spec: SpanTypeSpec, level: RequirementLevel) -> tuple[str, ...]:
+def _display_attrs_for_group(spec: SignalTypeSpec, level: RequirementLevel) -> tuple[str, ...]:
     """Return attrs for one visual group, including deprecated predecessors."""
     display_attrs: list[str] = []
     for attr in sorted(spec.attrs_for_requirement_level(level)):
@@ -73,18 +73,18 @@ def _display_attrs_for_group(spec: SpanTypeSpec, level: RequirementLevel) -> tup
     return tuple(display_attrs)
 
 
-def span_type_attribute_groups(spec: SpanTypeSpec) -> list[SpanTypeAttributeGroup]:
-    """Return ordered attribute groups for a span-type specification."""
-    groups: list[SpanTypeAttributeGroup] = []
-    for level in _SPAN_TYPE_LEVELS:
+def signal_type_attribute_groups(spec: SignalTypeSpec) -> list[SignalTypeAttributeGroup]:
+    """Return ordered attribute groups for a signal-type specification."""
+    groups: list[SignalTypeAttributeGroup] = []
+    for level in _SIGNAL_TYPE_LEVELS:
         attrs = _display_attrs_for_group(spec, level.key)
         if attrs:
-            groups.append(SpanTypeAttributeGroup(level, attrs))
+            groups.append(SignalTypeAttributeGroup(level, attrs))
     return groups
 
 
-def span_type_heatmap_columns(spec: SpanTypeSpec) -> list[HeatmapColumn]:
-    """Return ordered heatmap columns for a span-type specification."""
+def signal_type_heatmap_columns(spec: SignalTypeSpec) -> list[HeatmapColumn]:
+    """Return ordered heatmap columns for a signal-type specification."""
     return [
         HeatmapColumn(
             header_text=attr,
@@ -92,13 +92,13 @@ def span_type_heatmap_columns(spec: SpanTypeSpec) -> list[HeatmapColumn]:
             group_key=group.level.key,
             group_label=group.level.label,
         )
-        for group in span_type_attribute_groups(spec)
+        for group in signal_type_attribute_groups(spec)
         for i, attr in enumerate(group.attrs)
     ]
 
 
-def span_type_heatmap_groups(spec: SpanTypeSpec) -> list[HeatmapGroup]:
-    """Return grouped header metadata for a span-type heatmap."""
+def signal_type_heatmap_groups(spec: SignalTypeSpec) -> list[HeatmapGroup]:
+    """Return grouped header metadata for a signal-type heatmap."""
     return [
         HeatmapGroup(
             key=group.level.key,
@@ -106,7 +106,7 @@ def span_type_heatmap_groups(spec: SpanTypeSpec) -> list[HeatmapGroup]:
             description=group.level.description,
             colspan=len(group.attrs),
         )
-        for group in span_type_attribute_groups(spec)
+        for group in signal_type_attribute_groups(spec)
     ]
 
 
@@ -129,7 +129,7 @@ def relevant_span_type_keys(result: TestResult) -> list[str]:
     for span_type_key in SPAN_TYPE_ORDER:
         spec = SPAN_TYPE_SPECS[span_type_key]
         expected_attrs: list[str] = []
-        for group in span_type_attribute_groups(spec):
+        for group in signal_type_attribute_groups(spec):
             expected_attrs.extend(group.attrs)
         if not expected_attrs:
             continue
@@ -173,7 +173,7 @@ def build_span_type_present_names(result: TestResult) -> dict[str, list[str]]:
     for span_type_key in relevant_span_type_keys(result):
         spec = SPAN_TYPE_SPECS[span_type_key]
         present_names: list[str] = []
-        for group in span_type_attribute_groups(spec):
+        for group in signal_type_attribute_groups(spec):
             type_present = span_type_present_attributes(result, span_type_key, group.level.key)
             present_names.extend(
                 attr for attr in group.attrs
