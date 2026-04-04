@@ -1,8 +1,4 @@
 {
-  "metrics": {
-    "gen_ai.client.operation.duration": [],
-    "gen_ai.client.token.usage": []
-  },
   "spans": {
     "inference": [
       "gen_ai.request.model",
@@ -18,5 +14,9 @@
       "gen_ai.system",
       "gen_ai.usage.input_tokens"
     ]
+  },
+  "metrics": {
+    "gen_ai.client.operation.duration": [],
+    "gen_ai.client.token.usage": []
   }
 }

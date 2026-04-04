@@ -1,12 +1,4 @@
 {
-  "events": {
-    "gen_ai.choice": [],
-    "gen_ai.user.message": []
-  },
-  "metrics": {
-    "gen_ai.client.operation.duration": [],
-    "gen_ai.client.token.usage": []
-  },
   "spans": {
     "inference": [
       "gen_ai.operation.name",
@@ -30,5 +22,13 @@
       "server.address",
       "server.port"
     ]
+  },
+  "metrics": {
+    "gen_ai.client.operation.duration": [],
+    "gen_ai.client.token.usage": []
+  },
+  "events": {
+    "gen_ai.choice": [],
+    "gen_ai.user.message": []
   }
 }
