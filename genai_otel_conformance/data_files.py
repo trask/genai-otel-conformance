@@ -75,13 +75,6 @@ class TestDataEntry:
 def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, object]:
     """Drop empty top-level objects and sort span attribute names alphabetically."""
     normalized: dict[str, object] = {}
-    for key in ("events", "metrics"):
-        value = data.get(key)
-        if value:
-            normalized[key] = {
-                name: []
-                for name in _present_signal_names(value)
-            }
     spans = data.get("spans")
     if spans:
         cleaned = {
@@ -91,6 +84,13 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
         }
         if cleaned:
             normalized["spans"] = cleaned
+    for key in ("metrics", "events"):
+        value = data.get(key)
+        if value:
+            normalized[key] = {
+                name: []
+                for name in _present_signal_names(value)
+            }
     return normalized
 
 

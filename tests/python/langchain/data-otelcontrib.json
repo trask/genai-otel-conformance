@@ -1,8 +1,4 @@
 {
-  "metrics": {
-    "gen_ai.client.operation.duration": [],
-    "gen_ai.client.token.usage": []
-  },
   "spans": {
     "create_agent": [
       "gen_ai.agent.name",
@@ -35,5 +31,9 @@
       "gen_ai.tool.name",
       "gen_ai.tool.type"
     ]
+  },
+  "metrics": {
+    "gen_ai.client.operation.duration": [],
+    "gen_ai.client.token.usage": []
   }
 }

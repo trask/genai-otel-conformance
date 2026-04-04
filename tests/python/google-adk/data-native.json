@@ -1,9 +1,4 @@
 {
-  "events": {
-    "gen_ai.choice": [],
-    "gen_ai.system.message": [],
-    "gen_ai.user.message": []
-  },
   "spans": {
     "invoke_agent": [
       "gen_ai.agent.description",
@@ -23,5 +18,10 @@
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
     ]
+  },
+  "events": {
+    "gen_ai.choice": [],
+    "gen_ai.system.message": [],
+    "gen_ai.user.message": []
   }
 }

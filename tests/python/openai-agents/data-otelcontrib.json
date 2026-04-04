@@ -1,15 +1,4 @@
 {
-  "events": {
-    "gen_ai.assistant.message": [],
-    "gen_ai.choice": [],
-    "gen_ai.system.message": [],
-    "gen_ai.tool.message": [],
-    "gen_ai.user.message": []
-  },
-  "metrics": {
-    "gen_ai.client.operation.duration": [],
-    "gen_ai.client.token.usage": []
-  },
   "spans": {
     "inference": [
       "gen_ai.operation.name",
@@ -23,5 +12,16 @@
       "server.address",
       "server.port"
     ]
+  },
+  "metrics": {
+    "gen_ai.client.operation.duration": [],
+    "gen_ai.client.token.usage": []
+  },
+  "events": {
+    "gen_ai.assistant.message": [],
+    "gen_ai.choice": [],
+    "gen_ai.system.message": [],
+    "gen_ai.tool.message": [],
+    "gen_ai.user.message": []
   }
 }
