@@ -41,6 +41,10 @@ async function main() {
     if (resp.usage) {
       span.setAttribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens);
       span.setAttribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens);
+      const reasoningTokens = resp.usage.completion_tokens_details?.reasoning_tokens;
+      if (reasoningTokens !== undefined) {
+        span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens);
+      }
     }
     console.log(`    -> ${resp.choices[0].message.content?.slice(0, 60)}`);
     span.end();
@@ -82,6 +86,10 @@ async function main() {
       if (chunk.usage) {
         inputTokens = chunk.usage.prompt_tokens;
         outputTokens = chunk.usage.completion_tokens;
+        const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens;
+        if (reasoningTokens !== undefined) {
+          span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens);
+        }
       }
     }
     span.setAttribute("gen_ai.response.model", model);

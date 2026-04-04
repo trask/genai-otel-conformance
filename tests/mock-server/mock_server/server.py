@@ -35,6 +35,9 @@ OPENAI_CHAT_RESPONSE = {
     "usage": {
         "prompt_tokens": 25,
         "completion_tokens": 12,
+        "completion_tokens_details": {
+            "reasoning_tokens": 7,
+        },
         "total_tokens": 37,
     },
 }
@@ -67,6 +70,9 @@ OPENAI_CHAT_TOOL_CALL_RESPONSE = {
     "usage": {
         "prompt_tokens": 50,
         "completion_tokens": 20,
+        "completion_tokens_details": {
+            "reasoning_tokens": 9,
+        },
         "total_tokens": 70,
     },
 }
@@ -190,6 +196,9 @@ def _stream_openai_chat(body):
             "usage": {
                 "prompt_tokens": 25,
                 "completion_tokens": 6,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 4,
+                },
                 "total_tokens": 31,
             },
         }
@@ -401,6 +410,7 @@ GOOGLE_GENAI_RESPONSE = {
     "usageMetadata": {
         "promptTokenCount": 25,
         "candidatesTokenCount": 12,
+        "thoughtsTokenCount": 7,
         "totalTokenCount": 37,
     },
     "modelVersion": "gemini-2.0-flash",
@@ -432,6 +442,7 @@ def _stream_google_genai():
         "usageMetadata": {
             "promptTokenCount": 25,
             "candidatesTokenCount": 6,
+            "thoughtsTokenCount": 4,
             "totalTokenCount": 31,
         },
     }
@@ -486,6 +497,7 @@ def _google_genai_stream_chunks():
         "usageMetadata": {
             "promptTokenCount": 25,
             "candidatesTokenCount": 6,
+            "thoughtsTokenCount": 4,
             "totalTokenCount": 31,
         },
     })

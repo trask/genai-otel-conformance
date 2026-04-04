@@ -36,6 +36,10 @@ def run_chat_prototype(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+            completion_tokens_details = getattr(resp.usage, "completion_tokens_details", None)
+            reasoning_tokens = getattr(completion_tokens_details, "reasoning_tokens", None)
+            if reasoning_tokens is not None:
+                span.set_attribute("gen_ai.usage.reasoning.output_tokens", reasoning_tokens)
         print(f"    -> {resp.choices[0].message.content[:60]}")
 
 
@@ -74,6 +78,10 @@ def run_chat_streaming_prototype(client):
             if chunk.usage:
                 input_tokens = chunk.usage.prompt_tokens
                 output_tokens = chunk.usage.completion_tokens
+                completion_tokens_details = getattr(chunk.usage, "completion_tokens_details", None)
+                reasoning_tokens = getattr(completion_tokens_details, "reasoning_tokens", None)
+                if reasoning_tokens is not None:
+                    span.set_attribute("gen_ai.usage.reasoning.output_tokens", reasoning_tokens)
         if model:
             span.set_attribute("gen_ai.response.model", model)
         if response_id:
@@ -127,6 +135,10 @@ def run_chat_tool_call_prototype(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+            completion_tokens_details = getattr(resp.usage, "completion_tokens_details", None)
+            reasoning_tokens = getattr(completion_tokens_details, "reasoning_tokens", None)
+            if reasoning_tokens is not None:
+                span.set_attribute("gen_ai.usage.reasoning.output_tokens", reasoning_tokens)
         choice = resp.choices[0]
         if choice.message.tool_calls:
             print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")

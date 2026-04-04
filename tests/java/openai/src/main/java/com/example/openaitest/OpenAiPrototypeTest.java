@@ -79,6 +79,9 @@ public class OpenAiPrototypeTest {
             completion.usage().ifPresent(usage -> {
                 span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
                 span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                usage.completionTokensDetails().ifPresent(details ->
+                        details.reasoningTokens().ifPresent(reasoningTokens ->
+                                span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens)));
             });
 
             String content = choice.message().content().orElse("");
@@ -119,6 +122,9 @@ public class OpenAiPrototypeTest {
                     chunk.usage().ifPresent(usage -> {
                         span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
                         span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                        usage.completionTokensDetails().ifPresent(details ->
+                                details.reasoningTokens().ifPresent(reasoningTokens ->
+                                        span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens)));
                     });
                 });
             } catch (Exception e) {
@@ -184,6 +190,9 @@ public class OpenAiPrototypeTest {
             completion.usage().ifPresent(usage -> {
                 span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
                 span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                usage.completionTokensDetails().ifPresent(details ->
+                        details.reasoningTokens().ifPresent(reasoningTokens ->
+                                span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens)));
             });
 
             List<ChatCompletionMessageToolCall> toolCalls =

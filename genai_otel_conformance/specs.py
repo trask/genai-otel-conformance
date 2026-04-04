@@ -49,6 +49,7 @@ _INFERENCE_COND_REQUIRED = [
     "gen_ai.output.type",
     "gen_ai.request.choice.count",
     "gen_ai.request.seed",
+    "gen_ai.usage.reasoning.output_tokens",
 ]
 _INFERENCE_RECOMMENDED = [
     "gen_ai.request.frequency_penalty",

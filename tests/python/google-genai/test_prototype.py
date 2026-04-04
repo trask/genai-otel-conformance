@@ -45,6 +45,8 @@ def run_chat():
                 span.set_attribute("gen_ai.usage.input_tokens", response.usage_metadata.prompt_token_count)
             if hasattr(response.usage_metadata, "candidates_token_count") and response.usage_metadata.candidates_token_count:
                 span.set_attribute("gen_ai.usage.output_tokens", response.usage_metadata.candidates_token_count)
+            if response.usage_metadata.thoughts_token_count is not None:
+                span.set_attribute("gen_ai.usage.reasoning.output_tokens", response.usage_metadata.thoughts_token_count)
         print(f"    -> {response.text[:60]}")
 
 
@@ -84,6 +86,8 @@ def run_chat_streaming():
                 span.set_attribute("gen_ai.usage.input_tokens", last_chunk.usage_metadata.prompt_token_count)
             if hasattr(last_chunk.usage_metadata, "candidates_token_count") and last_chunk.usage_metadata.candidates_token_count:
                 span.set_attribute("gen_ai.usage.output_tokens", last_chunk.usage_metadata.candidates_token_count)
+            if last_chunk.usage_metadata.thoughts_token_count is not None:
+                span.set_attribute("gen_ai.usage.reasoning.output_tokens", last_chunk.usage_metadata.thoughts_token_count)
         print(f"    -> {text[:60]}")
 
 

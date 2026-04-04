@@ -80,6 +80,9 @@ async function main() {
       if (resp.usageMetadata.candidatesTokenCount) {
         span.setAttribute("gen_ai.usage.output_tokens", resp.usageMetadata.candidatesTokenCount);
       }
+      if (resp.usageMetadata.thoughtsTokenCount !== undefined) {
+        span.setAttribute("gen_ai.usage.reasoning.output_tokens", resp.usageMetadata.thoughtsTokenCount);
+      }
     }
     const text = candidate?.content?.parts?.[0]?.text ?? "";
     console.log(`    -> ${text.slice(0, 60)}`);
@@ -111,6 +114,9 @@ async function main() {
       }
       if (aggregated.usageMetadata.candidatesTokenCount) {
         span.setAttribute("gen_ai.usage.output_tokens", aggregated.usageMetadata.candidatesTokenCount);
+      }
+      if (aggregated.usageMetadata.thoughtsTokenCount !== undefined) {
+        span.setAttribute("gen_ai.usage.reasoning.output_tokens", aggregated.usageMetadata.thoughtsTokenCount);
       }
     }
     console.log(`    -> ${text.slice(0, 60)}`);
