@@ -71,16 +71,17 @@ jobs:
           java_matrix+=']}'
           echo "java=${java_matrix}" >> "$GITHUB_OUTPUT"
 
-          # .NET: one entry per directory, all native
+          # .NET: discover committed data files so only real test modules/ecosystems are included
           dotnet_matrix='{"test":['
           first=true
-          for d in tests/dotnet/*/; do
-            [[ -d "$d" ]] || continue
-            dir=$(basename "$d")
-            name="${dir}-native"
+          for f in tests/dotnet/*/data-*.json; do
+            [[ -f "$f" ]] || continue
+            dir=$(basename "$(dirname "$f")")
+            eco=$(basename "$f" .json | sed 's/^data-//')
+            name="${dir}-${eco}"
             $first || dotnet_matrix+=','
             first=false
-            dotnet_matrix+="{\"name\":\"${name}\",\"dir\":\"${d%/}\",\"lib\":\"${dir}\",\"eco\":\"native\"}"
+            dotnet_matrix+="{\"name\":\"${name}\",\"dir\":\"tests/dotnet/${dir}\",\"lib\":\"${dir}\",\"eco\":\"${eco}\"}"
           done
           dotnet_matrix+=']}'
           echo "dotnet=${dotnet_matrix}" >> "$GITHUB_OUTPUT"

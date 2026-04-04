@@ -4,7 +4,9 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <!-- Beta required: last stable (2.1.0) is binary-incompatible with OpenAI >= 2.8
+         pulled in by Microsoft.Extensions.AI.OpenAI -->
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.9.0-beta.1" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.4.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.4.0" />
     <PackageReference Include="OpenTelemetry" Version="1.15.0" />
