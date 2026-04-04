@@ -14,6 +14,7 @@ package-lock.json
 # .NET
 bin/
 obj/
+*.sln
 
 # Java
 build/
