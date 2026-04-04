@@ -28,8 +28,8 @@ def _validate_test_lang(location: TestLocation) -> None:
 class ObservedTelemetry:
     attrs: dict[str, int] = field(default_factory=dict)
     non_registry_attrs: dict[str, int] = field(default_factory=dict)
-    events: dict[str, int] = field(default_factory=dict)
     metrics: dict[str, int] = field(default_factory=dict)
+    events: dict[str, int] = field(default_factory=dict)
     entity_counts: dict[str, int] = field(default_factory=dict)
     has_data: bool = False
 
@@ -55,10 +55,10 @@ class TestResult:
             or bool(self.violation_messages)
             or bool(self.observed.attrs)
             or bool(self.observed.non_registry_attrs)
-            or bool(self.observed.events)
             or bool(self.spans.detected_types)
-            or bool(self.detected.events)
             or bool(self.detected.metrics)
+            or bool(self.observed.events)
+            or bool(self.detected.events)
         )
 
 

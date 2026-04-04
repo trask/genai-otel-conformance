@@ -72,6 +72,6 @@ class DetailView:
     entity_summary: str
     span_sections: list[SpanSectionView] = field(default_factory=list)
     non_registry_attrs: list[CountItemView] = field(default_factory=list)
-    events: list[CountItemView] = field(default_factory=list)
     metrics: list[CountItemView] = field(default_factory=list)
+    events: list[CountItemView] = field(default_factory=list)
     violation_messages: list[str] = field(default_factory=list)
