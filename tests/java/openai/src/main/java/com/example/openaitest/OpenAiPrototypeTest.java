@@ -5,6 +5,9 @@
 
 package com.example.openaitest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.openai.core.JsonValue;
+import com.openai.core.ObjectMappers;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.http.StreamResponse;
@@ -138,34 +141,39 @@ public class OpenAiPrototypeTest {
     static void runChatToolCall(OpenAIClient client) {
         System.out.println("  [chat_tool_call] chat with tool calling");
         ChatModel requestModel = ChatModel.GPT_4O_MINI;
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                .model(requestModel)
+                .addUserMessage("What's the weather in Seattle?")
+                .addTool(ChatCompletionFunctionTool.builder()
+                        .function(FunctionDefinition.builder()
+                                .name("get_weather")
+                                .description("Get the current weather")
+                                .parameters(FunctionParameters.builder()
+                                        .putAdditionalProperty("type", JsonValue.from("object"))
+                                        .putAdditionalProperty("properties", JsonValue.from(
+                                                Map.of("location", Map.of(
+                                                        "type", "string",
+                                                        "description", "City name"
+                                                ))
+                                        ))
+                                        .putAdditionalProperty("required", JsonValue.from(singletonList("location")))
+                                        .build())
+                                .build())
+                        .build())
+                .build();
+        // Derive from params.tools() — the same tools passed to the API call
+        String toolDefinitionsJson;
+        try {
+            toolDefinitionsJson = ObjectMappers.jsonMapper().writeValueAsString(params.tools().orElse(List.of()));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         Span span = tracer.spanBuilder("chat gpt-4o-mini").startSpan();
         try {
             span.setAttribute("gen_ai.operation.name", "chat");
             span.setAttribute("gen_ai.provider.name", "openai");
             span.setAttribute("gen_ai.request.model", requestModel.toString());
-
-            ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
-                    .model(requestModel)
-                    .addUserMessage("What's the weather in Seattle?")
-                    .addTool(ChatCompletionFunctionTool.builder()
-                            .function(FunctionDefinition.builder()
-                                    .name("get_weather")
-                                    .description("Get the current weather")
-                                    .parameters(FunctionParameters.builder()
-                                            .putAdditionalProperty("type", com.openai.core.JsonValue.from("object"))
-                                            .putAdditionalProperty("properties", com.openai.core.JsonValue.from(
-                                                    Map.of("location", Map.of(
-                                                            "type", "string",
-                                                            "description", "City name"
-                                                    ))
-                                            ))
-                                            .putAdditionalProperty("required", com.openai.core.JsonValue.from(
-                                                    singletonList("location")
-                                            ))
-                                            .build())
-                                    .build())
-                            .build())
-                    .build();
+            span.setAttribute("gen_ai.tool.definitions", toolDefinitionsJson);
             ChatCompletion completion = client.chat().completions().create(params);
 
             span.setAttribute("gen_ai.response.id", completion.id());

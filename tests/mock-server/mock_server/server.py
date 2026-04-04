@@ -135,7 +135,7 @@ def _mock_tool_argument_value(name, schema):
 
 def _mock_tool_arguments(tool):
     function = (tool or {}).get("function", {})
-    parameters = function.get("parameters", {})
+    parameters = function.get("parameters") or (tool or {}).get("input_schema", {})
     properties = parameters.get("properties", {})
     required = parameters.get("required", [])
 
@@ -278,6 +278,37 @@ ANTHROPIC_MESSAGE_RESPONSE = {
     },
 }
 
+ANTHROPIC_MESSAGE_TOOL_USE_RESPONSE = {
+    "id": "msg-mock-002",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+        {
+            "type": "tool_use",
+            "id": "toolu_mock_001",
+            "name": "get_weather",
+            "input": {"location": "Seattle"},
+        }
+    ],
+    "model": "claude-sonnet-4-20250514",
+    "stop_reason": "tool_use",
+    "stop_sequence": None,
+    "usage": {
+        "input_tokens": 50,
+        "output_tokens": 20,
+    },
+}
+
+
+def _anthropic_has_tool_result(body):
+    for message in body.get("messages", []):
+        content = message.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    return True
+    return False
+
 
 def _stream_anthropic_message(body):
     """Yield SSE events for Anthropic streaming."""
@@ -336,6 +367,16 @@ def anthropic_messages():
 
     if body.get("stream"):
         return Response(_stream_anthropic_message(body), mimetype="text/event-stream")
+
+    if body.get("tools") and not _anthropic_has_tool_result(body):
+        resp = copy.deepcopy(ANTHROPIC_MESSAGE_TOOL_USE_RESPONSE)
+        resp["model"] = body.get("model", resp["model"])
+        tool = body.get("tools", [{}])[0]
+        tool_name = tool.get("name")
+        if tool_name:
+            resp["content"][0]["name"] = tool_name
+        resp["content"][0]["input"] = _mock_tool_arguments(tool)
+        return resp
 
     resp = dict(ANTHROPIC_MESSAGE_RESPONSE)
     resp["model"] = body.get("model", resp["model"])

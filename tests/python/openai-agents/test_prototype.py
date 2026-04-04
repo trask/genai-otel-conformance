@@ -5,6 +5,7 @@ against a mock OpenAI server, with manual OTel spans.
 """
 
 import asyncio
+import json
 import os
 from urllib.parse import urlparse
 
@@ -20,6 +21,7 @@ async def run_agent():
     """Run a simple agent with the OpenAI Agents SDK, with manual spans."""
     from agents import Agent, Runner, function_tool
     from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
+    from agents.tool import FunctionTool
     import openai
 
     @function_tool
@@ -31,11 +33,12 @@ async def run_agent():
     request_model = "gpt-4o-mini"
     model = OpenAIChatCompletionsModel(model=request_model, openai_client=client)
 
+    tools = [get_weather]
     agent = Agent(
         name="test-agent",
         instructions="You are a helpful assistant.",
         model=model,
-        tools=[get_weather],
+        tools=tools,
     )
 
     print("  [agent_run] agent with tool calling (prototype)")
@@ -45,6 +48,20 @@ async def run_agent():
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
         span.set_attribute("gen_ai.response.model", request_model)
+        # OpenAI Agents SDK converts FunctionTools to OpenAI function-calling
+        # format before sending to the API, so we mirror that shape here.
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.params_json_schema,
+                },
+            }
+            for t in tools
+            if isinstance(t, FunctionTool)
+        ]))
         if endpoint.hostname:
             span.set_attribute("server.address", endpoint.hostname)
         if endpoint.port is not None:

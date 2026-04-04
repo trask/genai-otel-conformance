@@ -14,8 +14,11 @@
 // semantic conventions.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -236,9 +239,34 @@ class Program
         using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
         {
             var endpoint = new Uri(mockBaseUrl);
+            // Semantic Kernel converts plugins to OpenAI function-calling format
+            // before sending to the API, so we mirror that shape here.
+            var toolDefinitionsJson = JsonSerializer.Serialize(
+                kernel.Plugins
+                    .SelectMany(p => p)
+                    .Select(f => new Dictionary<string, object>
+                    {
+                        ["type"] = "function",
+                        ["function"] = new
+                        {
+                            name = f.Name,
+                            description = f.Description,
+                            parameters = new
+                            {
+                                type = "object",
+                                properties = f.Metadata.Parameters.ToDictionary(
+                                    p => p.Name,
+                                    p => new { type = ToJsonSchemaType(p.ParameterType) }),
+                                required = f.Metadata.Parameters
+                                    .Where(p => p.IsRequired)
+                                    .Select(p => p.Name)
+                            }
+                        }
+                    }));
             activity?.SetTag("gen_ai.operation.name", "chat");
             activity?.SetTag("gen_ai.provider.name", "openai");
             activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("gen_ai.tool.definitions", toolDefinitionsJson);
             activity?.SetTag("server.address", endpoint.Host);
             activity?.SetTag("server.port", endpoint.Port);
 
@@ -275,6 +303,18 @@ class Program
         Console.WriteLine("Flushing telemetry...");
         tracerProvider.ForceFlush();
         Console.WriteLine("Done.");
+    }
+
+    static string ToJsonSchemaType(Type? type)
+    {
+        if (type == null) return "string";
+        type = Nullable.GetUnderlyingType(type) ?? type;
+        if (type == typeof(string)) return "string";
+        if (type == typeof(bool)) return "boolean";
+        if (type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte)) return "integer";
+        if (type == typeof(float) || type == typeof(double) || type == typeof(decimal)) return "number";
+        if (type.IsArray || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))) return "array";
+        return "string";
     }
 }
 

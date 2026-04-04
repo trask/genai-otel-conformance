@@ -6,7 +6,10 @@
 
 using System;
 using System.ClientModel;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -176,6 +179,86 @@ class Program
             }
 
             Console.WriteLine($"    -> {text[..Math.Min(60, text.Length)]}");
+        }
+
+        // Scenario: chat with tool calling
+        Console.WriteLine("  [chat_tool_call] chat with tool calling");
+        using (var activity = activitySource.StartActivity("chat gpt-4o-mini"))
+        {
+            var endpoint = new Uri(mockBaseUrl);
+            var toolName = "get_weather";
+            var toolDescription = "Get the current weather";
+            var toolParameters = BinaryData.FromString(
+                """
+                {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "City name"
+                    }
+                  },
+                  "required": ["location"]
+                }
+                """
+            );
+            var weatherTool = OpenAI.Chat.ChatTool.CreateFunctionTool(
+                functionName: toolName,
+                functionDescription: toolDescription,
+                functionParameters: toolParameters
+            );
+
+            List<OpenAI.Chat.ChatMessage> messages =
+            [
+                new OpenAI.Chat.UserChatMessage("What's the weather in Seattle?"),
+            ];
+            OpenAI.Chat.ChatCompletionOptions options = new()
+            {
+                ToolChoice = OpenAI.Chat.ChatToolChoice.CreateAutoChoice(),
+            };
+            options.Tools.Add(weatherTool);
+
+            // Derive from options.Tools — the same collection passed to CompleteChatAsync (OpenAI function-calling format)
+            var toolDefinitionsJson = JsonSerializer.Serialize(
+                options.Tools.Select(t => new Dictionary<string, object>
+                {
+                    ["type"] = "function",
+                    ["function"] = new
+                    {
+                        name = t.FunctionName,
+                        description = t.FunctionDescription,
+                        parameters = JsonSerializer.Deserialize<JsonElement>(t.FunctionParameters)
+                    }
+                }).ToArray()
+            );
+            activity?.SetTag("gen_ai.operation.name", "chat");
+            activity?.SetTag("gen_ai.provider.name", "openai");
+            activity?.SetTag("gen_ai.request.model", modelId);
+            activity?.SetTag("gen_ai.tool.definitions", toolDefinitionsJson);
+            activity?.SetTag("server.address", endpoint.Host);
+            activity?.SetTag("server.port", endpoint.Port);
+
+            OpenAI.Chat.ChatCompletion completion = await chatClient.CompleteChatAsync(messages, options);
+
+            activity?.SetTag("gen_ai.response.id", completion.Id);
+            activity?.SetTag("gen_ai.response.model", completion.Model);
+            activity?.SetTag("gen_ai.response.finish_reasons",
+                new[] { completion.FinishReason.ToString() });
+            if (completion.Usage != null)
+            {
+                activity?.SetTag("gen_ai.usage.input_tokens", completion.Usage.InputTokenCount);
+                activity?.SetTag("gen_ai.usage.output_tokens", completion.Usage.OutputTokenCount);
+            }
+
+            if (completion.ToolCalls.Count > 0)
+            {
+                Console.WriteLine($"    -> tool_call: {completion.ToolCalls[0].FunctionName}");
+            }
+            else
+            {
+                var content = completion.Content[0].Text;
+                Console.WriteLine($"    -> {content[..Math.Min(60, content.Length)]}");
+            }
         }
 
         Console.WriteLine("Flushing telemetry...");

@@ -95,6 +95,52 @@ async function main() {
     span.end();
   });
 
+  // Scenario: tool calling chat
+  console.log("  [chat_tool_call] tool calling chat completion (prototype)");
+  await tracer.startActiveSpan("chat claude-sonnet-4-20250514", async (span) => {
+    const requestModel = "claude-sonnet-4-20250514";
+    const requestMaxTokens = 100;
+    const requestTool = {
+      name: "get_weather",
+      description: "Get the current weather for a location.",
+      input_schema: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "The location to get weather for",
+          },
+        },
+        required: ["location"],
+      },
+    };
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "anthropic");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    span.setAttribute("gen_ai.request.max_tokens", requestMaxTokens);
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    const resp = await client.messages.create({
+      model: requestModel,
+      max_tokens: requestMaxTokens,
+      messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+      tools: [requestTool],
+    });
+    span.setAttribute("gen_ai.response.model", resp.model);
+    span.setAttribute("gen_ai.response.id", resp.id);
+    span.setAttribute("gen_ai.response.finish_reasons", [resp.stop_reason ?? "tool_use"]);
+    if (resp.usage) {
+      span.setAttribute("gen_ai.usage.input_tokens", resp.usage.input_tokens);
+      span.setAttribute("gen_ai.usage.output_tokens", resp.usage.output_tokens);
+    }
+    const firstBlock = resp.content[0] as any;
+    if (firstBlock?.type === "tool_use") {
+      console.log(`    -> tool_call: ${firstBlock.name}`);
+    } else {
+      console.log(`    -> ${firstBlock?.text?.slice(0, 60) ?? ""}`);
+    }
+    span.end();
+  });
+
   await flushAndShutdownOtel(otel);
 }
 

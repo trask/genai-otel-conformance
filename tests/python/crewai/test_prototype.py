@@ -4,6 +4,7 @@ Exercises: agent task execution
 against a mock OpenAI server, with manual OTel spans.
 """
 
+import json
 import os
 
 from otel_setup import setup_otel, flush_and_shutdown
@@ -30,11 +31,13 @@ def run_crew():
         """Get the current weather for a location."""
         return "Sunny, 72°F"
 
+    tools = [get_weather]
+
     researcher = Agent(
         role="Researcher",
         goal="Find information",
         backstory="You are a helpful research assistant.",
-        tools=[get_weather],
+        tools=tools,
         verbose=False,
         allow_delegation=False,
     )
@@ -51,6 +54,19 @@ def run_crew():
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
+        # CrewAI converts tools to OpenAI function-calling format before
+        # passing them to litellm, so we mirror that shape here.
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.func.__doc__,
+                    "parameters": t.args_schema.model_json_schema(),
+                },
+            }
+            for t in tools
+        ]))
         result = crew.kickoff()
         print(f"    -> {str(result)[:60]}")
 

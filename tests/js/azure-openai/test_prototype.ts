@@ -99,6 +99,54 @@ async function main() {
     span.end();
   });
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling (prototype)");
+  await tracer.startActiveSpan("chat gpt-4o-mini", async (span) => {
+    const requestModel = "gpt-4o-mini";
+    const endpoint = new URL(MOCK_BASE_URL);
+    const requestTool = {
+      type: "function" as const,
+      function: {
+        name: "get_weather",
+        description: "Get the current weather",
+        parameters: {
+          type: "object",
+          properties: {
+            location: { type: "string", description: "City name" },
+          },
+          required: ["location"],
+        },
+      },
+    };
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "openai");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    span.setAttribute("server.address", endpoint.hostname);
+    if (endpoint.port) {
+      span.setAttribute("server.port", Number(endpoint.port));
+    }
+    const resp = await client.chat.completions.create({
+      model: requestModel,
+      messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+      tools: [requestTool],
+    });
+    span.setAttribute("gen_ai.response.model", resp.model);
+    span.setAttribute("gen_ai.response.id", resp.id);
+    span.setAttribute("gen_ai.response.finish_reasons", resp.choices.map(c => c.finish_reason));
+    if (resp.usage) {
+      span.setAttribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens);
+      span.setAttribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens);
+    }
+    const toolCall = resp.choices[0].message.tool_calls?.[0];
+    if (toolCall?.type === "function") {
+      console.log(`    -> tool_call: ${toolCall.function.name}`);
+    } else {
+      console.log(`    -> ${resp.choices[0].message.content?.slice(0, 60)}`);
+    }
+    span.end();
+  });
+
   // Scenario: embeddings
   console.log("  [embeddings] embedding generation (prototype)");
   await tracer.startActiveSpan("embeddings text-embedding-3-small", async (span) => {
