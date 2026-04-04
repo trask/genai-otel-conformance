@@ -1,5 +1,6 @@
 """Conformance test: prototype instrumentation for LangChain."""
 
+import json
 import os
 
 from opentelemetry import trace
@@ -74,6 +75,51 @@ def run_chat_streaming_prototype(llm, request_model):
         print(f"    -> {text[:60]}")
 
 
+def run_agent_prototype(llm, request_model):
+    """Scenario: agent with tool calling and prototype instrumentation."""
+    print("  [agent] agent with tool calling (prototype)")
+    from langchain_core.tools import tool
+
+    @tool
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        return "Sunny, 72°F"
+
+    tool_definition = {
+        "name": get_weather.name,
+        "description": get_weather.description,
+        "args_schema": get_weather.args_schema.model_json_schema(),
+    }
+
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "openai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([tool_definition]))
+
+        llm_with_tools = llm.bind_tools([get_weather], tool_choice="auto")
+        resp = llm_with_tools.invoke("What's the weather in Seattle?")
+        meta = getattr(resp, "response_metadata", {})
+        if meta.get("model_name"):
+            span.set_attribute("gen_ai.response.model", meta["model_name"])
+        if getattr(resp, "id", None):
+            span.set_attribute("gen_ai.response.id", resp.id)
+        if meta.get("finish_reason"):
+            span.set_attribute("gen_ai.response.finish_reasons", [meta["finish_reason"]])
+        usage = getattr(resp, "usage_metadata", None)
+        input_tokens = _usage_value(usage, "input_tokens")
+        output_tokens = _usage_value(usage, "output_tokens")
+        if input_tokens is not None:
+            span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
+        if output_tokens is not None:
+            span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+        tool_calls = getattr(resp, "tool_calls", [])
+        if tool_calls:
+            print(f"    -> tool_call: {tool_calls[0]['name']}")
+        else:
+            print(f"    -> {str(getattr(resp, 'content', ''))[:60]}")
+
+
 def run_embeddings_prototype():
     """Scenario: embedding generation with prototype instrumentation."""
     print("  [embeddings] embedding generation (prototype)")
@@ -109,6 +155,7 @@ def main():
 
     run_chat_prototype(llm, request_model)
     run_chat_streaming_prototype(llm, request_model)
+    run_agent_prototype(llm, request_model)
     run_embeddings_prototype()
 
     flush_and_shutdown(tp, lp, mp)

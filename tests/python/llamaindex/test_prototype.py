@@ -1,5 +1,6 @@
 """Conformance test: prototype instrumentation for LlamaIndex."""
 
+import json
 import os
 
 from opentelemetry import trace
@@ -61,6 +62,36 @@ def run_chat_streaming_prototype(llm, request_model, request_temperature):
         print(f"    -> {text[:60]}")
 
 
+def run_agent_prototype(llm, request_model, request_temperature):
+    """Scenario: agent with tool calling and prototype instrumentation."""
+    print("  [chat_tool_call] agent with tool calling (prototype)")
+    from llama_index.core.tools import FunctionTool
+
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        return "Sunny, 72°F"
+
+    weather_tool = FunctionTool.from_defaults(fn=get_weather)
+    tool_definition = {
+        "name": weather_tool.metadata.name,
+        "description": weather_tool.metadata.description,
+        "fn_schema": weather_tool.metadata.fn_schema.model_json_schema(),
+    }
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "openai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.request.temperature", request_temperature)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([tool_definition]))
+
+        response = llm.predict_and_call(
+            tools=[weather_tool],
+            user_msg="What's the weather in Seattle?",
+            verbose=False,
+        )
+        print(f"    -> {str(response)[:60]}")
+
+
 def run_embeddings_prototype():
     """Scenario: embedding generation with prototype instrumentation."""
     print("  [embeddings] embedding generation (prototype)")
@@ -98,6 +129,7 @@ def main():
 
     run_chat_prototype(llm, request_model, request_temperature)
     run_chat_streaming_prototype(llm, request_model, request_temperature)
+    run_agent_prototype(llm, request_model, request_temperature)
     run_embeddings_prototype()
 
     flush_and_shutdown(tp, lp, mp)

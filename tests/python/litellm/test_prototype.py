@@ -1,6 +1,6 @@
 """Conformance test: prototype instrumentation for LiteLLM.
 
-Exercises: chat, chat_streaming, embeddings
+Exercises: chat, chat_streaming, chat_tool_call, embeddings
 against a mock OpenAI server, with manual OTel spans.
 """
 
@@ -114,6 +114,63 @@ def run_chat_streaming():
         print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call():
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    import litellm
+
+    print("  [chat_tool_call] chat with tool calling via LiteLLM (prototype)")
+    request_model = "gpt-4o-mini"
+    litellm_model = f"openai/{request_model}"
+    request_messages = [{"role": "user", "content": "What's the weather in Seattle?"}]
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "openai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([request_tool]))
+        span.set_attribute(
+            "gen_ai.input.messages",
+            json.dumps([
+                {
+                    "role": message["role"],
+                    "parts": [{"type": "text", "content": message["content"]}],
+                }
+                for message in request_messages
+            ]),
+        )
+        resp = litellm.completion(
+            model=litellm_model,
+            messages=request_messages,
+            tools=[request_tool],
+            api_base=MOCK_BASE_URL,
+            api_key="mock-key",
+        )
+        span.set_attribute("gen_ai.response.model", resp.model)
+        span.set_attribute("gen_ai.response.id", resp.id)
+        span.set_attribute("gen_ai.response.finish_reasons", [c.finish_reason for c in resp.choices])
+        if resp.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+        tool_calls = getattr(resp.choices[0].message, "tool_calls", None)
+        if tool_calls:
+            print(f"    -> tool_call: {tool_calls[0].function.name}")
+        else:
+            print(f"    -> {resp.choices[0].message.content[:60]}")
+
+
 def run_embeddings():
     """Scenario: embedding generation with prototype instrumentation."""
     import litellm
@@ -145,6 +202,7 @@ def main():
 
     run_chat()
     run_chat_streaming()
+    run_chat_tool_call()
     run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)

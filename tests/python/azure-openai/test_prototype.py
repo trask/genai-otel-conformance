@@ -1,5 +1,6 @@
 """Conformance test: prototype instrumentation for Azure OpenAI."""
 
+import json
 import os
 from urllib.parse import urlparse
 
@@ -90,27 +91,27 @@ def run_chat_tool_call_prototype(client):
     """Scenario: chat with tool calling with prototype instrumentation."""
     print("  [chat_tool_call] chat with tool calling (prototype)")
     request_model = "gpt-4o-mini"
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get the current weather",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string", "description": "City name"},
-                    },
-                    "required": ["location"],
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
                 },
+                "required": ["location"],
             },
-        }
-    ]
+        },
+    }
+    tools = [request_tool]
     with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
         endpoint = urlparse(MOCK_BASE_URL)
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
         if endpoint.hostname:
             span.set_attribute("server.address", endpoint.hostname)
         if endpoint.port is not None:

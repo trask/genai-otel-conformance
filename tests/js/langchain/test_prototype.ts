@@ -1,6 +1,7 @@
 /**
  * Conformance test: Prototype instrumentation for LangChain.
  */
+import { z, toJSONSchema } from "zod";
 import { trace } from "@opentelemetry/api";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
@@ -83,6 +84,51 @@ async function main() {
       span.setAttribute("gen_ai.usage.output_tokens", usageMetadata.output_tokens);
     }
     console.log(`    -> ${text.slice(0, 60)}`);
+    span.end();
+  });
+
+  // Scenario: agent-style tool call request
+  console.log("  [chat_tool_call] tool calling (prototype)");
+  await tracer.startActiveSpan("chat gpt-4o-mini", async (span) => {
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "openai");
+    span.setAttribute("gen_ai.request.model", chatModel);
+    const tools = [
+      {
+        name: "get_weather",
+        description: "Get the current weather for a location.",
+        schema: z.object({
+          location: z.string().describe("The location to get weather for"),
+        }),
+      },
+    ];
+    // Derive from the same tools array passed to bindTools (LangChain StructuredToolParams format)
+    span.setAttribute(
+      "gen_ai.tool.definitions",
+      JSON.stringify(tools.map((t) => ({ name: t.name, description: t.description, schema: toJSONSchema(t.schema) }))),
+    );
+
+    const llmWithTools = llm.bindTools(tools, { tool_choice: "auto" });
+    const resp = await llmWithTools.invoke([["user", "What's the weather in Seattle?"]]);
+    const responseMetadata = resp.response_metadata as any;
+    if ((resp as any).id) {
+      span.setAttribute("gen_ai.response.id", (resp as any).id);
+    }
+    if (responseMetadata?.model_name) {
+      span.setAttribute("gen_ai.response.model", responseMetadata.model_name);
+    }
+    if (responseMetadata?.finish_reason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [responseMetadata.finish_reason]);
+    }
+    if (resp.usage_metadata) {
+      span.setAttribute("gen_ai.usage.input_tokens", resp.usage_metadata.input_tokens);
+      span.setAttribute("gen_ai.usage.output_tokens", resp.usage_metadata.output_tokens);
+    }
+    if (Array.isArray((resp as any).tool_calls) && (resp as any).tool_calls.length > 0) {
+      console.log(`    -> tool_call: ${(resp as any).tool_calls[0].name}`);
+    } else {
+      console.log(`    -> ${resp.content.toString().slice(0, 60)}`);
+    }
     span.end();
   });
 

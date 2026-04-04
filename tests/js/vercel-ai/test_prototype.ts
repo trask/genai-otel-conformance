@@ -2,6 +2,8 @@
  * Conformance test: Prototype instrumentation for Vercel AI SDK.
  */
 import { trace } from "@opentelemetry/api";
+import { tool } from "ai";
+import { z, toJSONSchema } from "zod";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -91,6 +93,66 @@ async function main() {
       span.setAttribute("gen_ai.response.id", response.id);
     }
     console.log(`    -> ${text.slice(0, 60)}`);
+    span.end();
+  });
+
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling (prototype)");
+  await tracer.startActiveSpan("chat gpt-4o-mini", async (span) => {
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "openai");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    const weatherToolSchema = z.object({
+      location: z.string().describe("The location to get weather for"),
+    });
+    const tools = {
+      get_weather: tool({
+        description: "Get the current weather for a location.",
+        inputSchema: weatherToolSchema,
+        execute: async ({ location }) => ({
+          location: location,
+          weather: "Sunny, 72°F",
+        }),
+      }),
+    };
+    span.setAttribute(
+      "gen_ai.tool.definitions",
+      JSON.stringify(
+        Object.entries(tools).map(([name, t]) => ({
+          name: name,
+          description: t.description,
+          inputSchema: toJSONSchema(t.inputSchema!),
+        })),
+      ),
+    );
+    const result = await generateText({
+      model: openai.chat(requestModel),
+      prompt: "What's the weather in Seattle?",
+      tools,
+    });
+    span.setAttribute("gen_ai.response.finish_reasons", [result.finishReason]);
+    if (result.usage) {
+      if (result.usage.inputTokens != null) {
+        span.setAttribute("gen_ai.usage.input_tokens", result.usage.inputTokens);
+      }
+      if (result.usage.outputTokens != null) {
+        span.setAttribute("gen_ai.usage.output_tokens", result.usage.outputTokens);
+      }
+    }
+    if ((result as any).response?.model) {
+      span.setAttribute("gen_ai.response.model", (result as any).response.model);
+    } else {
+      span.setAttribute("gen_ai.response.model", requestModel);
+    }
+    if ((result as any).response?.id) {
+      span.setAttribute("gen_ai.response.id", (result as any).response.id);
+    }
+    const toolCalls = (result as any).toolCalls;
+    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+      console.log(`    -> tool_call: ${toolCalls[0].toolName}`);
+    } else {
+      console.log(`    -> ${result.text.slice(0, 60)}`);
+    }
     span.end();
   });
 
