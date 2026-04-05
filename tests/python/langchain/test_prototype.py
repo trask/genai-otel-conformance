@@ -4,6 +4,7 @@ import json
 import os
 
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 from otel_setup import flush_and_shutdown, setup_otel
 
@@ -27,7 +28,8 @@ def run_chat_prototype(llm, request_model):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
-        resp = llm.invoke("Say hello.")
+        prompt_text = "Say hello."
+        resp = llm.invoke(prompt_text)
         meta = getattr(resp, "response_metadata", {})
         if meta.get("model_name"):
             span.set_attribute("gen_ai.response.model", meta["model_name"])
@@ -42,6 +44,38 @@ def run_chat_prototype(llm, request_model):
             span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
         if output_tokens is not None:
             span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": "user", "parts": [{"type": "text", "content": prompt_text}]}
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": resp.content}],
+                    "finish_reason": meta.get("finish_reason"),
+                }
+            ]),
+        }
+        if meta.get("model_name"):
+            event_attrs["gen_ai.response.model"] = meta["model_name"]
+        if getattr(resp, "id", None):
+            event_attrs["gen_ai.response.id"] = resp.id
+        if meta.get("finish_reason"):
+            event_attrs["gen_ai.response.finish_reasons"] = [meta["finish_reason"]]
+        if input_tokens is not None:
+            event_attrs["gen_ai.usage.input_tokens"] = input_tokens
+        if output_tokens is not None:
+            event_attrs["gen_ai.usage.output_tokens"] = output_tokens
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {resp.content[:60]}")
 
 

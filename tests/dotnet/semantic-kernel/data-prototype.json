@@ -20,5 +20,8 @@
       "gen_ai.tool.description",
       "gen_ai.tool.name"
     ]
+  },
+  "events": {
+    "gen_ai.client.inference.operation.details": []
   }
 }

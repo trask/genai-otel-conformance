@@ -85,6 +85,49 @@ def run_chat():
             span.set_attribute("gen_ai.usage.input_tokens", prompt_tokens)
         if completion_tokens is not None:
             span.set_attribute("gen_ai.usage.output_tokens", completion_tokens)
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.response.model": request_model,
+        }
+        if history_entry is not None:
+            if request_messages:
+                event_attrs["gen_ai.input.messages"] = json.dumps([
+                    {"role": m["role"], "parts": [{"type": "text", "content": m["content"]}]}
+                    for m in request_messages if isinstance(m.get("content"), str)
+                ])
+            response = history_entry.get("response")
+            if response is not None:
+                if getattr(response, "id", None):
+                    event_attrs["gen_ai.response.id"] = response.id
+                finish_reasons = [
+                    str(choice.finish_reason).lower()
+                    for choice in response.choices
+                    if getattr(choice, "finish_reason", None)
+                ]
+                if finish_reasons:
+                    event_attrs["gen_ai.response.finish_reasons"] = finish_reasons
+                event_attrs["gen_ai.output.messages"] = json.dumps([
+                    {
+                        "role": "assistant",
+                        "parts": [{"type": "text", "content": choice.message.content}],
+                        "finish_reason": choice.finish_reason,
+                    }
+                    for choice in response.choices
+                    if getattr(choice.message, "content", None)
+                ])
+        if prompt_tokens is not None:
+            event_attrs["gen_ai.usage.input_tokens"] = prompt_tokens
+        if completion_tokens is not None:
+            event_attrs["gen_ai.usage.output_tokens"] = completion_tokens
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {str(result)[:60]}")
 
 

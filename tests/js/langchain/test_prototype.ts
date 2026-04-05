@@ -3,6 +3,7 @@
  */
 import { z, toJSONSchema } from "zod";
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -32,7 +33,8 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "openai");
     span.setAttribute("gen_ai.request.model", chatModel);
-    const resp = await llm.invoke([["user", "Say hello."]]);
+    const messages = [{ role: "user" as const, content: "Say hello." }];
+    const resp = await llm.invoke(messages);
     const responseMetadata = resp.response_metadata as any;
     if ((resp as any).id) {
       span.setAttribute("gen_ai.response.id", (resp as any).id);
@@ -47,6 +49,31 @@ async function main() {
       span.setAttribute("gen_ai.usage.input_tokens", resp.usage_metadata.input_tokens);
       span.setAttribute("gen_ai.usage.output_tokens", resp.usage_metadata.output_tokens);
     }
+
+    // Emit inference operation details event
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": chatModel,
+        "gen_ai.response.id": (resp as any).id,
+        "gen_ai.response.model": responseMetadata?.model_name,
+        "gen_ai.response.finish_reasons": responseMetadata?.finish_reason ? [responseMetadata.finish_reason] : undefined,
+        "gen_ai.usage.input_tokens": resp.usage_metadata?.input_tokens,
+        "gen_ai.usage.output_tokens": resp.usage_metadata?.output_tokens,
+        "gen_ai.input.messages": JSON.stringify(
+          messages.map(m => ({ role: m.role, parts: [{ type: "text", content: m.content }] }))
+        ),
+        "gen_ai.output.messages": JSON.stringify([{
+          role: "assistant",
+          parts: [{ type: "text", content: resp.content.toString() }],
+          finish_reason: responseMetadata?.finish_reason,
+        }]),
+      },
+    });
+
     console.log(`    -> ${resp.content.toString().slice(0, 60)}`);
     span.end();
   });
@@ -57,7 +84,7 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "openai");
     span.setAttribute("gen_ai.request.model", chatModel);
-    const stream = await llm.stream([["user", "Tell me a joke."]]);
+    const stream = await llm.stream([{ role: "user" as const, content: "Tell me a joke." }]);
     let text = "";
     let usageMetadata: any = null;
     let responseMetadata: any = null;
@@ -109,7 +136,7 @@ async function main() {
     );
 
     const llmWithTools = llm.bindTools(tools, { tool_choice: "auto" });
-    const resp = await llmWithTools.invoke([["user", "What's the weather in Seattle?"]]);
+    const resp = await llmWithTools.invoke([{ role: "user" as const, content: "What's the weather in Seattle?" }]);
     const responseMetadata = resp.response_metadata as any;
     if ((resp as any).id) {
       span.setAttribute("gen_ai.response.id", (resp as any).id);

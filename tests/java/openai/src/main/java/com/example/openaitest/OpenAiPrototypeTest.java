@@ -23,18 +23,26 @@ import com.openai.models.embeddings.EmbeddingModel;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.KeyValue;
+import io.opentelemetry.api.common.Value;
+import io.opentelemetry.api.logs.Logger;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 
 import java.util.List;
 import java.util.Map;
 
+import static io.opentelemetry.api.common.AttributeKey.longKey;
+import static io.opentelemetry.api.common.AttributeKey.stringArrayKey;
+import static io.opentelemetry.api.common.AttributeKey.stringKey;
+import static io.opentelemetry.api.common.AttributeKey.valueKey;
 import static java.util.Collections.singletonList;
 
 public class OpenAiPrototypeTest {
 
     private static final Tracer tracer = GlobalOpenTelemetry.getTracer("gen_ai.prototype");
+    private static final Logger eventLogger =
+            GlobalOpenTelemetry.get().getLogsBridge().get("gen_ai.prototype");
 
     public static void main(String[] args) {
         String mockBaseUrl = System.getenv("MOCK_LLM_URL") + "/v1";
@@ -59,29 +67,73 @@ public class OpenAiPrototypeTest {
     static void runChat(OpenAIClient client) {
         System.out.println("  [chat] basic chat completion");
         ChatModel requestModel = ChatModel.GPT_4O_MINI;
+        String userMessage = "Say hello.";
         Span span = tracer.spanBuilder("chat gpt-4o-mini").startSpan();
         try {
-            span.setAttribute("gen_ai.operation.name", "chat");
-            span.setAttribute("gen_ai.provider.name", "openai");
-            span.setAttribute("gen_ai.request.model", requestModel.toString());
+            span.setAttribute(stringKey("gen_ai.operation.name"), "chat");
+            span.setAttribute(stringKey("gen_ai.provider.name"), "openai");
+            span.setAttribute(stringKey("gen_ai.request.model"), requestModel.toString());
 
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model(requestModel)
-                    .addUserMessage("Say hello.")
+                    .addUserMessage(userMessage)
                     .build();
             ChatCompletion completion = client.chat().completions().create(params);
 
-            span.setAttribute("gen_ai.response.id", completion.id());
-            span.setAttribute("gen_ai.response.model", completion.model());
+            span.setAttribute(stringKey("gen_ai.response.id"), completion.id());
+            span.setAttribute(stringKey("gen_ai.response.model"), completion.model());
             ChatCompletion.Choice choice = completion.choices().get(0);
-            span.setAttribute(AttributeKey.stringArrayKey("gen_ai.response.finish_reasons"),
+            span.setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
                     List.of(choice.finishReason().toString()));
             completion.usage().ifPresent(usage -> {
-                span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
-                span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
+                span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
             });
 
             String content = choice.message().content().orElse("");
+
+            // Emit inference operation details event
+            Value<?> inputMessages = Value.of(
+                    Value.of(
+                            KeyValue.of("role", Value.of("user")),
+                            KeyValue.of("parts", Value.of(
+                                    Value.of(
+                                            KeyValue.of("type", Value.of("text")),
+                                            KeyValue.of("content", Value.of(userMessage))
+                                    )
+                            ))
+                    )
+            );
+            Value<?> outputMessages = Value.of(
+                    Value.of(
+                            KeyValue.of("role", Value.of("assistant")),
+                            KeyValue.of("parts", Value.of(
+                                    Value.of(
+                                            KeyValue.of("type", Value.of("text")),
+                                            KeyValue.of("content", Value.of(content))
+                                    )
+                            )),
+                            KeyValue.of("finish_reason", Value.of(choice.finishReason().toString()))
+                    )
+            );
+            var logBuilder = eventLogger.logRecordBuilder();
+            logBuilder
+                    .setEventName("gen_ai.client.inference.operation.details")
+                    .setAttribute(stringKey("gen_ai.operation.name"), "chat")
+                    .setAttribute(stringKey("gen_ai.request.model"), requestModel.toString())
+                    .setAttribute(stringKey("gen_ai.response.id"), completion.id())
+                    .setAttribute(stringKey("gen_ai.response.model"), completion.model())
+                    .setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
+                            List.of(choice.finishReason().toString()))
+                    .setAttribute(valueKey("gen_ai.input.messages"), inputMessages)
+                    .setAttribute(valueKey("gen_ai.output.messages"), outputMessages);
+            completion.usage().ifPresent(usage -> {
+                logBuilder
+                        .setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens())
+                        .setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+            });
+            logBuilder.emit();
+
             System.out.println("    -> " + content.substring(0, Math.min(60, content.length())));
         } finally {
             span.end();
@@ -93,9 +145,9 @@ public class OpenAiPrototypeTest {
         ChatModel requestModel = ChatModel.GPT_4O_MINI;
         Span span = tracer.spanBuilder("chat gpt-4o-mini").startSpan();
         try {
-            span.setAttribute("gen_ai.operation.name", "chat");
-            span.setAttribute("gen_ai.provider.name", "openai");
-            span.setAttribute("gen_ai.request.model", requestModel.toString());
+            span.setAttribute(stringKey("gen_ai.operation.name"), "chat");
+            span.setAttribute(stringKey("gen_ai.provider.name"), "openai");
+            span.setAttribute(stringKey("gen_ai.request.model"), requestModel.toString());
 
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model(requestModel)
@@ -117,18 +169,18 @@ public class OpenAiPrototypeTest {
                         choice.finishReason().ifPresent(fr -> finishReason[0] = fr.toString());
                     }
                     chunk.usage().ifPresent(usage -> {
-                        span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
-                        span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                        span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
+                        span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
                     });
                 });
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
 
-            if (responseId[0] != null) span.setAttribute("gen_ai.response.id", responseId[0]);
-            if (responseModel[0] != null) span.setAttribute("gen_ai.response.model", responseModel[0]);
+            if (responseId[0] != null) span.setAttribute(stringKey("gen_ai.response.id"), responseId[0]);
+            if (responseModel[0] != null) span.setAttribute(stringKey("gen_ai.response.model"), responseModel[0]);
             if (finishReason[0] != null) {
-                span.setAttribute(AttributeKey.stringArrayKey("gen_ai.response.finish_reasons"),
+                span.setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
                         List.of(finishReason[0]));
             }
 
@@ -170,20 +222,20 @@ public class OpenAiPrototypeTest {
         }
         Span span = tracer.spanBuilder("chat gpt-4o-mini").startSpan();
         try {
-            span.setAttribute("gen_ai.operation.name", "chat");
-            span.setAttribute("gen_ai.provider.name", "openai");
-            span.setAttribute("gen_ai.request.model", requestModel.toString());
-            span.setAttribute("gen_ai.tool.definitions", toolDefinitionsJson);
+            span.setAttribute(stringKey("gen_ai.operation.name"), "chat");
+            span.setAttribute(stringKey("gen_ai.provider.name"), "openai");
+            span.setAttribute(stringKey("gen_ai.request.model"), requestModel.toString());
+            span.setAttribute(stringKey("gen_ai.tool.definitions"), toolDefinitionsJson);
             ChatCompletion completion = client.chat().completions().create(params);
 
-            span.setAttribute("gen_ai.response.id", completion.id());
-            span.setAttribute("gen_ai.response.model", completion.model());
+            span.setAttribute(stringKey("gen_ai.response.id"), completion.id());
+            span.setAttribute(stringKey("gen_ai.response.model"), completion.model());
             ChatCompletion.Choice choice = completion.choices().get(0);
-            span.setAttribute(AttributeKey.stringArrayKey("gen_ai.response.finish_reasons"),
+            span.setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
                     List.of(choice.finishReason().toString()));
             completion.usage().ifPresent(usage -> {
-                span.setAttribute("gen_ai.usage.input_tokens", usage.promptTokens());
-                span.setAttribute("gen_ai.usage.output_tokens", usage.completionTokens());
+                span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
+                span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
             });
 
             List<ChatCompletionMessageToolCall> toolCalls =
@@ -205,10 +257,10 @@ public class OpenAiPrototypeTest {
         EmbeddingCreateParams.EncodingFormat requestEncodingFormat = EmbeddingCreateParams.EncodingFormat.BASE64;
         Span span = tracer.spanBuilder("embeddings text-embedding-3-small").startSpan();
         try {
-            span.setAttribute("gen_ai.operation.name", "embeddings");
-            span.setAttribute("gen_ai.provider.name", "openai");
-            span.setAttribute("gen_ai.request.model", requestModel.toString());
-            span.setAttribute(AttributeKey.stringArrayKey("gen_ai.request.encoding_formats"),
+            span.setAttribute(stringKey("gen_ai.operation.name"), "embeddings");
+            span.setAttribute(stringKey("gen_ai.provider.name"), "openai");
+            span.setAttribute(stringKey("gen_ai.request.model"), requestModel.toString());
+            span.setAttribute(stringArrayKey("gen_ai.request.encoding_formats"),
                 List.of(requestEncodingFormat.asString()));
 
             EmbeddingCreateParams params = EmbeddingCreateParams.builder()
@@ -218,8 +270,8 @@ public class OpenAiPrototypeTest {
                     .build();
             CreateEmbeddingResponse response = client.embeddings().create(params);
 
-            span.setAttribute("gen_ai.response.model", response.model());
-            span.setAttribute("gen_ai.usage.input_tokens", response.usage().promptTokens());
+            span.setAttribute(stringKey("gen_ai.response.model"), response.model());
+            span.setAttribute(longKey("gen_ai.usage.input_tokens"), response.usage().promptTokens());
 
             System.out.println("    -> embedding dim: " + response.data().get(0).embedding().size());
         } finally {

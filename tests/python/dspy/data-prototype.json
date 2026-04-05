@@ -15,6 +15,7 @@
     ]
   },
   "events": {
+    "gen_ai.client.inference.operation.details": [],
     "gen_ai.evaluation.result": [
       "gen_ai.evaluation.explanation",
       "gen_ai.evaluation.name",

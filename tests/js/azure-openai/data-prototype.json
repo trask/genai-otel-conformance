@@ -22,5 +22,8 @@
       "server.address",
       "server.port"
     ]
+  },
+  "events": {
+    "gen_ai.client.inference.operation.details": []
   }
 }

@@ -4,10 +4,12 @@ Exercises: chat, embeddings
 against a mock Cohere server, with manual OTel spans.
 """
 
+import json
 import os
 
 from otel_setup import setup_otel, flush_and_shutdown
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
@@ -22,9 +24,10 @@ def run_chat(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "cohere")
         span.set_attribute("gen_ai.request.model", request_model)
+        messages = [{"role": "user", "content": "Say hello."}]
         resp = client.chat(
             model=request_model,
-            messages=[{"role": "user", "content": "Say hello."}],
+            messages=messages,
         )
         if hasattr(resp, "id") and resp.id:
             span.set_attribute("gen_ai.response.id", resp.id)
@@ -36,7 +39,40 @@ def run_chat(client):
                     span.set_attribute("gen_ai.usage.input_tokens", int(resp.usage.tokens.input_tokens))
                 if hasattr(resp.usage.tokens, "output_tokens"):
                     span.set_attribute("gen_ai.usage.output_tokens", int(resp.usage.tokens.output_tokens))
-        print(f"    -> {resp.message.content[0].text[:60]}")
+
+        # Emit inference operation details event
+        content = resp.message.content[0].text
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": m["role"], "parts": [{"type": "text", "content": m["content"]}]}
+                for m in messages
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": content}],
+                    "finish_reason": resp.finish_reason if hasattr(resp, "finish_reason") else None,
+                }
+            ]),
+        }
+        if hasattr(resp, "id") and resp.id:
+            event_attrs["gen_ai.response.id"] = resp.id
+        if hasattr(resp, "finish_reason") and resp.finish_reason:
+            event_attrs["gen_ai.response.finish_reasons"] = [resp.finish_reason]
+        if hasattr(resp, "usage") and resp.usage and hasattr(resp.usage, "tokens") and resp.usage.tokens:
+            if hasattr(resp.usage.tokens, "input_tokens"):
+                event_attrs["gen_ai.usage.input_tokens"] = int(resp.usage.tokens.input_tokens)
+            if hasattr(resp.usage.tokens, "output_tokens"):
+                event_attrs["gen_ai.usage.output_tokens"] = int(resp.usage.tokens.output_tokens)
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
+        print(f"    -> {content[:60]}")
 
 
 def run_embeddings(client):

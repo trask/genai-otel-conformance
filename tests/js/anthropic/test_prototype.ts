@@ -2,6 +2,7 @@
  * Conformance test: Prototype instrumentation for Anthropic.
  */
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -28,10 +29,11 @@ async function main() {
     span.setAttribute("gen_ai.provider.name", "anthropic");
     span.setAttribute("gen_ai.request.model", requestModel);
     span.setAttribute("gen_ai.request.max_tokens", requestMaxTokens);
+    const messages: { role: "user"; content: string }[] = [{ role: "user", content: "Say hello." }];
     const resp = await client.messages.create({
       model: requestModel,
       max_tokens: requestMaxTokens,
-      messages: [{ role: "user", content: "Say hello." }],
+      messages,
     });
     span.setAttribute("gen_ai.response.model", resp.model);
     span.setAttribute("gen_ai.response.id", resp.id);
@@ -40,6 +42,33 @@ async function main() {
       span.setAttribute("gen_ai.usage.input_tokens", resp.usage.input_tokens);
       span.setAttribute("gen_ai.usage.output_tokens", resp.usage.output_tokens);
     }
+
+    // Emit inference operation details event
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": requestModel,
+        "gen_ai.response.id": resp.id,
+        "gen_ai.response.model": resp.model,
+        "gen_ai.response.finish_reasons": [resp.stop_reason ?? "end_turn"],
+        "gen_ai.usage.input_tokens": resp.usage?.input_tokens,
+        "gen_ai.usage.output_tokens": resp.usage?.output_tokens,
+        "gen_ai.input.messages": JSON.stringify(
+          messages.map(m => ({ role: m.role, parts: [{ type: "text", content: m.content }] }))
+        ),
+        "gen_ai.output.messages": JSON.stringify(
+          resp.content.filter((b: any) => b.type === "text").map((b: any) => ({
+            role: "assistant",
+            parts: [{ type: "text", content: b.text }],
+            finish_reason: resp.stop_reason ?? "end_turn",
+          }))
+        ),
+      },
+    });
+
     console.log(`    -> ${(resp.content[0] as any).text.slice(0, 60)}`);
     span.end();
   });

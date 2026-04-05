@@ -9,6 +9,7 @@ import os
 
 from otel_setup import setup_otel, flush_and_shutdown
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
 
@@ -49,6 +50,41 @@ def run_chat():
                     span.set_attribute("gen_ai.usage.input_tokens", usage["prompt_tokens"])
                 if "completion_tokens" in usage:
                     span.set_attribute("gen_ai.usage.output_tokens", usage["completion_tokens"])
+
+        # Emit inference operation details event
+        user_content = messages[0].text
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": "user", "parts": [{"type": "text", "content": user_content}]}
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": reply.text}],
+                    "finish_reason": reply.meta.get("finish_reason") if hasattr(reply, "meta") and reply.meta else None,
+                }
+            ]),
+        }
+        if hasattr(reply, "meta") and reply.meta:
+            meta = reply.meta
+            if "model" in meta:
+                event_attrs["gen_ai.response.model"] = meta["model"]
+            if "finish_reason" in meta:
+                event_attrs["gen_ai.response.finish_reasons"] = [meta["finish_reason"]]
+            if "usage" in meta and meta["usage"]:
+                usage = meta["usage"]
+                if "prompt_tokens" in usage:
+                    event_attrs["gen_ai.usage.input_tokens"] = usage["prompt_tokens"]
+                if "completion_tokens" in usage:
+                    event_attrs["gen_ai.usage.output_tokens"] = usage["completion_tokens"]
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {reply.text[:60]}")
 
 

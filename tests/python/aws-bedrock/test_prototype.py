@@ -1,8 +1,10 @@
 """Conformance test: prototype instrumentation for AWS Bedrock."""
 
+import json
 import os
 
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 from otel_setup import flush_and_shutdown, setup_otel
 
@@ -34,14 +36,15 @@ def run_converse_prototype(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "aws.bedrock")
         span.set_attribute("gen_ai.request.model", request_model)
+        messages = [
+            {
+                "role": "user",
+                "content": [{"text": "Say hello."}],
+            }
+        ]
         response = client.converse(
             modelId=request_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [{"text": "Say hello."}],
-                }
-            ],
+            messages=messages,
         )
         stop_reason = response.get("stopReason")
         if stop_reason:
@@ -52,6 +55,35 @@ def run_converse_prototype(client):
         if usage.get("outputTokens") is not None:
             span.set_attribute("gen_ai.usage.output_tokens", usage["outputTokens"])
         text = response["output"]["message"]["content"][0]["text"]
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": m["role"], "parts": [{"type": "text", "content": m["content"][0]["text"]}]}
+                for m in messages
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": text}],
+                    "finish_reason": stop_reason,
+                }
+            ]),
+        }
+        if stop_reason:
+            event_attrs["gen_ai.response.finish_reasons"] = [stop_reason]
+        if usage.get("inputTokens") is not None:
+            event_attrs["gen_ai.usage.input_tokens"] = usage["inputTokens"]
+        if usage.get("outputTokens") is not None:
+            event_attrs["gen_ai.usage.output_tokens"] = usage["outputTokens"]
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {text[:60]}")
 
 

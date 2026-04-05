@@ -2,6 +2,7 @@
  * Conformance test: Prototype instrumentation for Vercel AI SDK.
  */
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { tool } from "ai";
 import { z, toJSONSchema } from "zod";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
@@ -33,9 +34,10 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "openai");
     span.setAttribute("gen_ai.request.model", requestModel);
+    const userMessage = "Say hello.";
     const result = await generateText({
       model: openai.chat(requestModel),
-      prompt: "Say hello.",
+      prompt: userMessage,
     });
     span.setAttribute("gen_ai.response.finish_reasons", [result.finishReason]);
     if (result.usage) {
@@ -54,6 +56,31 @@ async function main() {
     if ((result as any).response?.id) {
       span.setAttribute("gen_ai.response.id", (result as any).response.id);
     }
+
+    // Emit inference operation details event
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": requestModel,
+        "gen_ai.response.id": (result as any).response?.id,
+        "gen_ai.response.model": (result as any).response?.model ?? requestModel,
+        "gen_ai.response.finish_reasons": [result.finishReason],
+        "gen_ai.usage.input_tokens": result.usage?.inputTokens,
+        "gen_ai.usage.output_tokens": result.usage?.outputTokens,
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", parts: [{ type: "text", content: userMessage }] }
+        ]),
+        "gen_ai.output.messages": JSON.stringify([{
+          role: "assistant",
+          parts: [{ type: "text", content: result.text }],
+          finish_reason: result.finishReason,
+        }]),
+      },
+    });
+
     console.log(`    -> ${result.text.slice(0, 60)}`);
     span.end();
   });

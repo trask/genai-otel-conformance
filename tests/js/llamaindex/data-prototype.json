@@ -16,5 +16,8 @@
       "gen_ai.provider.name",
       "gen_ai.request.model"
     ]
+  },
+  "events": {
+    "gen_ai.client.inference.operation.details": []
   }
 }

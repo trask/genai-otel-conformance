@@ -6,7 +6,9 @@
 package com.example.bedrocktest;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.KeyValue;
+import io.opentelemetry.api.common.Value;
+import io.opentelemetry.api.logs.Logger;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -22,9 +24,16 @@ import software.amazon.awssdk.services.bedrockruntime.model.Message;
 import java.net.URI;
 import java.util.List;
 
+import static io.opentelemetry.api.common.AttributeKey.longKey;
+import static io.opentelemetry.api.common.AttributeKey.stringArrayKey;
+import static io.opentelemetry.api.common.AttributeKey.stringKey;
+import static io.opentelemetry.api.common.AttributeKey.valueKey;
+
 public class AwsBedrockPrototypeTest {
 
     private static final Tracer tracer = GlobalOpenTelemetry.getTracer("gen_ai.prototype");
+    private static final Logger eventLogger =
+            GlobalOpenTelemetry.get().getLogsBridge().get("gen_ai.prototype");
     private static URI mockEndpoint;
 
     public static void main(String[] args) throws Exception {
@@ -53,30 +62,68 @@ public class AwsBedrockPrototypeTest {
         String modelId = "anthropic.claude-3-haiku-20240307-v1:0";
         Span span = tracer.spanBuilder("chat " + modelId).startSpan();
         try {
-            span.setAttribute("gen_ai.operation.name", "chat");
-            span.setAttribute("gen_ai.provider.name", "aws.bedrock");
-            span.setAttribute("gen_ai.request.model", modelId);
+            span.setAttribute(stringKey("gen_ai.operation.name"), "chat");
+            span.setAttribute(stringKey("gen_ai.provider.name"), "aws.bedrock");
+            span.setAttribute(stringKey("gen_ai.request.model"), modelId);
             if (mockEndpoint.getHost() != null) {
-                span.setAttribute("server.address", mockEndpoint.getHost());
+                span.setAttribute(stringKey("server.address"), mockEndpoint.getHost());
             }
             if (mockEndpoint.getPort() != -1) {
-                span.setAttribute("server.port", (long) mockEndpoint.getPort());
+                span.setAttribute(longKey("server.port"), (long) mockEndpoint.getPort());
             }
 
+            String userMessage = "Say hello.";
             ConverseResponse response = client.converse(ConverseRequest.builder()
                     .modelId(modelId)
                     .messages(Message.builder()
                             .role(ConversationRole.USER)
-                            .content(ContentBlock.fromText("Say hello."))
+                            .content(ContentBlock.fromText(userMessage))
                             .build())
                     .build());
 
-            span.setAttribute(AttributeKey.stringArrayKey("gen_ai.response.finish_reasons"),
+            span.setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
                     List.of(response.stopReason().toString()));
-            span.setAttribute("gen_ai.usage.input_tokens", (long) response.usage().inputTokens());
-            span.setAttribute("gen_ai.usage.output_tokens", (long) response.usage().outputTokens());
+            span.setAttribute(longKey("gen_ai.usage.input_tokens"), (long) response.usage().inputTokens());
+            span.setAttribute(longKey("gen_ai.usage.output_tokens"), (long) response.usage().outputTokens());
 
             String text = response.output().message().content().get(0).text();
+
+            // Emit inference operation details event
+            Value<?> inputMessages = Value.of(
+                    Value.of(
+                            KeyValue.of("role", Value.of("user")),
+                            KeyValue.of("parts", Value.of(
+                                    Value.of(
+                                            KeyValue.of("type", Value.of("text")),
+                                            KeyValue.of("content", Value.of(userMessage))
+                                    )
+                            ))
+                    )
+            );
+            Value<?> outputMessages = Value.of(
+                    Value.of(
+                            KeyValue.of("role", Value.of("assistant")),
+                            KeyValue.of("parts", Value.of(
+                                    Value.of(
+                                            KeyValue.of("type", Value.of("text")),
+                                            KeyValue.of("content", Value.of(text))
+                                    )
+                            )),
+                            KeyValue.of("finish_reason", Value.of(response.stopReason().toString()))
+                    )
+            );
+            eventLogger.logRecordBuilder()
+                    .setEventName("gen_ai.client.inference.operation.details")
+                    .setAttribute(stringKey("gen_ai.operation.name"), "chat")
+                    .setAttribute(stringKey("gen_ai.request.model"), modelId)
+                    .setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
+                            List.of(response.stopReason().toString()))
+                    .setAttribute(longKey("gen_ai.usage.input_tokens"), (long) response.usage().inputTokens())
+                    .setAttribute(longKey("gen_ai.usage.output_tokens"), (long) response.usage().outputTokens())
+                    .setAttribute(valueKey("gen_ai.input.messages"), inputMessages)
+                    .setAttribute(valueKey("gen_ai.output.messages"), outputMessages)
+                    .emit();
+
             System.out.println("    -> " + text.substring(0, Math.min(60, text.length())));
         } finally {
             span.end();
