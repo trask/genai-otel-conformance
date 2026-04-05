@@ -18,6 +18,7 @@ class SpanClassification:
 class DetectedSignals:
     events: dict[str, int] = field(default_factory=dict)
     metrics: dict[str, int] = field(default_factory=dict)
+    event_attrs: dict[str, set[str]] = field(default_factory=dict)
 
 
 def _has_any_attr(attrs: dict[str, object], *names: str) -> bool:
@@ -226,6 +227,11 @@ def summarize_samples(
                 event_name = log.get("event_name", "")
                 if event_name.startswith("gen_ai."):
                     signals.events[event_name] = signals.events.get(event_name, 0) + 1
+                    attr_names = _span_attribute_names(log, include_attr)
+                    if event_name not in signals.event_attrs:
+                        signals.event_attrs[event_name] = set(attr_names)
+                    else:
+                        signals.event_attrs[event_name].intersection_update(attr_names)
 
             metric = sample.get("metric")
             if metric:

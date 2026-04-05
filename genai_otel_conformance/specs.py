@@ -195,6 +195,7 @@ GENAI_EVENT_TYPES = [
     "gen_ai.assistant.message",
     "gen_ai.tool.message",
     "gen_ai.choice",
+    "gen_ai.evaluation.result",
 ]
 
 GENAI_METRIC_TYPES = [
