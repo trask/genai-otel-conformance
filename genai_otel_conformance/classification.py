@@ -11,7 +11,6 @@ from typing import NamedTuple
 class SpanClassification:
     detected_types: set[str] = field(default_factory=set)
     per_type_attrs: dict[str, set[str]] = field(default_factory=dict)
-    per_type_any_attrs: dict[str, set[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -260,11 +259,7 @@ def summarize_samples(
                 spans.detected_types.update(classified)
                 attr_names = _span_attribute_names(span, include_attr)
                 for span_type in classified:
-                    if span_type not in spans.per_type_attrs:
-                        spans.per_type_attrs[span_type] = set(attr_names)
-                    else:
-                        spans.per_type_attrs[span_type].intersection_update(attr_names)
-                    spans.per_type_any_attrs.setdefault(span_type, set()).update(attr_names)
+                    spans.per_type_attrs.setdefault(span_type, set()).update(attr_names)
 
             log = sample.get("log")
             if log:
@@ -272,10 +267,7 @@ def summarize_samples(
                 if event_name.startswith("gen_ai."):
                     signals.events[event_name] = signals.events.get(event_name, 0) + 1
                     attr_names = _span_attribute_names(log, include_attr)
-                    if event_name not in signals.event_attrs:
-                        signals.event_attrs[event_name] = set(attr_names)
-                    else:
-                        signals.event_attrs[event_name].intersection_update(attr_names)
+                    signals.event_attrs.setdefault(event_name, set()).update(attr_names)
                     signals.event_any_attrs.setdefault(event_name, set()).update(attr_names)
 
             metric = sample.get("metric")
