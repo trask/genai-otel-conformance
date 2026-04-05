@@ -88,8 +88,8 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
         value = data.get(key)
         if value:
             normalized[key] = {
-                name: []
-                for name in _present_signal_names(value)
+                name: sorted(attrs) if isinstance(attrs, (list, set)) else []
+                for name, attrs in value.items()
             }
     return normalized
 
@@ -101,6 +101,7 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
         result.observed.events,
         result.detected.events,
     )
+    event_attrs = result.detected.event_attrs
     metric_names = build_present_signal_names(
         GENAI_METRIC_TYPES,
         result.observed.metrics,
@@ -111,8 +112,8 @@ def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTest
     path = TestLocation.from_test_name(test_name).data_file(TESTS_DIR)
 
     data: dict[str, object] = {
-        "events": event_names,
-        "metrics": metric_names,
+        "events": {name: event_attrs.get(name, set()) for name in event_names},
+        "metrics": {name: [] for name in metric_names},
     }
     if spans:
         data["spans"] = spans
