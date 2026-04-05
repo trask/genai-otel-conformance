@@ -113,7 +113,12 @@ def run_converse_tool_call_prototype(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "aws.bedrock")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_config["tools"]))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
+            "type": "function",
+            "name": tool_spec["toolSpec"]["name"],
+            "description": tool_spec["toolSpec"]["description"],
+            "parameters": tool_spec["toolSpec"]["inputSchema"]["json"],
+        }]))
         messages = [
             {
                 "role": "user",

@@ -155,16 +155,12 @@ def run_tool_call():
                 {"role": "user", "parts": [{"type": "text", "content": prompt_text}]},
             ]),
         )
-        # Pydantic AI converts tools to OpenAI function-calling format before
-        # sending to the API, so we mirror that shape here.
         span.set_attribute("gen_ai.tool.definitions", json.dumps([
             {
                 "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.function_schema.json_schema,
-                },
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.function_schema.json_schema,
             }
             for t in tools
         ]))

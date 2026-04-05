@@ -107,9 +107,10 @@ def run_agent_prototype(llm, request_model, request_temperature):
 
     weather_tool = FunctionTool.from_defaults(fn=get_weather)
     tool_definition = {
+        "type": "function",
         "name": weather_tool.metadata.name,
         "description": weather_tool.metadata.description,
-        "fn_schema": weather_tool.metadata.fn_schema.model_json_schema(),
+        "parameters": weather_tool.metadata.fn_schema.model_json_schema(),
     }
     with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
         span.set_attribute("gen_ai.operation.name", "chat")

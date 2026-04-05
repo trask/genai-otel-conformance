@@ -115,17 +115,16 @@ def run_chat_tool_call():
         span.set_attribute("gen_ai.provider.name", "google_genai")
         span.set_attribute("gen_ai.request.model", request_model)
         span.set_attribute("gen_ai.tool.definitions", json.dumps([{
-            "function_declarations": [{
-                "name": "get_weather",
-                "description": "Get the current weather",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string", "description": "City name"},
-                    },
-                    "required": ["location"],
+            "type": "function",
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
                 },
-            }]
+                "required": ["location"],
+            },
         }]))
         response = client.models.generate_content(
             model=request_model,

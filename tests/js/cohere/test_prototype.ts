@@ -86,7 +86,18 @@ async function main() {
         location: { description: "City name", type: "str" as const, required: true },
       },
     };
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([{
+      type: "function",
+      name: requestTool.name,
+      description: requestTool.description,
+      parameters: {
+        type: "object",
+        properties: Object.fromEntries(
+          Object.entries(requestTool.parameterDefinitions).map(([k, v]: [string, any]) => [k, { type: v.type, description: v.description }])
+        ),
+        required: Object.entries(requestTool.parameterDefinitions).filter(([, v]: [string, any]) => v.required).map(([k]) => k),
+      },
+    }]));
     const resp = await client.chat({
       model: requestModel,
       message: "What's the weather in Seattle?",

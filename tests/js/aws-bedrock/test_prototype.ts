@@ -109,7 +109,12 @@ async function main() {
       },
     };
     const toolConfig = { tools: [toolSpec] };
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify(toolConfig.tools));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([{
+      type: "function",
+      name: toolSpec.toolSpec.name,
+      description: toolSpec.toolSpec.description,
+      parameters: toolSpec.toolSpec.inputSchema.json,
+    }]));
     const messages = [
       { role: "user" as const, content: [{ text: "What's the weather in Seattle?" }] },
     ];
