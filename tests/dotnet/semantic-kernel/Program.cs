@@ -193,6 +193,7 @@ class Program
             string finishReason = null;
             int? inputTokens = null;
             int? outputTokens = null;
+            int? reasoningTokens = null;
             if (metadata != null)
             {
                 if (metadata.TryGetValue("Id", out var id) && id != null)
@@ -213,6 +214,11 @@ class Program
                     outputTokens = usage.OutputTokenCount;
                     activity?.SetTag("gen_ai.usage.input_tokens", inputTokens);
                     activity?.SetTag("gen_ai.usage.output_tokens", outputTokens);
+                    if (usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                    {
+                        reasoningTokens = usage.OutputTokenDetails.ReasoningTokenCount;
+                        activity?.SetTag("gen_ai.usage.reasoning.output_tokens", reasoningTokens);
+                    }
                 }
             }
 
@@ -236,6 +242,7 @@ class Program
                 ["gen_ai.response.finish_reasons"] = finishReason != null ? new[] { finishReason } : null,
                 ["gen_ai.usage.input_tokens"] = inputTokens,
                 ["gen_ai.usage.output_tokens"] = outputTokens,
+                ["gen_ai.usage.reasoning.output_tokens"] = reasoningTokens,
                 ["gen_ai.input.messages"] = inputMessagesJson,
                 ["gen_ai.output.messages"] = outputMessagesJson,
                 ["server.address"] = endpoint.Host,
@@ -279,6 +286,8 @@ class Program
                     {
                         activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
                         activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                        if (usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                            activity?.SetTag("gen_ai.usage.reasoning.output_tokens", usage.OutputTokenDetails.ReasoningTokenCount);
                     }
                 }
             }
@@ -347,6 +356,8 @@ class Program
                 {
                     activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
                     activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                    if (usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                        activity?.SetTag("gen_ai.usage.reasoning.output_tokens", usage.OutputTokenDetails.ReasoningTokenCount);
                 }
             }
 
