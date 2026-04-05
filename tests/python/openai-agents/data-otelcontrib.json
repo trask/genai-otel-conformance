@@ -18,10 +18,20 @@
     "gen_ai.client.token.usage": []
   },
   "events": {
-    "gen_ai.assistant.message": [],
-    "gen_ai.choice": [],
-    "gen_ai.system.message": [],
-    "gen_ai.tool.message": [],
-    "gen_ai.user.message": []
+    "gen_ai.system.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.user.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.assistant.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.tool.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.choice": [
+      "gen_ai.system"
+    ]
   }
 }
