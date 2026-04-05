@@ -190,11 +190,6 @@ SPAN_TYPE_ORDER = [
 ]
 
 GENAI_EVENT_TYPES = [
-    "gen_ai.system.message",
-    "gen_ai.user.message",
-    "gen_ai.assistant.message",
-    "gen_ai.tool.message",
-    "gen_ai.choice",
     "gen_ai.evaluation.result",
 ]
 
