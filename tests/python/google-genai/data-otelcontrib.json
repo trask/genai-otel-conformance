@@ -14,7 +14,11 @@
     "gen_ai.client.token.usage": []
   },
   "events": {
-    "gen_ai.choice": [],
-    "gen_ai.user.message": []
+    "gen_ai.user.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.choice": [
+      "gen_ai.system"
+    ]
   }
 }
