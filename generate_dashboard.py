@@ -92,6 +92,7 @@ def _test_entry_sort_key(entry: TestDataEntry) -> tuple[str, int, int, str]:
 
 def _build_heatmap(
     label: str,
+    anchor_id: str,
     columns: list[HeatmapColumn],
     entries: list[TestDataEntry],
     details_available: bool,
@@ -119,7 +120,7 @@ def _build_heatmap(
         ))
 
     _compute_rowspans(rows)
-    return HeatmapView(label, columns, column_groups or [], rows)
+    return HeatmapView(label, anchor_id, columns, column_groups or [], rows)
 
 
 def _build_status_cells(
@@ -276,8 +277,10 @@ def _prepare_heatmaps_from_data(
         if not columns:
             continue
 
+        anchor_id = f"span-{st_key.replace('_', '-')}"
         heatmap = _build_heatmap(
-            spec.label,
+            f"{spec.label} Spans",
+            anchor_id,
             columns,
             relevant,
             details_available,
@@ -291,21 +294,33 @@ def _prepare_heatmaps_from_data(
     return heatmaps
 
 
-def _prepare_signal_heatmap(
+def _prepare_individual_signal_heatmaps(
     test_data_entries: list[TestDataEntry],
     signal_names: list[str],
-    label: str,
-    status_extractor: Callable[[TestDataEntry], dict[str, str]],
-    details_available: bool = True,
-) -> HeatmapView | None:
-    """Build an event or metric heatmap from committed data-*.json entries."""
-    relevant = [entry for entry in test_data_entries if status_extractor(entry)]
+    anchor_prefix: str,
+    entry_statuses: Callable[[TestDataEntry], dict[str, str]],
+    details_available: bool,
+) -> list[HeatmapView]:
+    """Build one heatmap per signal name (event type or metric type)."""
+    relevant = [entry for entry in test_data_entries if entry_statuses(entry)]
+    if not relevant:
+        return []
 
-    columns = [
-        HeatmapColumn(header_text=name, is_group_start=i == 0)
-        for i, name in enumerate(signal_names)
-    ]
-    return _build_heatmap(label, columns, relevant, details_available, status_extractor)
+    heatmaps: list[HeatmapView] = []
+    for name in signal_names:
+        anchor_id = f"{anchor_prefix}-{name.replace('.', '-').replace('_', '-')}"
+        columns = [HeatmapColumn(header_text="Present", is_group_start=True)]
+        heatmap = _build_heatmap(
+            name,
+            anchor_id,
+            columns,
+            relevant,
+            details_available,
+            lambda entry, _n=name: {"Present": entry_statuses(entry).get(_n, "absent")},
+        )
+        if heatmap is not None:
+            heatmaps.append(heatmap)
+    return heatmaps
 
 
 def _has_result_directories() -> bool:
@@ -334,17 +349,17 @@ def generate_dashboard_html(test_data_entries: list[TestDataEntry], details_avai
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     heatmaps = _prepare_heatmaps_from_data(test_data_entries, details_available)
-    event_heatmap = _prepare_signal_heatmap(
+    event_heatmaps = _prepare_individual_signal_heatmaps(
         test_data_entries,
         GENAI_EVENT_TYPES,
-        "GenAI Events",
+        "event",
         lambda entry: entry.events,
         details_available,
     )
-    metric_heatmap = _prepare_signal_heatmap(
+    metric_heatmaps = _prepare_individual_signal_heatmaps(
         test_data_entries,
         GENAI_METRIC_TYPES,
-        "GenAI Metrics",
+        "metric",
         lambda entry: entry.metrics,
         details_available,
     )
@@ -352,10 +367,8 @@ def generate_dashboard_html(test_data_entries: list[TestDataEntry], details_avai
     return _render_template(
         "dashboard.html",
         now=now,
-        heatmaps=heatmaps,
+        heatmaps=heatmaps + metric_heatmaps + event_heatmaps,
         details_available=details_available,
-        event_heatmap=event_heatmap,
-        metric_heatmap=metric_heatmap,
     )
 
 

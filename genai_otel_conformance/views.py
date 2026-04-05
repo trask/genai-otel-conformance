@@ -29,6 +29,7 @@ class HeatmapRow:
 @dataclass(frozen=True)
 class HeatmapView:
     label: str
+    anchor_id: str
     columns: list[HeatmapColumn]
     column_groups: list[HeatmapGroup]
     rows: list[HeatmapRow]
