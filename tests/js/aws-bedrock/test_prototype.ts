@@ -66,6 +66,7 @@ async function main() {
       attributes: {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": requestModel,
+        "gen_ai.response.model": requestModel,
         "gen_ai.response.finish_reasons": resp.stopReason ? [resp.stopReason] : undefined,
         "gen_ai.usage.input_tokens": resp.usage?.inputTokens,
         "gen_ai.usage.output_tokens": resp.usage?.outputTokens,

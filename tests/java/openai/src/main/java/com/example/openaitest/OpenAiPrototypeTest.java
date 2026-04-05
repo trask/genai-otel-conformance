@@ -70,21 +70,22 @@ public class OpenAiPrototypeTest {
         String userMessage = "Say hello.";
         Span span = tracer.spanBuilder("chat gpt-4o-mini").startSpan();
         try {
+            try (var scope = span.makeCurrent()) {
             span.setAttribute(stringKey("gen_ai.operation.name"), "chat");
             span.setAttribute(stringKey("gen_ai.provider.name"), "openai");
             span.setAttribute(stringKey("gen_ai.request.model"), requestModel.toString());
 
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
-                    .model(requestModel)
-                    .addUserMessage(userMessage)
-                    .build();
+                .model(requestModel)
+                .addUserMessage(userMessage)
+                .build();
             ChatCompletion completion = client.chat().completions().create(params);
 
             span.setAttribute(stringKey("gen_ai.response.id"), completion.id());
             span.setAttribute(stringKey("gen_ai.response.model"), completion.model());
             ChatCompletion.Choice choice = completion.choices().get(0);
             span.setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
-                    List.of(choice.finishReason().toString()));
+                List.of(choice.finishReason().toString()));
             completion.usage().ifPresent(usage -> {
                 span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
                 span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
@@ -94,47 +95,48 @@ public class OpenAiPrototypeTest {
 
             // Emit inference operation details event
             Value<?> inputMessages = Value.of(
-                    Value.of(
-                            KeyValue.of("role", Value.of("user")),
-                            KeyValue.of("parts", Value.of(
-                                    Value.of(
-                                            KeyValue.of("type", Value.of("text")),
-                                            KeyValue.of("content", Value.of(userMessage))
-                                    )
-                            ))
-                    )
+                Value.of(
+                    KeyValue.of("role", Value.of("user")),
+                    KeyValue.of("parts", Value.of(
+                        Value.of(
+                            KeyValue.of("type", Value.of("text")),
+                            KeyValue.of("content", Value.of(userMessage))
+                        )
+                    ))
+                )
             );
             Value<?> outputMessages = Value.of(
-                    Value.of(
-                            KeyValue.of("role", Value.of("assistant")),
-                            KeyValue.of("parts", Value.of(
-                                    Value.of(
-                                            KeyValue.of("type", Value.of("text")),
-                                            KeyValue.of("content", Value.of(content))
-                                    )
-                            )),
-                            KeyValue.of("finish_reason", Value.of(choice.finishReason().toString()))
-                    )
+                Value.of(
+                    KeyValue.of("role", Value.of("assistant")),
+                    KeyValue.of("parts", Value.of(
+                        Value.of(
+                            KeyValue.of("type", Value.of("text")),
+                            KeyValue.of("content", Value.of(content))
+                        )
+                    )),
+                    KeyValue.of("finish_reason", Value.of(choice.finishReason().toString()))
+                )
             );
             var logBuilder = eventLogger.logRecordBuilder();
             logBuilder
-                    .setEventName("gen_ai.client.inference.operation.details")
-                    .setAttribute(stringKey("gen_ai.operation.name"), "chat")
-                    .setAttribute(stringKey("gen_ai.request.model"), requestModel.toString())
-                    .setAttribute(stringKey("gen_ai.response.id"), completion.id())
-                    .setAttribute(stringKey("gen_ai.response.model"), completion.model())
-                    .setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
-                            List.of(choice.finishReason().toString()))
-                    .setAttribute(valueKey("gen_ai.input.messages"), inputMessages)
-                    .setAttribute(valueKey("gen_ai.output.messages"), outputMessages);
+                .setEventName("gen_ai.client.inference.operation.details")
+                .setAttribute(stringKey("gen_ai.operation.name"), "chat")
+                .setAttribute(stringKey("gen_ai.request.model"), requestModel.toString())
+                .setAttribute(stringKey("gen_ai.response.id"), completion.id())
+                .setAttribute(stringKey("gen_ai.response.model"), completion.model())
+                .setAttribute(stringArrayKey("gen_ai.response.finish_reasons"),
+                    List.of(choice.finishReason().toString()))
+                .setAttribute(valueKey("gen_ai.input.messages"), inputMessages)
+                .setAttribute(valueKey("gen_ai.output.messages"), outputMessages);
             completion.usage().ifPresent(usage -> {
                 logBuilder
-                        .setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens())
-                        .setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+                    .setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens())
+                    .setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
             });
             logBuilder.emit();
 
             System.out.println("    -> " + content.substring(0, Math.min(60, content.length())));
+            }
         } finally {
             span.end();
         }

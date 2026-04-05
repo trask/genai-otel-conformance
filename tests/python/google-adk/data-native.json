@@ -18,5 +18,16 @@
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens"
     ]
+  },
+  "events": {
+    "gen_ai.system.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.user.message": [
+      "gen_ai.system"
+    ],
+    "gen_ai.choice": [
+      "gen_ai.system"
+    ]
   }
 }
