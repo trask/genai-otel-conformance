@@ -147,6 +147,17 @@ class Program
             .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
             .Build();
 
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(logging =>
+            {
+                logging.IncludeScopes = true;
+                logging.SetResourceBuilder(resourceBuilder);
+                logging.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            });
+        });
+        var eventLogger = loggerFactory.CreateLogger("gen_ai.prototype");
+
         // Build kernel pointing at mock server - NO OTel diagnostic switches
         var builder = Kernel.CreateBuilder();
         var modelId = "gpt-4o-mini";
@@ -171,25 +182,67 @@ class Program
             activity?.SetTag("server.port", endpoint.Port);
 
             var history = new ChatHistory();
-            history.AddUserMessage("Say hello.");
+            var userMessage = "Say hello.";
+            history.AddUserMessage(userMessage);
             var result = await chatService.GetChatMessageContentsAsync(history);
 
             var msg = result[0];
             if (msg.ModelId != null) activity?.SetTag("gen_ai.response.model", msg.ModelId);
             var metadata = msg.Metadata;
+            string? responseId = null;
+            string? finishReason = null;
+            int? inputTokens = null;
+            int? outputTokens = null;
             if (metadata != null)
             {
                 if (metadata.TryGetValue("Id", out var id) && id != null)
-                    activity?.SetTag("gen_ai.response.id", id.ToString());
+                {
+                    responseId = id.ToString();
+                    activity?.SetTag("gen_ai.response.id", responseId);
+                }
                 if (metadata.TryGetValue("FinishReason", out var fr) && fr != null)
+                {
+                    finishReason = fr.ToString();
                     activity?.SetTag("gen_ai.response.finish_reasons",
-                        new[] { fr.ToString() });
+                        new[] { finishReason });
+                }
                 if (metadata.TryGetValue("Usage", out var usageObj) &&
                     usageObj is OpenAI.Chat.ChatTokenUsage usage)
                 {
-                    activity?.SetTag("gen_ai.usage.input_tokens", usage.InputTokenCount);
-                    activity?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokenCount);
+                    inputTokens = usage.InputTokenCount;
+                    outputTokens = usage.OutputTokenCount;
+                    activity?.SetTag("gen_ai.usage.input_tokens", inputTokens);
+                    activity?.SetTag("gen_ai.usage.output_tokens", outputTokens);
                 }
+            }
+
+            // Emit inference operation details event
+            var inputMessagesJson = JsonSerializer.Serialize(new[] {
+                new { role = "user", parts = new[] { new { type = "text", content = userMessage } } }
+            });
+            var outputMessagesJson = JsonSerializer.Serialize(new[] {
+                new {
+                    role = "assistant",
+                    parts = new[] { new { type = "text", content = msg.Content } },
+                    finish_reason = finishReason
+                }
+            });
+            using (eventLogger.BeginScope(new Dictionary<string, object?>
+            {
+                ["gen_ai.operation.name"] = "chat",
+                ["gen_ai.request.model"] = modelId,
+                ["gen_ai.response.id"] = responseId,
+                ["gen_ai.response.model"] = msg.ModelId,
+                ["gen_ai.response.finish_reasons"] = finishReason != null ? new[] { finishReason } : null,
+                ["gen_ai.usage.input_tokens"] = inputTokens,
+                ["gen_ai.usage.output_tokens"] = outputTokens,
+                ["gen_ai.input.messages"] = inputMessagesJson,
+                ["gen_ai.output.messages"] = outputMessagesJson,
+                ["server.address"] = endpoint.Host,
+                ["server.port"] = endpoint.Port,
+            }))
+            {
+                eventLogger.LogInformation(new EventId(0, "gen_ai.client.inference.operation.details"), "Inference operation details");
             }
 
             Console.WriteLine($"    -> {msg.Content?[..Math.Min(60, msg.Content?.Length ?? 0)]}");
@@ -302,6 +355,7 @@ class Program
 
         Console.WriteLine("Flushing telemetry...");
         tracerProvider.ForceFlush();
+        loggerFactory.Dispose();
         Console.WriteLine("Done.");
     }
 

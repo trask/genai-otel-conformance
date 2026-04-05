@@ -4,11 +4,13 @@ Exercises: chat, chat_streaming
 against a mock Vertex AI server, with manual OTel spans.
 """
 
+import json
 import os
 import warnings
 
 from otel_setup import setup_otel, flush_and_shutdown
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
@@ -64,7 +66,8 @@ def run_chat():
             warnings.simplefilter("ignore", DeprecationWarning)
             warnings.simplefilter("ignore", UserWarning)
             model = GenerativeModel(request_model)
-            response = model.generate_content("Say hello.")
+            prompt_text = "Say hello."
+            response = model.generate_content(prompt_text)
         response_model = response.to_dict().get("modelVersion")
         if response_model:
             span.set_attribute("gen_ai.response.model", response_model)
@@ -77,6 +80,36 @@ def run_chat():
                 span.set_attribute("gen_ai.usage.input_tokens", response.usage_metadata.prompt_token_count)
             if response.usage_metadata.candidates_token_count:
                 span.set_attribute("gen_ai.usage.output_tokens", response.usage_metadata.candidates_token_count)
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.response.model": response_model or request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": "user", "parts": [{"type": "text", "content": prompt_text}]}
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": response.text}],
+                    "finish_reason": str(response.candidates[0].finish_reason.name) if response.candidates else None,
+                }
+            ]),
+        }
+        if response.candidates and response.candidates[0].finish_reason:
+            event_attrs["gen_ai.response.finish_reasons"] = [str(response.candidates[0].finish_reason.name)]
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            if response.usage_metadata.prompt_token_count:
+                event_attrs["gen_ai.usage.input_tokens"] = response.usage_metadata.prompt_token_count
+            if response.usage_metadata.candidates_token_count:
+                event_attrs["gen_ai.usage.output_tokens"] = response.usage_metadata.candidates_token_count
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {response.text[:60]}")
 
 

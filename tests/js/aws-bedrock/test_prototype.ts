@@ -2,6 +2,7 @@
  * Conformance test: Prototype instrumentation for AWS Bedrock.
  */
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -39,12 +40,13 @@ async function main() {
     span.setAttribute("gen_ai.provider.name", "aws.bedrock");
     span.setAttribute("gen_ai.request.model", requestModel);
     span.setAttribute("gen_ai.response.model", requestModel);
+    const messages = [
+      { role: "user" as const, content: [{ text: "Say hello." }] },
+    ];
     const resp = await client.send(
       new ConverseCommand({
         modelId: requestModel,
-        messages: [
-          { role: "user", content: [{ text: "Say hello." }] },
-        ],
+        messages,
       })
     );
     if (resp.stopReason) {
@@ -54,7 +56,32 @@ async function main() {
       if (resp.usage.inputTokens) span.setAttribute("gen_ai.usage.input_tokens", resp.usage.inputTokens);
       if (resp.usage.outputTokens) span.setAttribute("gen_ai.usage.output_tokens", resp.usage.outputTokens);
     }
-    console.log(`    -> ${resp.output?.message?.content?.[0]?.text?.slice(0, 60)}`);
+
+    // Emit inference operation details event
+    const outputText = resp.output?.message?.content?.[0]?.text ?? "";
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": requestModel,
+        "gen_ai.response.model": requestModel,
+        "gen_ai.response.finish_reasons": resp.stopReason ? [resp.stopReason] : undefined,
+        "gen_ai.usage.input_tokens": resp.usage?.inputTokens,
+        "gen_ai.usage.output_tokens": resp.usage?.outputTokens,
+        "gen_ai.input.messages": JSON.stringify(
+          messages.map(m => ({ role: m.role, parts: [{ type: "text", content: m.content[0].text }] }))
+        ),
+        "gen_ai.output.messages": JSON.stringify([{
+          role: "assistant",
+          parts: [{ type: "text", content: outputText }],
+          finish_reason: resp.stopReason,
+        }]),
+      },
+    });
+
+    console.log(`    -> ${outputText.slice(0, 60)}`);
     span.end();
   });
 

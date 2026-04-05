@@ -114,6 +114,17 @@ class Program
             .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
             .Build();
 
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(logging =>
+            {
+                logging.IncludeScopes = true;
+                logging.SetResourceBuilder(resourceBuilder);
+                logging.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            });
+        });
+        var eventLogger = loggerFactory.CreateLogger("gen_ai.prototype");
+
         // Create raw OpenAI ChatClient - NO Extensions.AI wrapper
         var modelId = "gpt-4o-mini";
         var chatClient = new OpenAI.Chat.ChatClient(
@@ -132,8 +143,9 @@ class Program
             activity?.SetTag("server.address", endpoint.Host);
             activity?.SetTag("server.port", endpoint.Port);
 
+            var userMessage = "Say hello.";
             OpenAI.Chat.ChatCompletion completion = await chatClient.CompleteChatAsync(
-                new OpenAI.Chat.UserChatMessage("Say hello."));
+                new OpenAI.Chat.UserChatMessage(userMessage));
 
             activity?.SetTag("gen_ai.response.id", completion.Id);
             activity?.SetTag("gen_ai.response.model", completion.Model);
@@ -146,6 +158,36 @@ class Program
             }
 
             var content = completion.Content[0].Text;
+
+            // Emit inference operation details event
+            var inputMessagesJson = JsonSerializer.Serialize(new[] {
+                new { role = "user", parts = new[] { new { type = "text", content = userMessage } } }
+            });
+            var outputMessagesJson = JsonSerializer.Serialize(new[] {
+                new {
+                    role = "assistant",
+                    parts = new[] { new { type = "text", content } },
+                    finish_reason = completion.FinishReason.ToString()
+                }
+            });
+            using (eventLogger.BeginScope(new Dictionary<string, object?>
+            {
+                ["gen_ai.operation.name"] = "chat",
+                ["gen_ai.request.model"] = modelId,
+                ["gen_ai.response.id"] = completion.Id,
+                ["gen_ai.response.model"] = completion.Model,
+                ["gen_ai.response.finish_reasons"] = new[] { completion.FinishReason.ToString() },
+                ["gen_ai.usage.input_tokens"] = completion.Usage?.InputTokenCount,
+                ["gen_ai.usage.output_tokens"] = completion.Usage?.OutputTokenCount,
+                ["gen_ai.input.messages"] = inputMessagesJson,
+                ["gen_ai.output.messages"] = outputMessagesJson,
+                ["server.address"] = endpoint.Host,
+                ["server.port"] = endpoint.Port,
+            }))
+            {
+                eventLogger.LogInformation(new EventId(0, "gen_ai.client.inference.operation.details"), "Inference operation details");
+            }
+
             Console.WriteLine($"    -> {content[..Math.Min(60, content.Length)]}");
         }
 
@@ -262,6 +304,7 @@ class Program
 
         Console.WriteLine("Flushing telemetry...");
         tracerProvider.ForceFlush();
+        loggerFactory.Dispose();
         Console.WriteLine("Done.");
     }
 }
