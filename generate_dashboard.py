@@ -296,7 +296,7 @@ def _prepare_heatmaps_from_data(
 
 def _prepare_individual_signal_heatmaps(
     test_data_entries: list[TestDataEntry],
-    signal_names: list[str],
+    signal_types: dict[str, str],
     anchor_prefix: str,
     entry_statuses: Callable[[TestDataEntry], dict[str, str]],
     details_available: bool,
@@ -307,11 +307,11 @@ def _prepare_individual_signal_heatmaps(
         return []
 
     heatmaps: list[HeatmapView] = []
-    for name in signal_names:
+    for name, label in signal_types.items():
         anchor_id = f"{anchor_prefix}-{name.replace('.', '-').replace('_', '-')}"
         columns = [HeatmapColumn(header_text="Present", is_group_start=True)]
         heatmap = _build_heatmap(
-            name,
+            label,
             anchor_id,
             columns,
             relevant,
