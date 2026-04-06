@@ -1,8 +1,7 @@
 {
   "spans": {
     "invoke_agent_internal": [
-      "gen_ai.request.model",
-      "gen_ai.response.model"
+      "gen_ai.request.model"
     ]
   },
   "metrics": {
