@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:manual": "npx tsx test_manual.ts"
+    "test:prototype": "npx tsx test_prototype.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "3.1009.0",

@@ -29,9 +29,9 @@ dependencies {
 val mainSourceSet = sourceSets["main"]
 val configFile = rootProject.file("otel-config.yaml").absolutePath
 
-tasks.register<JavaExec>("runManual") {
+tasks.register<JavaExec>("runPrototype") {
     group = "application"
     classpath = mainSourceSet.runtimeClasspath
-    mainClass.set("com.example.bedrockagenttest.AwsBedrockAgentManualTest")
+    mainClass.set("com.example.bedrockagenttest.AwsBedrockAgentPrototypeTest")
     jvmArgs("-Dotel.config.file=$configFile", "-Dotel.java.global-autoconfigure.enabled=true")
 }
