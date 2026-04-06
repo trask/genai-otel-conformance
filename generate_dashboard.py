@@ -26,6 +26,8 @@ from genai_otel_conformance.metadata import (
 from genai_otel_conformance.statuses import (
     HeatmapColumn,
     HeatmapGroup,
+    event_type_present_attributes,
+    metric_type_present_attributes,
     relevant_span_type_keys,
     signal_type_attribute_groups,
     signal_type_heatmap_columns,
@@ -39,8 +41,9 @@ from genai_otel_conformance.results import (
 )
 from genai_otel_conformance.specs import (
     DISPLAY_DEPRECATED_ATTRS,
-    GENAI_EVENT_TYPES,
-    GENAI_METRIC_TYPES,
+    EVENT_TYPE_SPECS,
+    METRIC_TYPE_SPECS,
+    SignalTypeSpec,
     SPAN_TYPE_ORDER,
     SPAN_TYPE_SPECS,
 )
@@ -178,6 +181,31 @@ def _build_span_sections(result: TestResult) -> list[SpanSectionView]:
     return sections
 
 
+def _build_signal_type_sections(
+    signal_type_specs: dict[str, SignalTypeSpec],
+    merged_counts: dict[str, int],
+    present_fn: Callable[[str, str], set[str]],
+    result: TestResult,
+) -> list[SpanSectionView]:
+    sections: list[SpanSectionView] = []
+    for signal_name, spec in signal_type_specs.items():
+        if merged_counts.get(signal_name, 0) <= 0:
+            continue
+        groups: list[DetailGroupView] = []
+        for group_spec in signal_type_attribute_groups(spec):
+            type_present = present_fn(signal_name, group_spec.level.key)
+            attrs: list[DetailAttributeView] = []
+            for attr in group_spec.attrs:
+                if attr in type_present:
+                    count = result.observed.attrs.get(attr, result.observed.non_registry_attrs.get(attr, 0))
+                    attrs.append(DetailAttributeView(attr, True, count))
+                else:
+                    attrs.append(DetailAttributeView(attr, False, 0))
+            groups.append(DetailGroupView(group_spec.level.label, attrs))
+        sections.append(SpanSectionView(spec.label, groups))
+    return sections
+
+
 def _sorted_count_items(counts: dict[str, int]) -> list[CountItemView]:
     return [CountItemView(name, count) for name, count in sorted(counts.items())]
 
@@ -188,6 +216,8 @@ def _build_detail(
 ) -> DetailView:
     span_sections: list[SpanSectionView] = []
     non_registry_attrs: list[CountItemView] = []
+    metric_sections: list[SpanSectionView] = []
+    event_sections: list[SpanSectionView] = []
     metrics: list[CountItemView] = []
     events: list[CountItemView] = []
 
@@ -200,10 +230,22 @@ def _build_detail(
         merged_metrics = merge_signal_counts(result.observed.metrics, result.detected.metrics)
         if merged_metrics:
             metrics = _sorted_count_items(merged_metrics)
+            metric_sections = _build_signal_type_sections(
+                METRIC_TYPE_SPECS,
+                merged_metrics,
+                lambda name, level: metric_type_present_attributes(result, name, level),
+                result,
+            )
 
         merged_events = merge_signal_counts(result.observed.events, result.detected.events)
         if merged_events:
             events = _sorted_count_items(merged_events)
+            event_sections = _build_signal_type_sections(
+                EVENT_TYPE_SPECS,
+                merged_events,
+                lambda name, level: event_type_present_attributes(result, name, level),
+                result,
+            )
 
     return DetailView(
         test_name=entry.test_name,
@@ -217,6 +259,8 @@ def _build_detail(
         entity_summary=_entity_summary(result) if result else "",
         span_sections=span_sections,
         non_registry_attrs=non_registry_attrs,
+        metric_sections=metric_sections,
+        event_sections=event_sections,
         metrics=metrics,
         events=events,
         violation_messages=result.violation_messages if result else [],
@@ -294,29 +338,36 @@ def _prepare_heatmaps_from_data(
     return heatmaps
 
 
-def _prepare_individual_signal_heatmaps(
+def _prepare_signal_type_heatmaps(
     test_data_entries: list[TestDataEntry],
-    signal_types: dict[str, str],
+    signal_type_specs: dict[str, SignalTypeSpec],
     anchor_prefix: str,
-    entry_statuses: Callable[[TestDataEntry], dict[str, str]],
+    entry_signals: Callable[[TestDataEntry], dict[str, dict[str, str]]],
     details_available: bool,
 ) -> list[HeatmapView]:
-    """Build one heatmap per signal name (event type or metric type)."""
-    relevant = [entry for entry in test_data_entries if entry_statuses(entry)]
-    if not relevant:
-        return []
-
+    """Build one heatmap per signal type with per-attribute columns."""
     heatmaps: list[HeatmapView] = []
-    for name, label in signal_types.items():
+    deprecated_attrs = set(DISPLAY_DEPRECATED_ATTRS.values())
+    for name, spec in signal_type_specs.items():
+        relevant = [entry for entry in test_data_entries if name in entry_signals(entry)]
+        if not relevant:
+            continue
+
+        columns = signal_type_heatmap_columns(spec)
+        column_groups = signal_type_heatmap_groups(spec)
+        if not columns:
+            continue
+
         anchor_id = f"{anchor_prefix}-{name.replace('.', '-').replace('_', '-')}"
-        columns = [HeatmapColumn(header_text="Present", is_group_start=True)]
         heatmap = _build_heatmap(
-            label,
+            spec.label,
             anchor_id,
             columns,
             relevant,
             details_available,
-            lambda entry, _n=name: {"Present": entry_statuses(entry).get(_n, "absent")},
+            lambda entry, _n=name: entry_signals(entry).get(_n, {}),
+            deprecated_attrs=deprecated_attrs,
+            column_groups=column_groups,
         )
         if heatmap is not None:
             heatmaps.append(heatmap)
@@ -349,16 +400,16 @@ def generate_dashboard_html(test_data_entries: list[TestDataEntry], details_avai
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     heatmaps = _prepare_heatmaps_from_data(test_data_entries, details_available)
-    event_heatmaps = _prepare_individual_signal_heatmaps(
+    event_heatmaps = _prepare_signal_type_heatmaps(
         test_data_entries,
-        GENAI_EVENT_TYPES,
+        EVENT_TYPE_SPECS,
         "event",
         lambda entry: entry.events,
         details_available,
     )
-    metric_heatmaps = _prepare_individual_signal_heatmaps(
+    metric_heatmaps = _prepare_signal_type_heatmaps(
         test_data_entries,
-        GENAI_METRIC_TYPES,
+        METRIC_TYPE_SPECS,
         "metric",
         lambda entry: entry.metrics,
         details_available,
