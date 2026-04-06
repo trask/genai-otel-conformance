@@ -5,7 +5,7 @@
       "gen_ai.operation.name",
       "gen_ai.provider.name"
     ],
-    "invoke_agent": [
+    "invoke_agent_internal": [
       "gen_ai.agent.id",
       "gen_ai.agent.name",
       "gen_ai.operation.name",

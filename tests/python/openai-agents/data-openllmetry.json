@@ -1,6 +1,6 @@
 {
   "spans": {
-    "invoke_agent": [
+    "invoke_agent_internal": [
       "gen_ai.agent.name",
       "gen_ai.system"
     ],

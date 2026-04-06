@@ -72,6 +72,31 @@ _INFERENCE_OPT_IN = [
     "gen_ai.tool.definitions",
 ]
 
+_INVOKE_AGENT_COND_REQUIRED = [
+    "gen_ai.conversation.id",
+    "gen_ai.output.type",
+    "gen_ai.request.choice.count",
+    "gen_ai.request.seed",
+    "gen_ai.agent.description",
+    "gen_ai.agent.id",
+    "gen_ai.agent.name",
+    "gen_ai.agent.version",
+    "gen_ai.data_source.id",
+]
+_INVOKE_AGENT_RECOMMENDED = [
+    "gen_ai.request.frequency_penalty",
+    "gen_ai.request.max_tokens",
+    "gen_ai.request.presence_penalty",
+    "gen_ai.request.stop_sequences",
+    "gen_ai.request.temperature",
+    "gen_ai.request.top_p",
+    "gen_ai.response.finish_reasons",
+    "gen_ai.usage.cache_creation.input_tokens",
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.input_tokens",
+    "gen_ai.usage.output_tokens",
+]
+
 SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
     "inference": SignalTypeSpec(
         label="Inference",
@@ -153,17 +178,19 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
         opt_in=("gen_ai.system_instructions",),
     ),
     "invoke_agent": SignalTypeSpec(
-        label="Invoke Agent",
+        label="Invoke Agent Client Spans",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
-        conditionally_required=tuple(_COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INFERENCE_COND_REQUIRED + [
-            "gen_ai.agent.description",
-            "gen_ai.agent.id",
-            "gen_ai.agent.name",
-            "gen_ai.agent.version",
-            "gen_ai.data_source.id",
-        ]),
-        recommended=tuple(_INFERENCE_RECOMMENDED + _CLIENT_RECOMMENDED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INVOKE_AGENT_COND_REQUIRED),
+        recommended=tuple(_INVOKE_AGENT_RECOMMENDED + _CLIENT_RECOMMENDED),
+        opt_in=tuple(_INFERENCE_OPT_IN),
+    ),
+    "invoke_agent_internal": SignalTypeSpec(
+        label="Invoke Agent Internal Spans",
+        discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + ["gen_ai.request.model"] + _INVOKE_AGENT_COND_REQUIRED),
+        recommended=tuple(_INVOKE_AGENT_RECOMMENDED),
         opt_in=tuple(_INFERENCE_OPT_IN),
     ),
     "invoke_workflow": SignalTypeSpec(
@@ -182,6 +209,7 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
 SPAN_TYPE_ORDER = [
     "create_agent",
     "invoke_agent",
+    "invoke_agent_internal",
     "invoke_workflow",
     "inference",
     "embeddings",
