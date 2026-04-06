@@ -40,6 +40,7 @@ def run_evaluation():
                 event_name="gen_ai.evaluation.result",
                 body="Evaluation result",
                 attributes={
+                    "gen_ai.evaluation.explanation": str(result["relevance_reason"]),
                     "gen_ai.evaluation.name": evaluation_name,
                     "gen_ai.evaluation.score.label": score_label,
                     "gen_ai.evaluation.score.value": score,
