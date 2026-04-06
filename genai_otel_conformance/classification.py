@@ -201,6 +201,26 @@ def _span_attribute_names(
     return names
 
 
+def _metric_attribute_names(
+    metric: dict[str, object],
+    include_attr: Callable[[dict[str, object]], bool] | None = None,
+) -> set[str]:
+    names: set[str] = set()
+    for dp in metric.get("data_points", []):
+        if not isinstance(dp, dict):
+            continue
+        for attr in dp.get("attributes", []):
+            if not isinstance(attr, dict):
+                continue
+            name = attr.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            if include_attr is not None and not include_attr(attr):
+                continue
+            names.add(name)
+    return names
+
+
 def summarize_samples(
     all_objects: list[dict],
     include_attr: Callable[[dict[str, object]], bool] | None = None,
@@ -242,7 +262,7 @@ def summarize_samples(
                 metric_name = metric.get("name", "")
                 if metric_name.startswith("gen_ai."):
                     signals.metrics[metric_name] = signals.metrics.get(metric_name, 0) + 1
-                    attr_names = _span_attribute_names(metric, include_attr)
+                    attr_names = _metric_attribute_names(metric, include_attr)
                     if metric_name not in signals.metric_attrs:
                         signals.metric_attrs[metric_name] = set(attr_names)
                     else:
