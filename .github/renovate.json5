@@ -8,7 +8,7 @@
   "customManagers": [
     {
       customType: 'regex',
-      fileMatch: ['^versions\.env$'],
+      managerFilePatterns: ['/^versions\.env$/'],
       matchStrings: [
         '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+WEAVER_VERSION=(?<currentValue>\\S+)',
         '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+SEMCONV_VERSION=(?<currentValue>\\S+)',
@@ -33,25 +33,34 @@
     {
       description: 'Group Python OpenTelemetry SDK packages',
       matchManagers: ['pip_requirements'],
-      matchPackagePatterns: ['^opentelemetry-(?!instrumentation)'],
+      matchPackageNames: [
+        'opentelemetry-**',
+        '!opentelemetry-instrumentation**',
+      ],
       groupName: 'python-opentelemetry',
     },
     {
       description: 'Group JS OpenTelemetry SDK packages',
       matchManagers: ['npm'],
-      matchPackagePatterns: ['^@opentelemetry/(?!instrumentation)'],
+      matchPackageNames: [
+        '@opentelemetry/**',
+        '!@opentelemetry/instrumentation**',
+      ],
       groupName: 'js-opentelemetry',
     },
     {
       description: 'Group Java OpenTelemetry SDK packages',
       matchManagers: ['gradle'],
-      matchPackagePatterns: ['^io\\.opentelemetry(?!\\.instrumentation)'],
+      matchPackageNames: [
+        'io.opentelemetry**',
+        '!io.opentelemetry.instrumentation**',
+      ],
       groupName: 'java-opentelemetry',
     },
     {
       description: 'Group all .NET OpenTelemetry packages',
       matchManagers: ['nuget'],
-      matchPackagePatterns: ['^OpenTelemetry'],
+      matchPackageNames: ['OpenTelemetry**'],
       groupName: 'dotnet-opentelemetry',
     },
   ],
