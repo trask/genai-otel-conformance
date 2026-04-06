@@ -113,6 +113,68 @@ def run_chat():
         print(f"    -> {response.text[:60]}")
 
 
+def run_chat_tool_call():
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    from vertexai.generative_models import FunctionDeclaration, GenerativeModel, Tool
+
+    print("  [chat_tool_call] chat with tool calling via Vertex AI (prototype)")
+    request_model = "gemini-2.0-flash"
+    get_weather_func = FunctionDeclaration(
+        name="get_weather",
+        description="Get the current weather",
+        parameters={
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "City name"},
+            },
+            "required": ["location"],
+        },
+    )
+    tool = Tool(function_declarations=[get_weather_func])
+    with _prototype_tracer.start_as_current_span("chat gemini-2.0-flash") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "vertex_ai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
+            "function_declarations": [{
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            }]
+        }]))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            warnings.simplefilter("ignore", UserWarning)
+            model = GenerativeModel(request_model)
+            response = model.generate_content(
+                "What's the weather in Seattle?",
+                tools=[tool],
+            )
+        response_model = response.to_dict().get("modelVersion")
+        if response_model:
+            span.set_attribute("gen_ai.response.model", response_model)
+        else:
+            span.set_attribute("gen_ai.response.model", request_model)
+        if response.candidates and response.candidates[0].finish_reason:
+            span.set_attribute("gen_ai.response.finish_reasons", [str(response.candidates[0].finish_reason.name)])
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            if response.usage_metadata.prompt_token_count:
+                span.set_attribute("gen_ai.usage.input_tokens", response.usage_metadata.prompt_token_count)
+            if response.usage_metadata.candidates_token_count:
+                span.set_attribute("gen_ai.usage.output_tokens", response.usage_metadata.candidates_token_count)
+        part = response.candidates[0].content.parts[0]
+        if hasattr(part, "function_call") and part.function_call and part.function_call.name:
+            print(f"    -> tool_call: {part.function_call.name}")
+        else:
+            print(f"    -> {response.text[:60]}")
+
+
 def run_chat_streaming():
     """Scenario: streaming chat completion with prototype instrumentation."""
     from vertexai.generative_models import GenerativeModel
@@ -156,6 +218,7 @@ def main():
     _init_vertexai()
 
     run_chat()
+    run_chat_tool_call()
     run_chat_streaming()
 
     flush_and_shutdown(tp, lp, mp)

@@ -75,6 +75,52 @@ def run_chat(client):
         print(f"    -> {resp.choices[0].message.content[:60]}")
 
 
+def run_chat_tool_call(client):
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    print("  [chat_tool_call] chat with tool calling (prototype)")
+    request_model = "mistral-large-latest"
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    tools = [request_tool]
+    with _prototype_tracer.start_as_current_span("chat mistral-large-latest") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "mistral")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        resp = client.chat.complete(
+            model=request_model,
+            messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+            tools=tools,
+        )
+        if resp.model:
+            span.set_attribute("gen_ai.response.model", resp.model)
+        if resp.id:
+            span.set_attribute("gen_ai.response.id", resp.id)
+        if resp.choices:
+            span.set_attribute("gen_ai.response.finish_reasons",
+                               [c.finish_reason for c in resp.choices if c.finish_reason])
+        if resp.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+        choice = resp.choices[0]
+        if choice.message.tool_calls:
+            print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+        else:
+            print(f"    -> {choice.message.content[:60]}")
+
+
 def run_chat_streaming(client):
     """Scenario: streaming chat completion with prototype instrumentation."""
     print("  [chat_streaming] streaming chat completion (prototype)")
@@ -124,6 +170,7 @@ def main():
     )
 
     run_chat(client)
+    run_chat_tool_call(client)
     try:
         run_chat_streaming(client)
     except Exception as e:

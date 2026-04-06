@@ -87,6 +87,59 @@ def run_converse_prototype(client):
         print(f"    -> {text[:60]}")
 
 
+def run_converse_tool_call_prototype(client):
+    """Scenario: Bedrock Converse API with tool calling prototype instrumentation."""
+    print("  [chat_tool_call] Bedrock Converse API with tool calling (prototype)")
+    request_model = "anthropic.claude-3-haiku-20240307-v1:0"
+    tool_spec = {
+        "toolSpec": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                }
+            },
+        }
+    }
+    tool_config = {"tools": [tool_spec]}
+    with _prototype_tracer.start_as_current_span(
+        "chat anthropic.claude-3-haiku-20240307-v1:0"
+    ) as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "aws.bedrock")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_config["tools"]))
+        messages = [
+            {
+                "role": "user",
+                "content": [{"text": "What's the weather in Seattle?"}],
+            }
+        ]
+        response = client.converse(
+            modelId=request_model,
+            messages=messages,
+            toolConfig=tool_config,
+        )
+        stop_reason = response.get("stopReason")
+        if stop_reason:
+            span.set_attribute("gen_ai.response.finish_reasons", [stop_reason])
+        usage = response.get("usage", {})
+        if usage.get("inputTokens") is not None:
+            span.set_attribute("gen_ai.usage.input_tokens", usage["inputTokens"])
+        if usage.get("outputTokens") is not None:
+            span.set_attribute("gen_ai.usage.output_tokens", usage["outputTokens"])
+        content = response["output"]["message"]["content"]
+        if content and "toolUse" in content[0]:
+            print(f"    -> tool_call: {content[0]['toolUse']['name']}")
+        else:
+            print(f"    -> {content[0]['text'][:60]}")
+
+
 def run_embeddings_prototype(client):
     """Scenario: Bedrock Titan Embeddings with prototype instrumentation."""
     import json as _json
@@ -119,6 +172,7 @@ def main():
     client = create_bedrock_client()
 
     run_converse_prototype(client)
+    run_converse_tool_call_prototype(client)
     run_embeddings_prototype(client)
 
     flush_and_shutdown(tp, lp, mp)

@@ -72,6 +72,50 @@ def run_chat_prototype(client):
         print(f"    -> {resp.message[:60]}")
 
 
+def run_chat_tool_call_prototype(client):
+    """Scenario: chat with tool calling via Instructor with prototype instrumentation."""
+    from pydantic import BaseModel
+
+    print("  [chat_tool_call] chat with tool calling via Instructor (prototype)")
+    request_model = "gpt-4o-mini"
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    tools = [request_tool]
+
+    class WeatherRequest(BaseModel):
+        location: str
+
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "openai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        resp, completion = client.chat.completions.create_with_completion(
+            model=request_model,
+            messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+            response_model=WeatherRequest,
+        )
+        span.set_attribute("gen_ai.response.model", completion.model)
+        span.set_attribute("gen_ai.response.id", completion.id)
+        span.set_attribute("gen_ai.response.finish_reasons", [c.finish_reason for c in completion.choices])
+        if completion.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", completion.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", completion.usage.completion_tokens)
+        print(f"    -> {resp.location}")
+
+
 def main():
     print("=== Prototype: Instructor Conformance Test ===")
 
@@ -85,6 +129,7 @@ def main():
     )
 
     run_chat_prototype(client)
+    run_chat_tool_call_prototype(client)
 
     flush_and_shutdown(tp, lp, mp)
 

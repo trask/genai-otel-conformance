@@ -98,6 +98,48 @@ def run_chat_streaming_prototype(client):
         print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call_prototype(client):
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    print("  [chat_tool_call] chat with tool calling (prototype)")
+    request_model = "llama-3.1-8b-instant"
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    tools = [request_tool]
+    with _prototype_tracer.start_as_current_span("chat llama-3.1-8b-instant") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "groq")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        resp = client.chat.completions.create(
+            model=request_model,
+            messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+            tools=tools,
+        )
+        span.set_attribute("gen_ai.response.model", resp.model)
+        span.set_attribute("gen_ai.response.id", resp.id)
+        span.set_attribute("gen_ai.response.finish_reasons", [c.finish_reason for c in resp.choices])
+        if resp.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+        choice = resp.choices[0]
+        if choice.message.tool_calls:
+            print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+        else:
+            print(f"    -> {choice.message.content[:60]}")
+
+
 def main():
     print("=== Prototype: Groq Conformance Test ===")
 
@@ -109,6 +151,7 @@ def main():
 
     run_chat_prototype(client)
     run_chat_streaming_prototype(client)
+    run_chat_tool_call_prototype(client)
 
     flush_and_shutdown(tp, lp, mp)
 
