@@ -1,0 +1,6 @@
+{
+  "display_name": "OpenAI Assistants",
+  "version_packages": {
+    "manual": "openai"
+  }
+}
