@@ -18,19 +18,20 @@
     | <button class="inline-action" type="button" data-section-toggle="collapse">Collapse all</button>
   </span></p>
 
-{# ── Attribute heatmap matrices (one per span type) ── #}
+{# ── Heatmap matrices (spans, metrics, events) ── #}
 {% for heatmap in heatmaps %}
-<details class="matrix-wrap section-anchor matrix-section" id="span-{{ heatmap.label|lower|replace(' ', '-') }}">
+<details class="matrix-wrap section-anchor matrix-section" id="{{ heatmap.anchor_id }}">
 <summary class="section-summary">
 <span class="section-summary-main">
-<span class="section-title" role="heading" aria-level="2">{{ heatmap.label }} Spans</span>
-<span class="section-meta">{{ heatmap.rows|length }} implementations, {{ heatmap.columns|length }} checks</span>
+<span class="section-title" role="heading" aria-level="2">{{ heatmap.label }}</span>
+<span class="section-meta">{{ heatmap.rows|length }} implementations{% if heatmap.columns|length > 1 %}, {{ heatmap.columns|length }} checks{% endif %}</span>
 </span>
 <span class="section-toggle" aria-hidden="true"></span>
 </summary>
 <div class="section-body">
 <div class="section-table">
 <table class="matrix heatmap"><thead>
+{% if heatmap.column_groups -%}
 <tr class="group-row">
 <th class="lib-header library-header" rowspan="2">Library</th>
 <th class="lib-header lang-header" rowspan="2">Lang</th>
@@ -44,6 +45,16 @@
 <th class="attr-header group-{{ col.group_key }}{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
 {% endfor -%}
 </tr>
+{% else -%}
+<tr>
+<th class="lib-header library-header">Library</th>
+<th class="lib-header lang-header">Lang</th>
+<th class="lib-header instrumentation-header">Instrumentation</th>
+{% for col in heatmap.columns -%}
+<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
+{% endfor -%}
+</tr>
+{% endif -%}
 </thead>
 <tbody>
 {% for row in heatmap.rows -%}
@@ -70,98 +81,6 @@
 </div>
 </details>
 {% endfor %}
-
-{# ── Metric heatmap ── #}
-{% if metric_heatmap %}
-<details class="matrix-wrap section-anchor matrix-section" id="metrics">
-<summary class="section-summary">
-<span class="section-summary-main">
-<span class="section-title" role="heading" aria-level="2">{{ metric_heatmap.label }}</span>
-<span class="section-meta">{{ metric_heatmap.rows|length }} implementations, {{ metric_heatmap.columns|length }} checks</span>
-</span>
-<span class="section-toggle" aria-hidden="true"></span>
-</summary>
-<div class="section-body">
-<div class="section-table">
-<table class="matrix heatmap"><thead><tr>
-<th class="lib-header library-header">Library</th>
-<th class="lib-header lang-header">Lang</th>
-<th class="lib-header instrumentation-header">Instrumentation</th>
-{% for col in metric_heatmap.columns -%}
-<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
-{% endfor -%}
-</tr></thead>
-<tbody>
-{% for row in metric_heatmap.rows -%}
-<tr{% if row.lang_rowspan > 0 %} class="lang-group-start"{% endif %}>
-{% if row.lib_rowspan > 0 -%}
-<td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
-{% endif -%}
-{% if row.lang_rowspan > 0 -%}
-<td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
-{% endif -%}
-<td class="lib instrumentation-cell">
-  {% if row.has_details %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
-  {{ row.eco_display }}
-  {% if row.has_details %}</a>{% endif %}
-</td>
-{% for cell in row.cells -%}
-<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
-{% endfor -%}
-</tr>
-{% endfor -%}
-</tbody></table>
-</div>
-<div class="section-footer"><a href="#top">Back to top</a></div>
-</div>
-</details>
-{% endif %}
-
-{# ── Event heatmap ── #}
-{% if event_heatmap %}
-<details class="matrix-wrap section-anchor matrix-section" id="events">
-<summary class="section-summary">
-<span class="section-summary-main">
-<span class="section-title" role="heading" aria-level="2">{{ event_heatmap.label }}</span>
-<span class="section-meta">{{ event_heatmap.rows|length }} implementations, {{ event_heatmap.columns|length }} checks</span>
-</span>
-<span class="section-toggle" aria-hidden="true"></span>
-</summary>
-<div class="section-body">
-<div class="section-table">
-<table class="matrix heatmap"><thead><tr>
-<th class="lib-header library-header">Library</th>
-<th class="lib-header lang-header">Lang</th>
-<th class="lib-header instrumentation-header">Instrumentation</th>
-{% for col in event_heatmap.columns -%}
-<th class="attr-header{{ ' group-start' if col.is_group_start else '' }}"><span>{{ col.header_text }}</span></th>
-{% endfor -%}
-</tr></thead>
-<tbody>
-{% for row in event_heatmap.rows -%}
-<tr{% if row.lang_rowspan > 0 %} class="lang-group-start"{% endif %}>
-{% if row.lib_rowspan > 0 -%}
-<td class="lib lib-cell library-cell" rowspan="{{ row.lib_rowspan }}">{{ row.lib_display }}</td>
-{% endif -%}
-{% if row.lang_rowspan > 0 -%}
-<td class="lib lang-cell" rowspan="{{ row.lang_rowspan }}">{{ row.language }}</td>
-{% endif -%}
-<td class="lib instrumentation-cell">
-  {% if row.has_details %}<a class="instrumentation-link" href="details.html#{{ row.test_name }}">{% endif %}
-  {{ row.eco_display }}
-  {% if row.has_details %}</a>{% endif %}
-</td>
-{% for cell in row.cells -%}
-<td class="{{ cell.cls }}">{{ cell.symbol }}</td>
-{% endfor -%}
-</tr>
-{% endfor -%}
-</tbody></table>
-</div>
-<div class="section-footer"><a href="#top">Back to top</a></div>
-</div>
-</details>
-{% endif %}
 
 </div>
 <script>

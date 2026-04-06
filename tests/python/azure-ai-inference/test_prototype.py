@@ -1,9 +1,11 @@
 """Conformance test: prototype instrumentation for Azure AI Inference."""
 
+import json
 import os
 from urllib.parse import urlparse
 
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 from otel_setup import flush_and_shutdown, setup_otel
 
@@ -27,9 +29,10 @@ def run_chat_prototype(client):
             span.set_attribute("server.address", endpoint.hostname)
         if endpoint.port is not None:
             span.set_attribute("server.port", endpoint.port)
+        user_content = "Say hello."
         resp = client.complete(
             model=request_model,
-            messages=[UserMessage(content="Say hello.")],
+            messages=[UserMessage(content=user_content)],
         )
         span.set_attribute("gen_ai.response.model", resp.model)
         span.set_attribute("gen_ai.response.id", resp.id)
@@ -39,6 +42,40 @@ def run_chat_prototype(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.response.id": resp.id,
+            "gen_ai.response.model": resp.model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": "user", "parts": [{"type": "text", "content": user_content}]}
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": c.message.content}],
+                    "finish_reason": str(c.finish_reason) if c.finish_reason else None,
+                }
+                for c in resp.choices
+            ]),
+        }
+        if finish_reasons:
+            event_attrs["gen_ai.response.finish_reasons"] = finish_reasons
+        if resp.usage:
+            event_attrs["gen_ai.usage.input_tokens"] = resp.usage.prompt_tokens
+            event_attrs["gen_ai.usage.output_tokens"] = resp.usage.completion_tokens
+        if endpoint.hostname:
+            event_attrs["server.address"] = endpoint.hostname
+        if endpoint.port is not None:
+            event_attrs["server.port"] = endpoint.port
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {resp.choices[0].message.content[:60]}")
 
 

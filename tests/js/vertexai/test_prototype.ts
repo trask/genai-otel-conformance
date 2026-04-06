@@ -2,6 +2,7 @@
  * Conformance test: Prototype instrumentation for Vertex AI.
  */
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -65,7 +66,8 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "vertex_ai");
     span.setAttribute("gen_ai.request.model", requestModel);
-    const result = await model.generateContent("Say hello.");
+    const userMessage = "Say hello.";
+    const result = await model.generateContent(userMessage);
     const resp = result.response;
     const responseModel = (resp as any).modelVersion ?? requestModel;
     span.setAttribute("gen_ai.response.model", responseModel);
@@ -82,6 +84,30 @@ async function main() {
       }
     }
     const text = candidate?.content?.parts?.[0]?.text ?? "";
+
+    // Emit inference operation details event
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": requestModel,
+        "gen_ai.response.model": responseModel,
+        "gen_ai.response.finish_reasons": candidate?.finishReason ? [candidate.finishReason] : undefined,
+        "gen_ai.usage.input_tokens": resp.usageMetadata?.promptTokenCount,
+        "gen_ai.usage.output_tokens": resp.usageMetadata?.candidatesTokenCount,
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", parts: [{ type: "text", content: userMessage }] }
+        ]),
+        "gen_ai.output.messages": JSON.stringify([{
+          role: "assistant",
+          parts: [{ type: "text", content: text }],
+          finish_reason: candidate?.finishReason,
+        }]),
+      },
+    });
+
     console.log(`    -> ${text.slice(0, 60)}`);
     span.end();
   });

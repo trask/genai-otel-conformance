@@ -4,10 +4,12 @@ Exercises: chat, chat_streaming, embeddings
 against a mock server, with manual OTel spans.
 """
 
+import json
 import os
 
 from otel_setup import setup_otel, flush_and_shutdown
 from opentelemetry import trace
+from opentelemetry._logs import get_logger_provider
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
@@ -22,9 +24,10 @@ def run_chat(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "mistral")
         span.set_attribute("gen_ai.request.model", request_model)
+        messages = [{"role": "user", "content": "Say hello."}]
         resp = client.chat.complete(
             model=request_model,
-            messages=[{"role": "user", "content": "Say hello."}],
+            messages=messages,
         )
         if resp.model:
             span.set_attribute("gen_ai.response.model", resp.model)
@@ -36,6 +39,39 @@ def run_chat(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+
+        # Emit inference operation details event
+        event_attrs = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": request_model,
+            "gen_ai.input.messages": json.dumps([
+                {"role": m["role"], "parts": [{"type": "text", "content": m["content"]}]}
+                for m in messages
+            ]),
+            "gen_ai.output.messages": json.dumps([
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": c.message.content}],
+                    "finish_reason": c.finish_reason,
+                }
+                for c in resp.choices
+            ]),
+        }
+        if resp.model:
+            event_attrs["gen_ai.response.model"] = resp.model
+        if resp.id:
+            event_attrs["gen_ai.response.id"] = resp.id
+        if resp.choices:
+            event_attrs["gen_ai.response.finish_reasons"] = [c.finish_reason for c in resp.choices if c.finish_reason]
+        if resp.usage:
+            event_attrs["gen_ai.usage.input_tokens"] = resp.usage.prompt_tokens
+            event_attrs["gen_ai.usage.output_tokens"] = resp.usage.completion_tokens
+        get_logger_provider().get_logger("gen_ai.prototype").emit(
+            event_name="gen_ai.client.inference.operation.details",
+            body="Inference operation details",
+            attributes=event_attrs,
+        )
+
         print(f"    -> {resp.choices[0].message.content[:60]}")
 
 

@@ -189,16 +189,12 @@ SPAN_TYPE_ORDER = [
     "execute_tool",
 ]
 
-GENAI_EVENT_TYPES = [
-    "gen_ai.system.message",
-    "gen_ai.user.message",
-    "gen_ai.assistant.message",
-    "gen_ai.tool.message",
-    "gen_ai.choice",
-    "gen_ai.evaluation.result",
-]
+GENAI_EVENT_TYPES: dict[str, str] = {
+    "gen_ai.client.inference.operation.details": "Inference Operation Details Event",
+    "gen_ai.evaluation.result": "Evaluation Result Event",
+}
 
-GENAI_METRIC_TYPES = [
-    "gen_ai.client.operation.duration",
-    "gen_ai.client.token.usage",
-]
+GENAI_METRIC_TYPES: dict[str, str] = {
+    "gen_ai.client.operation.duration": "Client Operation Duration Metric",
+    "gen_ai.client.token.usage": "Client Token Usage Metric",
+}

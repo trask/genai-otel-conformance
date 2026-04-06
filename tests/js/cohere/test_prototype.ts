@@ -2,6 +2,7 @@
  * Conformance test: Prototype instrumentation for Cohere.
  */
 import { trace } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
@@ -26,9 +27,10 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "cohere");
     span.setAttribute("gen_ai.request.model", requestModel);
+    const userMessage = "Say hello.";
     const resp = await client.chat({
       model: requestModel,
-      message: "Say hello.",
+      message: userMessage,
     });
     if ((resp as any).generationId) {
       span.setAttribute("gen_ai.response.id", (resp as any).generationId);
@@ -42,6 +44,30 @@ async function main() {
     if ((resp as any).meta?.billedUnits?.outputTokens) {
       span.setAttribute("gen_ai.usage.output_tokens", (resp as any).meta.billedUnits.outputTokens);
     }
+
+    // Emit inference operation details event
+    logs.getLogger("gen_ai.prototype").emit({
+      severityNumber: SeverityNumber.INFO,
+      eventName: "gen_ai.client.inference.operation.details",
+      body: "Inference operation details",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": requestModel,
+        "gen_ai.response.id": (resp as any).generationId,
+        "gen_ai.response.finish_reasons": (resp as any).finishReason ? [(resp as any).finishReason] : undefined,
+        "gen_ai.usage.input_tokens": (resp as any).meta?.billedUnits?.inputTokens,
+        "gen_ai.usage.output_tokens": (resp as any).meta?.billedUnits?.outputTokens,
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", parts: [{ type: "text", content: userMessage }] }
+        ]),
+        "gen_ai.output.messages": JSON.stringify([{
+          role: "assistant",
+          parts: [{ type: "text", content: resp.text }],
+          finish_reason: (resp as any).finishReason,
+        }]),
+      },
+    });
+
     console.log(`    -> ${resp.text.slice(0, 60)}`);
     span.end();
   });
