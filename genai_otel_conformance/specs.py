@@ -249,6 +249,8 @@ EVENT_TYPE_SPECS: dict[str, SignalTypeSpec] = {
             "gen_ai.evaluation.score.label",
             "gen_ai.evaluation.score.value",
             "gen_ai.response.id",
+            "gen_ai.usage.input_tokens",
+            "gen_ai.usage.output_tokens",
         ),
         opt_in=(),
     ),
