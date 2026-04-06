@@ -24,7 +24,7 @@
 <summary class="section-summary">
 <span class="section-summary-main">
 <span class="section-title" role="heading" aria-level="2">{{ heatmap.label }}</span>
-<span class="section-meta">{{ heatmap.rows|length }} implementations{% if heatmap.columns|length > 1 %}, {{ heatmap.columns|length }} attributes{% endif %}</span>
+<span class="section-meta">{% set ns = namespace(instrumentations=0, prototypes=0) %}{% for row in heatmap.rows %}{% if row.eco_display == 'Prototype' %}{% set ns.prototypes = ns.prototypes + 1 %}{% else %}{% set ns.instrumentations = ns.instrumentations + 1 %}{% endif %}{% endfor %}{{ ns.instrumentations }} instrumentation{{ 's' if ns.instrumentations != 1 else '' }}, {{ ns.prototypes }} prototype{{ 's' if ns.prototypes != 1 else '' }}{% if heatmap.columns|length > 1 %}, {{ heatmap.columns|length }} attributes{% endif %}</span>
 </span>
 <span class="section-toggle" aria-hidden="true"></span>
 </summary>
