@@ -85,6 +85,57 @@ async function main() {
     span.end();
   });
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling (prototype)");
+  await tracer.startActiveSpan("chat anthropic.claude-3-haiku-20240307-v1:0", async (span) => {
+    const requestModel = "anthropic.claude-3-haiku-20240307-v1:0";
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "aws.bedrock");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    span.setAttribute("gen_ai.response.model", requestModel);
+    const toolSpec = {
+      toolSpec: {
+        name: "get_weather",
+        description: "Get the current weather",
+        inputSchema: {
+          json: {
+            type: "object",
+            properties: {
+              location: { type: "string", description: "City name" },
+            },
+            required: ["location"],
+          },
+        },
+      },
+    };
+    const toolConfig = { tools: [toolSpec] };
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify(toolConfig.tools));
+    const messages = [
+      { role: "user" as const, content: [{ text: "What's the weather in Seattle?" }] },
+    ];
+    const resp = await client.send(
+      new ConverseCommand({
+        modelId: requestModel,
+        messages,
+        toolConfig,
+      })
+    );
+    if (resp.stopReason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [resp.stopReason]);
+    }
+    if (resp.usage) {
+      if (resp.usage.inputTokens) span.setAttribute("gen_ai.usage.input_tokens", resp.usage.inputTokens);
+      if (resp.usage.outputTokens) span.setAttribute("gen_ai.usage.output_tokens", resp.usage.outputTokens);
+    }
+    const content = resp.output?.message?.content?.[0];
+    if (content && "toolUse" in content && content.toolUse) {
+      console.log(`    -> tool_call: ${content.toolUse.name}`);
+    } else {
+      console.log(`    -> ${content?.text?.slice(0, 60) ?? ""}`);
+    }
+    span.end();
+  });
+
   // Scenario: streaming chat
   console.log("  [chat_streaming] streaming chat completion (prototype)");
   await tracer.startActiveSpan("chat anthropic.claude-3-haiku-20240307-v1:0", async (span) => {

@@ -79,6 +79,67 @@ def run_chat_prototype(client):
         print(f"    -> {resp.choices[0].message.content[:60]}")
 
 
+def run_chat_tool_call_prototype(client):
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    from azure.ai.inference.models import (
+        ChatCompletionsToolDefinition,
+        FunctionDefinition,
+        UserMessage,
+    )
+
+    print("  [chat_tool_call] chat with tool calling (prototype)")
+    request_model = "gpt-4o-mini"
+    tool = ChatCompletionsToolDefinition(
+        function=FunctionDefinition(
+            name="get_weather",
+            description="Get the current weather",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        )
+    )
+    tools = [tool]
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        endpoint = urlparse(MOCK_BASE_URL)
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "az.ai.inference")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
+            "type": "function",
+            "function": {
+                "name": tool.function.name,
+                "description": tool.function.description,
+                "parameters": tool.function.parameters,
+            },
+        }]))
+        if endpoint.hostname:
+            span.set_attribute("server.address", endpoint.hostname)
+        if endpoint.port is not None:
+            span.set_attribute("server.port", endpoint.port)
+        resp = client.complete(
+            model=request_model,
+            messages=[UserMessage(content="What's the weather in Seattle?")],
+            tools=tools,
+        )
+        span.set_attribute("gen_ai.response.model", resp.model)
+        span.set_attribute("gen_ai.response.id", resp.id)
+        finish_reasons = [str(c.finish_reason) for c in resp.choices if c.finish_reason]
+        if finish_reasons:
+            span.set_attribute("gen_ai.response.finish_reasons", finish_reasons)
+        if resp.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+        choice = resp.choices[0]
+        if choice.message.tool_calls:
+            print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+        else:
+            print(f"    -> {choice.message.content[:60]}")
+
+
 def run_chat_streaming_prototype(client):
     """Scenario: streaming chat completion with prototype instrumentation."""
     from azure.ai.inference.models import UserMessage
@@ -164,6 +225,7 @@ def main():
     )
 
     run_chat_prototype(chat_client)
+    run_chat_tool_call_prototype(chat_client)
     run_chat_streaming_prototype(chat_client)
     run_embeddings_prototype(embed_client)
 
