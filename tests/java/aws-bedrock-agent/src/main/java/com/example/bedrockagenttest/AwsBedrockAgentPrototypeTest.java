@@ -20,7 +20,7 @@ import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentResp
 
 import java.net.URI;
 
-public class AwsBedrockAgentManualTest {
+public class AwsBedrockAgentPrototypeTest {
 
     private static final String AGENT_ID = "MOCK_AGENT_ID";
     private static final String AGENT_ALIAS_ID = "MOCK_ALIAS_ID";

@@ -1,6 +1,6 @@
 {
   "display_name": "AWS Bedrock Agent",
   "version_packages": {
-    "manual": "boto3"
+    "prototype": "boto3"
   }
 }

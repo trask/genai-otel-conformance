@@ -1,6 +1,6 @@
 {
   "display_name": "Azure AI Foundry",
   "version_packages": {
-    "manual": "azure-ai-projects"
+    "prototype": "azure-ai-projects"
   }
 }

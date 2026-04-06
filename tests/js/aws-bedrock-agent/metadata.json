@@ -1,6 +1,6 @@
 {
   "display_name": "AWS Bedrock Agent",
   "version_packages": {
-    "manual": "@aws-sdk/client-bedrock-agent-runtime"
+    "prototype": "@aws-sdk/client-bedrock-agent-runtime"
   }
 }

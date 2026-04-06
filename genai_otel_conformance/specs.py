@@ -178,7 +178,7 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
         opt_in=("gen_ai.system_instructions",),
     ),
     "invoke_agent": SignalTypeSpec(
-        label="Invoke Agent Client Spans",
+        label="Invoke Agent Client",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + _CLIENT_COND_REQUIRED + _INVOKE_AGENT_COND_REQUIRED),
@@ -186,7 +186,7 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
         opt_in=tuple(_INFERENCE_OPT_IN),
     ),
     "invoke_agent_internal": SignalTypeSpec(
-        label="Invoke Agent Internal Spans",
+        label="Invoke Agent Internal",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
         conditionally_required=tuple(_COMMON_COND_REQUIRED + ["gen_ai.request.model"] + _INVOKE_AGENT_COND_REQUIRED),
