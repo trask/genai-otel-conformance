@@ -189,8 +189,8 @@ class Program
             var msg = result[0];
             if (msg.ModelId != null) activity?.SetTag("gen_ai.response.model", msg.ModelId);
             var metadata = msg.Metadata;
-            string? responseId = null;
-            string? finishReason = null;
+            string responseId = null;
+            string finishReason = null;
             int? inputTokens = null;
             int? outputTokens = null;
             if (metadata != null)
@@ -227,7 +227,7 @@ class Program
                     finish_reason = finishReason
                 }
             });
-            using (eventLogger.BeginScope(new Dictionary<string, object?>
+            using (eventLogger.BeginScope(new Dictionary<string, object>
             {
                 ["gen_ai.operation.name"] = "chat",
                 ["gen_ai.request.model"] = modelId,
@@ -359,7 +359,7 @@ class Program
         Console.WriteLine("Done.");
     }
 
-    static string ToJsonSchemaType(Type? type)
+    static string ToJsonSchemaType(Type type)
     {
         if (type == null) return "string";
         type = Nullable.GetUnderlyingType(type) ?? type;

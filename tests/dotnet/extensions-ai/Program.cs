@@ -170,7 +170,7 @@ class Program
                     finish_reason = completion.FinishReason.ToString()
                 }
             });
-            using (eventLogger.BeginScope(new Dictionary<string, object?>
+            using (eventLogger.BeginScope(new Dictionary<string, object>
             {
                 ["gen_ai.operation.name"] = "chat",
                 ["gen_ai.request.model"] = modelId,
