@@ -70,7 +70,7 @@ def _is_create_agent_span(ctx: SpanInfo) -> bool:
     return ctx.op_name == "create_agent"
 
 
-def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
+def _is_invoke_agent_like(ctx: SpanInfo) -> bool:
     return (
         ctx.oi_kind == "AGENT"
         or ctx.op_name == "invoke_agent"
@@ -86,6 +86,26 @@ def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
         or ("agentsclient" in ctx.name_lower and ("run" in ctx.name_lower or "process" in ctx.name_lower))
         or ("threads" in ctx.name_lower and "run" in ctx.name_lower and "thread.run" not in ctx.name_lower)
     )
+
+
+def _is_remote_agent(ctx: SpanInfo) -> bool:
+    return (
+        _has_any_attr(ctx.attrs, "server.address", "server.port")
+        or (
+            str(ctx.attrs.get("rpc.service", "")).lower() == "bedrockagentruntime"
+            and str(ctx.attrs.get("rpc.method", "")).lower() == "invokeagent"
+        )
+        or ("agentsclient" in ctx.name_lower and ("run" in ctx.name_lower or "process" in ctx.name_lower))
+        or ("threads" in ctx.name_lower and "run" in ctx.name_lower and "thread.run" not in ctx.name_lower)
+    )
+
+
+def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
+    return _is_invoke_agent_like(ctx) and _is_remote_agent(ctx)
+
+
+def _is_invoke_agent_internal_span(ctx: SpanInfo) -> bool:
+    return _is_invoke_agent_like(ctx) and not _is_remote_agent(ctx)
 
 
 def _is_execute_tool_span(ctx: SpanInfo) -> bool:
@@ -119,6 +139,7 @@ _SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[[SpanInfo], bool]]] = [
     ("inference", _is_inference_span),
     ("create_agent", _is_create_agent_span),
     ("invoke_agent", _is_invoke_agent_span),
+    ("invoke_agent_internal", _is_invoke_agent_internal_span),
     ("execute_tool", _is_execute_tool_span),
     ("invoke_workflow", _is_invoke_workflow_span),
     ("retrieval", _is_retrieval_span),
