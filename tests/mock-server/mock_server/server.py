@@ -114,6 +114,32 @@ OPENAI_RESPONSES_RESPONSE = {
 }
 
 
+def _mock_openai_chat_content(body):
+    response_format = body.get("response_format") or {}
+    if response_format.get("type") != "json_object":
+        return "This is a mock response from the conformance test server."
+
+    message_text = "\n".join(
+        message.get("content", "")
+        for message in body.get("messages", [])
+        if isinstance(message.get("content"), str)
+    )
+    if "Relevance-Judge" in message_text or "Relevance Evaluator" in message_text:
+        return json.dumps(
+            {
+                "explanation": "The response directly answers the user's question and stays fully on topic.",
+                "score": 5,
+            }
+        )
+
+    return json.dumps(
+        {
+            "explanation": "The response satisfies the evaluator request.",
+            "score": 5,
+        }
+    )
+
+
 def _mock_tool_argument_value(name, schema):
     schema_type = (schema or {}).get("type")
     if name == "location":
@@ -233,6 +259,8 @@ def openai_chat_completions(deployment=None):
 
     resp = dict(OPENAI_CHAT_RESPONSE)
     resp["model"] = body.get("model", resp["model"])
+    resp["choices"] = copy.deepcopy(resp["choices"])
+    resp["choices"][0]["message"]["content"] = _mock_openai_chat_content(body)
     return resp
 
 

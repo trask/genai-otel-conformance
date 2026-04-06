@@ -1,30 +1,40 @@
 """Conformance test: prototype instrumentation for Azure AI Evaluation."""
 
+import os
+
 from opentelemetry import trace
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.trace import SpanKind, StatusCode
 
 from otel_setup import flush_and_shutdown, setup_otel
 
+MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
+
 _prototype_tracer = trace.get_tracer("gen_ai.prototype")
 
 
 def run_evaluation():
     """Scenario: evaluation result event via Azure AI Evaluation."""
-    from azure.ai.evaluation import F1ScoreEvaluator
+    from azure.ai.evaluation import OpenAIModelConfiguration, RelevanceEvaluator
 
-    print("  [evaluate] Azure AI Evaluation F1 score event")
+    print("  [evaluate] Azure AI Evaluation relevance event")
 
-    ground_truth = "Paris is the capital of France."
+    query = "What is the capital of France?"
     response = "Paris is the capital of France."
-    evaluator = F1ScoreEvaluator()
-    evaluation_name = "f1_score"
+    model_config = OpenAIModelConfiguration(
+        type="openai",
+        api_key="mock-key",
+        model="gpt-4o-mini",
+        base_url=MOCK_BASE_URL,
+    )
+    evaluator = RelevanceEvaluator(model_config=model_config)
+    evaluation_name = "relevance"
 
     with _prototype_tracer.start_as_current_span("prototype.evaluation", kind=SpanKind.INTERNAL) as span:
         try:
-            result = evaluator(response=response, ground_truth=ground_truth)
-            score = float(result["f1_score"])
-            score_label = str(result["f1_result"])
+            result = evaluator(query=query, response=response)
+            score = float(result["relevance"])
+            score_label = str(result["relevance_result"])
 
             get_logger_provider().get_logger("gen_ai.evaluation.prototype").emit(
                 event_name="gen_ai.evaluation.result",
