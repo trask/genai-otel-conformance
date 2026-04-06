@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from genai_otel_conformance.results import TestResult, merge_signal_counts
 from genai_otel_conformance.specs import (
     DISPLAY_DEPRECATED_ATTRS,
+    EVENT_TYPE_SPECS,
+    METRIC_TYPE_SPECS,
     RequirementLevel,
     SignalTypeSpec,
     SPAN_TYPE_ORDER,
@@ -141,20 +143,6 @@ def relevant_span_type_keys(result: TestResult) -> list[str]:
     return relevant
 
 
-def build_present_signal_names(
-    signal_names: list[str],
-    statistics_counts: dict[str, int],
-    detected_counts: dict[str, int],
-) -> list[str]:
-    """Return the ordered names of observed signals."""
-    merged_counts = merge_signal_counts(statistics_counts, detected_counts)
-    return [
-        name
-        for name in signal_names
-        if merged_counts.get(name, 0) > 0
-    ]
-
-
 def build_statuses_from_present_names(
     expected_names: list[str],
     present_names: list[str] | set[str],
@@ -181,3 +169,68 @@ def build_span_type_present_names(result: TestResult) -> dict[str, list[str]]:
             )
         sparse[span_type_key] = present_names
     return sparse
+
+
+def event_type_present_attributes(
+    result: TestResult,
+    event_name: str,
+    level: RequirementLevel,
+) -> set[str]:
+    """Return attrs present for an event type at the requested requirement level."""
+    all_present = present_attributes(result)
+    if level is RequirementLevel.REQUIRED:
+        return result.detected.event_attrs.get(event_name, all_present)
+    return result.detected.event_any_attrs.get(event_name, all_present)
+
+
+def metric_type_present_attributes(
+    result: TestResult,
+    metric_name: str,
+    level: RequirementLevel,
+) -> set[str]:
+    """Return attrs present for a metric type at the requested requirement level."""
+    all_present = present_attributes(result)
+    if level is RequirementLevel.REQUIRED:
+        return result.detected.metric_attrs.get(metric_name, all_present)
+    return result.detected.metric_any_attrs.get(metric_name, all_present)
+
+
+def _build_signal_type_present_names(
+    signal_type_specs: dict[str, SignalTypeSpec],
+    merged_counts: dict[str, int],
+    present_fn: callable,
+) -> dict[str, list[str]]:
+    """Return sparse per-signal-type attribute lists for detected signals."""
+    sparse: dict[str, list[str]] = {}
+    for signal_name, spec in signal_type_specs.items():
+        if merged_counts.get(signal_name, 0) <= 0:
+            continue
+        present_names: list[str] = []
+        for group in signal_type_attribute_groups(spec):
+            type_present = present_fn(signal_name, group.level.key)
+            present_names.extend(
+                attr for attr in group.attrs
+                if attr in type_present
+            )
+        sparse[signal_name] = present_names
+    return sparse
+
+
+def build_event_type_present_names(result: TestResult) -> dict[str, list[str]]:
+    """Return sparse per-event-type attribute lists for detected events."""
+    merged = merge_signal_counts(result.observed.events, result.detected.events)
+    return _build_signal_type_present_names(
+        EVENT_TYPE_SPECS,
+        merged,
+        lambda name, level: event_type_present_attributes(result, name, level),
+    )
+
+
+def build_metric_type_present_names(result: TestResult) -> dict[str, list[str]]:
+    """Return sparse per-metric-type attribute lists for detected metrics."""
+    merged = merge_signal_counts(result.observed.metrics, result.detected.metrics)
+    return _build_signal_type_present_names(
+        METRIC_TYPE_SPECS,
+        merged,
+        lambda name, level: metric_type_present_attributes(result, name, level),
+    )

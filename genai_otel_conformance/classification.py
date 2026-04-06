@@ -19,6 +19,9 @@ class DetectedSignals:
     events: dict[str, int] = field(default_factory=dict)
     metrics: dict[str, int] = field(default_factory=dict)
     event_attrs: dict[str, set[str]] = field(default_factory=dict)
+    event_any_attrs: dict[str, set[str]] = field(default_factory=dict)
+    metric_attrs: dict[str, set[str]] = field(default_factory=dict)
+    metric_any_attrs: dict[str, set[str]] = field(default_factory=dict)
 
 
 def _has_any_attr(attrs: dict[str, object], *names: str) -> bool:
@@ -198,6 +201,26 @@ def _span_attribute_names(
     return names
 
 
+def _metric_attribute_names(
+    metric: dict[str, object],
+    include_attr: Callable[[dict[str, object]], bool] | None = None,
+) -> set[str]:
+    names: set[str] = set()
+    for dp in metric.get("data_points", []):
+        if not isinstance(dp, dict):
+            continue
+        for attr in dp.get("attributes", []):
+            if not isinstance(attr, dict):
+                continue
+            name = attr.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            if include_attr is not None and not include_attr(attr):
+                continue
+            names.add(name)
+    return names
+
+
 def summarize_samples(
     all_objects: list[dict],
     include_attr: Callable[[dict[str, object]], bool] | None = None,
@@ -232,11 +255,18 @@ def summarize_samples(
                         signals.event_attrs[event_name] = set(attr_names)
                     else:
                         signals.event_attrs[event_name].intersection_update(attr_names)
+                    signals.event_any_attrs.setdefault(event_name, set()).update(attr_names)
 
             metric = sample.get("metric")
             if metric:
                 metric_name = metric.get("name", "")
                 if metric_name.startswith("gen_ai."):
                     signals.metrics[metric_name] = signals.metrics.get(metric_name, 0) + 1
+                    attr_names = _metric_attribute_names(metric, include_attr)
+                    if metric_name not in signals.metric_attrs:
+                        signals.metric_attrs[metric_name] = set(attr_names)
+                    else:
+                        signals.metric_attrs[metric_name].intersection_update(attr_names)
+                    signals.metric_any_attrs.setdefault(metric_name, set()).update(attr_names)
 
     return spans, signals

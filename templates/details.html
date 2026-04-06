@@ -62,6 +62,25 @@
 <div class="attr"><code>{{ metric.name }}</code> &times;{{ metric.count }}</div>
 {% endfor -%}
 </div>
+{% for section in detail.metric_sections %}
+<div class="span-detail">
+<div class="span-header">{{ section.label }} Attributes</div>
+{% for group in section.groups %}
+<div class="req-group"><div class="req-group-label">{{ group.label }}</div>
+<div class="attr-check">
+{% for attr in group.attrs -%}
+{% if attr.present -%}
+<div class="icon present">&#x2713;</div>
+<div><span class="name">{{ attr.name }}</span> <span class="val">&times;{{ attr.count }}</span></div>
+{% else -%}
+<div class="icon missing">&#x2013;</div>
+<div><span class="name missing">{{ attr.name }}</span></div>
+{% endif -%}
+{% endfor -%}
+</div></div>
+{% endfor %}
+</div>
+{% endfor %}
 {% endif %}
 
 {% if detail.events %}
@@ -71,6 +90,25 @@
 <div class="attr"><code>{{ evt.name }}</code> &times;{{ evt.count }}</div>
 {% endfor -%}
 </div>
+{% for section in detail.event_sections %}
+<div class="span-detail">
+<div class="span-header">{{ section.label }} Attributes</div>
+{% for group in section.groups %}
+<div class="req-group"><div class="req-group-label">{{ group.label }}</div>
+<div class="attr-check">
+{% for attr in group.attrs -%}
+{% if attr.present -%}
+<div class="icon present">&#x2713;</div>
+<div><span class="name">{{ attr.name }}</span> <span class="val">&times;{{ attr.count }}</span></div>
+{% else -%}
+<div class="icon missing">&#x2013;</div>
+<div><span class="name missing">{{ attr.name }}</span></div>
+{% endif -%}
+{% endfor -%}
+</div></div>
+{% endfor %}
+</div>
+{% endfor %}
 {% endif %}
 
 {% elif detail.has_empty_run %}

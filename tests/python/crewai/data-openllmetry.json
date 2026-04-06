@@ -6,6 +6,9 @@
     ]
   },
   "metrics": {
-    "gen_ai.client.token.usage": []
+    "gen_ai.client.token.usage": [
+      "gen_ai.response.model",
+      "gen_ai.token.type"
+    ]
   }
 }

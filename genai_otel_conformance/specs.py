@@ -189,12 +189,75 @@ SPAN_TYPE_ORDER = [
     "execute_tool",
 ]
 
-GENAI_EVENT_TYPES: dict[str, str] = {
-    "gen_ai.client.inference.operation.details": "Inference Operation Details Event",
-    "gen_ai.evaluation.result": "Evaluation Result Event",
+EVENT_TYPE_SPECS: dict[str, SignalTypeSpec] = {
+    "gen_ai.client.inference.operation.details": SignalTypeSpec(
+        label="Inference Operation Details Event",
+        required=("gen_ai.operation.name",),
+        conditionally_required=(
+            "error.type",
+            "gen_ai.request.model",
+            "server.port",
+        ),
+        recommended=(
+            "gen_ai.input.messages",
+            "gen_ai.output.messages",
+            "gen_ai.response.finish_reasons",
+            "gen_ai.response.id",
+            "gen_ai.response.model",
+            "gen_ai.system_instructions",
+            "gen_ai.tool.definitions",
+            "gen_ai.usage.input_tokens",
+            "gen_ai.usage.output_tokens",
+            "server.address",
+        ),
+        opt_in=(),
+    ),
+    "gen_ai.evaluation.result": SignalTypeSpec(
+        label="Evaluation Result Event",
+        required=("gen_ai.evaluation.name",),
+        conditionally_required=(),
+        recommended=(
+            "gen_ai.evaluation.explanation",
+            "gen_ai.evaluation.score.label",
+            "gen_ai.evaluation.score.value",
+            "gen_ai.response.id",
+        ),
+        opt_in=(),
+    ),
 }
 
-GENAI_METRIC_TYPES: dict[str, str] = {
-    "gen_ai.client.operation.duration": "Client Operation Duration Metric",
-    "gen_ai.client.token.usage": "Client Token Usage Metric",
+METRIC_TYPE_SPECS: dict[str, SignalTypeSpec] = {
+    "gen_ai.client.operation.duration": SignalTypeSpec(
+        label="Client Operation Duration Metric",
+        required=("gen_ai.operation.name",),
+        conditionally_required=(
+            "error.type",
+            "gen_ai.request.model",
+            "server.port",
+        ),
+        recommended=(
+            "gen_ai.response.model",
+            "server.address",
+        ),
+        opt_in=(),
+    ),
+    "gen_ai.client.token.usage": SignalTypeSpec(
+        label="Client Token Usage Metric",
+        required=(
+            "gen_ai.operation.name",
+            "gen_ai.token.type",
+        ),
+        conditionally_required=(
+            "gen_ai.request.model",
+            "server.port",
+        ),
+        recommended=(
+            "gen_ai.response.model",
+            "server.address",
+        ),
+        opt_in=(),
+    ),
 }
+
+GENAI_EVENT_TYPES: dict[str, str] = {k: v.label for k, v in EVENT_TYPE_SPECS.items()}
+GENAI_METRIC_TYPES: dict[str, str] = {k: v.label for k, v in METRIC_TYPE_SPECS.items()}

@@ -20,12 +20,14 @@ from genai_otel_conformance.results import (
     parse_result_dir,
 )
 from genai_otel_conformance.specs import (
-    GENAI_EVENT_TYPES,
-    GENAI_METRIC_TYPES,
+    EVENT_TYPE_SPECS,
+    METRIC_TYPE_SPECS,
+    SignalTypeSpec,
     SPAN_TYPE_SPECS,
 )
 from genai_otel_conformance.statuses import (
-    build_present_signal_names,
+    build_event_type_present_names,
+    build_metric_type_present_names,
     build_span_type_present_names,
     build_statuses_from_present_names,
     signal_type_heatmap_columns,
@@ -48,8 +50,8 @@ class TestDataEntry:
     language_display: str
     ecosystem_display: str
     spans: dict[str, dict[str, str]]
-    metrics: dict[str, str]
-    events: dict[str, str]
+    metrics: dict[str, dict[str, str]]
+    events: dict[str, dict[str, str]]
 
     @property
     def label(self) -> str:
@@ -96,24 +98,15 @@ def _normalize_generated_test_payload(data: dict[str, object]) -> dict[str, obje
 
 def _build_single_test_data(test_name: str, result: TestResult) -> GeneratedTestData:
     """Build committed dashboard data from a parsed Weaver result."""
-    event_names = build_present_signal_names(
-        GENAI_EVENT_TYPES,
-        result.observed.events,
-        result.detected.events,
-    )
-    event_attrs = result.detected.event_attrs
-    metric_names = build_present_signal_names(
-        GENAI_METRIC_TYPES,
-        result.observed.metrics,
-        result.detected.metrics,
-    )
-    has_genai_signals = bool(event_names) or bool(metric_names)
+    event_present = build_event_type_present_names(result)
+    metric_present = build_metric_type_present_names(result)
+    has_genai_signals = bool(event_present) or bool(metric_present)
     spans = build_span_type_present_names(result)
     path = TestLocation.from_test_name(test_name).data_file(TESTS_DIR)
 
     data: dict[str, object] = {
-        "events": {name: event_attrs.get(name, set()) for name in event_names},
-        "metrics": {name: [] for name in metric_names},
+        "events": event_present,
+        "metrics": metric_present,
     }
     if spans:
         data["spans"] = spans
@@ -155,58 +148,23 @@ def make_anchor_id(language: str, library: str, ecosystem: str) -> str:
     return f"{library}-{lang_slug}-{ecosystem}"
 
 
-def _normalize_signal_data(
+def _normalize_signal_type_data(
     value: object,
-    signal_names: list[str],
-    field_name: str,
-    test_name: str,
-) -> dict[str, str]:
-    return build_statuses_from_present_names(
-        signal_names,
-        _signal_names_from_committed_data(value, field_name, test_name),
-    )
-
-
-def _present_signal_names(value: dict | list | None) -> list[str]:
-    if not isinstance(value, (dict, list)):
-        return []
-    return sorted(name for name in value if isinstance(name, str))
-
-
-def _signal_names_from_committed_data(
-    value: object,
-    field_name: str,
-    test_name: str,
-) -> list[str]:
-    if value is None:
-        return []
-    if not isinstance(value, dict):
-        raise ValueError(
-            f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
-        )
-
-    for name, payload in value.items():
-        if not isinstance(name, str) or not isinstance(payload, list):
-            raise ValueError(
-                f"Invalid {field_name} data for {test_name}: expected an object mapping signal names to lists"
-            )
-
-    return _present_signal_names(value)
-
-
-def _normalize_span_type_data(value: dict | None) -> dict[str, dict[str, str]]:
+    signal_type_specs: dict[str, SignalTypeSpec],
+) -> dict[str, dict[str, str]]:
+    """Normalize committed signal data into per-attribute present/absent statuses."""
     if not isinstance(value, dict):
         return {}
 
     normalized: dict[str, dict[str, str]] = {}
-    for span_type_key, spec in SPAN_TYPE_SPECS.items():
-        if span_type_key not in value:
+    for type_key, spec in signal_type_specs.items():
+        if type_key not in value:
             continue
 
         expected_names = [column.header_text for column in signal_type_heatmap_columns(spec)]
-        raw = value[span_type_key]
+        raw = value[type_key]
         present_names = [name for name in raw if isinstance(name, str)] if isinstance(raw, (dict, list)) else []
-        normalized[span_type_key] = build_statuses_from_present_names(expected_names, present_names)
+        normalized[type_key] = build_statuses_from_present_names(expected_names, present_names)
 
     return normalized
 
@@ -232,9 +190,9 @@ def _normalize_test_data_entry(entry: dict[str, object], location: TestLocation)
             entry.get("ecosystem"),
             ECOSYSTEM_DISPLAY.get(location.ecosystem, location.ecosystem),
         ),
-        spans=_normalize_span_type_data(entry.get("spans")),
-        metrics=_normalize_signal_data(entry.get("metrics"), GENAI_METRIC_TYPES, "metrics", test_name),
-        events=_normalize_signal_data(entry.get("events"), GENAI_EVENT_TYPES, "events", test_name),
+        spans=_normalize_signal_type_data(entry.get("spans"), SPAN_TYPE_SPECS),
+        metrics=_normalize_signal_type_data(entry.get("metrics"), METRIC_TYPE_SPECS),
+        events=_normalize_signal_type_data(entry.get("events"), EVENT_TYPE_SPECS),
     )
 
 

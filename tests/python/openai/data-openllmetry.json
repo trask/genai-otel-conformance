@@ -16,7 +16,16 @@
     ]
   },
   "metrics": {
-    "gen_ai.client.operation.duration": [],
-    "gen_ai.client.token.usage": []
+    "gen_ai.client.operation.duration": [
+      "gen_ai.operation.name",
+      "gen_ai.response.model",
+      "server.address"
+    ],
+    "gen_ai.client.token.usage": [
+      "gen_ai.operation.name",
+      "gen_ai.response.model",
+      "gen_ai.token.type",
+      "server.address"
+    ]
   }
 }
