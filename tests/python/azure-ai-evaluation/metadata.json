@@ -1,0 +1,7 @@
+{
+  "display_name": "Azure AI Evaluation",
+  "repo": "azure/azure-sdk-for-python",
+  "version_packages": {
+    "prototype": "azure-ai-evaluation"
+  }
+}
