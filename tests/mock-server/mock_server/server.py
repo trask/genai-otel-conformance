@@ -811,18 +811,13 @@ def create_message(thread_id):
     }
 
 
-@app.route("/v1/threads/<thread_id>/runs", methods=["POST"])
-@app.route("/openai/threads/<thread_id>/runs", methods=["POST"])
-@app.route("/threads/<thread_id>/runs", methods=["POST"])
-def create_run(thread_id):
-    body = request.get_json(silent=True) or {}
-    run_id = "run-mock-001"
+def _run_response(body, thread_id, run_id="run-mock-001"):
     return {
         "id": run_id,
         "object": "thread.run",
         "created_at": 1700000000,
         "thread_id": thread_id,
-        "assistant_id": body.get("assistant_id", "asst-mock-001"),
+        "assistant_id": body.get("assistant_id", body.get("agent_id", "asst-mock-001")),
         "status": "completed",
         "model": body.get("model", "gpt-4o-mini"),
         "instructions": body.get("instructions"),
@@ -834,6 +829,22 @@ def create_run(thread_id):
         },
         "metadata": {},
     }
+
+
+@app.route("/v1/threads/runs", methods=["POST"])
+@app.route("/openai/threads/runs", methods=["POST"])
+@app.route("/threads/runs", methods=["POST"])
+def create_thread_and_run():
+    body = request.get_json(silent=True) or {}
+    return _run_response(body, thread_id="thread-mock-001")
+
+
+@app.route("/v1/threads/<thread_id>/runs", methods=["POST"])
+@app.route("/openai/threads/<thread_id>/runs", methods=["POST"])
+@app.route("/threads/<thread_id>/runs", methods=["POST"])
+def create_run(thread_id):
+    body = request.get_json(silent=True) or {}
+    return _run_response(body, thread_id=thread_id)
 
 
 @app.route("/v1/threads/<thread_id>/runs/<run_id>", methods=["GET"])

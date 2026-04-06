@@ -1,0 +1,12 @@
+{
+  "name": "genai-conformance-js-aws-bedrock-agent",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:manual": "npx tsx test_manual.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "3.1009.0",
+    "@smithy/node-http-handler": "4.0.4"
+  }
+}
