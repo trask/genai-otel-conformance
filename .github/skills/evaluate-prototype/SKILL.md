@@ -93,6 +93,10 @@ Flag it if it depends on app-specific naming, opaque identifiers, cached data fr
 7. For each library that was not prototyped, decide whether it is out of scope, not yet implemented here, or a missed supporting library.
 8. Prefer these outcomes in order: `fix prototype` -> `add missing supporting library prototype` -> `leave unchanged; honest capture gap`.
 
+## Determining the PR Changeset
+
+Use `gh pr diff <number>` (not `git diff main`) to get the changeset. A stale local `main` causes `git diff main` to include unrelated commits.
+
 ## Do Not Conflate
 
 Keep these judgments separate:
