@@ -62,6 +62,46 @@ export async function runEmbeddings(client: BedrockRuntimeClient, InvokeModelCom
   console.log(`    -> embedding dim: ${result.embedding.length}`);
 }
 
+export async function runChatToolCall(client: BedrockRuntimeClient, ConverseCommand: any) {
+  console.log("  [chat_tool_call] Bedrock Converse with tool calling");
+  const resp = await client.send(
+    new ConverseCommand({
+      modelId: "anthropic.claude-3-haiku-20240307-v1:0",
+      messages: [
+        {
+          role: "user",
+          content: [{ text: "What's the weather in Seattle?" }],
+        },
+      ],
+      toolConfig: {
+        tools: [
+          {
+            toolSpec: {
+              name: "get_weather",
+              description: "Get the current weather",
+              inputSchema: {
+                json: {
+                  type: "object",
+                  properties: {
+                    location: { type: "string", description: "City name" },
+                  },
+                  required: ["location"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    })
+  );
+  const content = resp.output?.message?.content;
+  if (content?.[0]?.toolUse) {
+    console.log(`    -> tool_call: ${content[0].toolUse.name}`);
+  } else {
+    console.log(`    -> ${content?.[0]?.text?.slice(0, 60)}`);
+  }
+}
+
 export async function run(title: string, instrumentFn: (bedrockModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -84,6 +124,7 @@ export async function run(title: string, instrumentFn: (bedrockModule: any) => v
 
   await runChat(client, ConverseCommand);
   await runChatStreaming(client, ConverseStreamCommand);
+  await runChatToolCall(client, ConverseCommand);
   await runEmbeddings(client, InvokeModelCommand);
 
   await flushAndShutdownOtel(otel);

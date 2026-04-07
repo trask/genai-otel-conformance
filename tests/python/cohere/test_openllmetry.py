@@ -25,6 +25,35 @@ def run_chat(client):
     print(f"    -> {resp.message.content[0].text[:60]}")
 
 
+def run_chat_tool_call(client):
+    print("  [chat_tool_call] chat with tool calling")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+    resp = client.chat(
+        model="command-r-plus",
+        messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+        tools=tools,
+    )
+    if hasattr(resp.message, "tool_calls") and resp.message.tool_calls:
+        print(f"    -> tool_call: {resp.message.tool_calls[0].function.name}")
+    else:
+        print(f"    -> {resp.message.content[0].text[:60]}")
+
+
 def run_embeddings(client):
     print("  [embeddings] embedding generation")
     resp = client.embed(
@@ -49,6 +78,7 @@ def main():
     )
 
     run_chat(client)
+    run_chat_tool_call(client)
     run_embeddings(client)
 
     flush_and_shutdown(tp, lp, mp)

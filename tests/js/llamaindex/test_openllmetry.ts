@@ -65,6 +65,36 @@ async function main() {
   await runChat(llm);
   await runEmbeddings(OpenAIEmbedding);
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling");
+  const toolResp = await llm.chat({
+    messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+    additionalChatOptions: {
+      tools: [
+        {
+          type: "function" as const,
+          function: {
+            name: "get_weather",
+            description: "Get the current weather",
+            parameters: {
+              type: "object",
+              properties: {
+                location: { type: "string", description: "City name" },
+              },
+              required: ["location"],
+            },
+          },
+        },
+      ],
+    },
+  });
+  const toolRaw = toolResp.raw as any;
+  if (toolRaw?.choices?.[0]?.message?.tool_calls?.length) {
+    console.log(`    -> tool_call: ${toolRaw.choices[0].message.tool_calls[0].function.name}`);
+  } else {
+    console.log(`    -> ${toolResp.message.content.toString().slice(0, 60)}`);
+  }
+
   await flushAndShutdownOtel(otel);
 }
 

@@ -36,6 +36,40 @@ def run_chat_streaming(client):
     print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call(client):
+    """Scenario: chat with tool calling."""
+    from azure.ai.inference.models import (
+        ChatCompletionsToolDefinition,
+        FunctionDefinition,
+        UserMessage,
+    )
+
+    print("  [chat_tool_call] chat with tool calling")
+    tool = ChatCompletionsToolDefinition(
+        function=FunctionDefinition(
+            name="get_weather",
+            description="Get the current weather",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        )
+    )
+    resp = client.complete(
+        model="gpt-4o-mini",
+        messages=[UserMessage(content="What's the weather in Seattle?")],
+        tools=[tool],
+    )
+    choice = resp.choices[0]
+    if choice.message.tool_calls:
+        print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+    else:
+        print(f"    -> {choice.message.content[:60]}")
+
+
 def run_embeddings(client):
     """Scenario: embedding generation."""
     print("  [embeddings] embedding generation")

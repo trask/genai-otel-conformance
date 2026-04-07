@@ -38,6 +38,37 @@ export async function runChatStreaming(client: Anthropic) {
   console.log(`    -> ${text.slice(0, 60)}`);
 }
 
+export async function runChatToolCall(client: Anthropic) {
+  console.log("  [chat_tool_call] chat with tool calling");
+  const resp = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 100,
+    messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+    tools: [
+      {
+        name: "get_weather",
+        description: "Get the current weather for a location.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            location: {
+              type: "string",
+              description: "The location to get weather for",
+            },
+          },
+          required: ["location"],
+        },
+      },
+    ],
+  });
+  const firstBlock = resp.content[0];
+  if (firstBlock.type === "tool_use") {
+    console.log(`    -> tool_call: ${firstBlock.name}`);
+  } else if (firstBlock.type === "text") {
+    console.log(`    -> ${firstBlock.text.slice(0, 60)}`);
+  }
+}
+
 export async function run(title: string, instrumentFn: (anthropicModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -54,6 +85,7 @@ export async function run(title: string, instrumentFn: (anthropicModule: any) =>
 
   await runChat(client);
   await runChatStreaming(client);
+  await runChatToolCall(client);
 
   await flushAndShutdownOtel(otel);
 }

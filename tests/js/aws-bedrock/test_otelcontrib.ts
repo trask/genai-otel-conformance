@@ -92,6 +92,40 @@ async function main() {
   const embResult = JSON.parse(new TextDecoder().decode(embResp.body));
   console.log(`    -> embedding dim: ${embResult.embedding.length}`);
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] Bedrock Converse with tool calling");
+  const toolResp = await client.send(
+    new ConverseCommand({
+      modelId: "anthropic.claude-3-haiku-20240307-v1:0",
+      messages: [{ role: "user", content: [{ text: "What's the weather in Seattle?" }] }],
+      toolConfig: {
+        tools: [
+          {
+            toolSpec: {
+              name: "get_weather",
+              description: "Get the current weather",
+              inputSchema: {
+                json: {
+                  type: "object",
+                  properties: {
+                    location: { type: "string", description: "City name" },
+                  },
+                  required: ["location"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    })
+  );
+  const toolContent = toolResp.output?.message?.content;
+  if (toolContent?.[0]?.toolUse) {
+    console.log(`    -> tool_call: ${toolContent[0].toolUse.name}`);
+  } else {
+    console.log(`    -> ${toolContent?.[0]?.text?.slice(0, 60)}`);
+  }
+
   await flushAndShutdownOtel(otel);
 }
 

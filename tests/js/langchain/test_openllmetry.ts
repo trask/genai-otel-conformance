@@ -58,6 +58,27 @@ async function main() {
   const embResult = await embedModel.embedQuery("Hello, world!");
   console.log(`    -> embedding dim: ${embResult.length}`);
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling");
+  const { z } = await import("zod");
+  const llmWithTools = llm.bindTools([
+    {
+      name: "get_weather",
+      description: "Get the current weather for a location.",
+      schema: z.object({
+        location: z.string().describe("City name"),
+      }),
+    },
+  ]);
+  const toolResp = await llmWithTools.invoke([
+    { role: "user" as const, content: "What's the weather in Seattle?" },
+  ]);
+  if (Array.isArray((toolResp as any).tool_calls) && (toolResp as any).tool_calls.length > 0) {
+    console.log(`    -> tool_call: ${(toolResp as any).tool_calls[0].name}`);
+  } else {
+    console.log(`    -> ${toolResp.content.toString().slice(0, 60)}`);
+  }
+
   await flushAndShutdownOtel(otel);
 }
 
