@@ -6,7 +6,7 @@ against a mock Bedrock server, with the OpenInference Bedrock instrumentation.
 
 from opentelemetry import trace
 
-from common import run, run_converse, run_embeddings
+from common import run, run_converse, run_converse_tool_call, run_embeddings
 
 
 def instrument():

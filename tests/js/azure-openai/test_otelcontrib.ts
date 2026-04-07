@@ -69,6 +69,35 @@ async function main() {
   });
   console.log(`    -> embedding dim: ${embResp.data[0].embedding.length}`);
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling");
+  const toolResp = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "get_weather",
+          description: "Get the current weather",
+          parameters: {
+            type: "object",
+            properties: {
+              location: { type: "string", description: "City name" },
+            },
+            required: ["location"],
+          },
+        },
+      },
+    ],
+  });
+  const toolChoice = toolResp.choices[0];
+  if (toolChoice.message.tool_calls?.length) {
+    console.log(`    -> tool_call: ${toolChoice.message.tool_calls[0].function.name}`);
+  } else {
+    console.log(`    -> ${toolChoice.message.content?.slice(0, 60)}`);
+  }
+
   await flushAndShutdownOtel(otel);
 }
 

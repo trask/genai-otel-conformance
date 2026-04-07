@@ -28,6 +28,28 @@ export async function runEmbeddings(client: any) {
   console.log(`    -> embedding dim: ${embeddings[0].length}`);
 }
 
+export async function runChatToolCall(client: any) {
+  console.log("  [chat_tool_call] chat with tool calling");
+  const resp = await client.chat({
+    model: "command-r-plus",
+    message: "What's the weather in Seattle?",
+    tools: [
+      {
+        name: "get_weather",
+        description: "Get the current weather",
+        parameterDefinitions: {
+          location: { description: "City name", type: "str" as const, required: true },
+        },
+      },
+    ],
+  });
+  if ((resp as any).toolCalls?.length) {
+    console.log(`    -> tool_call: ${(resp as any).toolCalls[0].name}`);
+  } else {
+    console.log(`    -> ${resp.text.slice(0, 60)}`);
+  }
+}
+
 export async function run(title: string, instrumentFn: (cohereModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -43,6 +65,7 @@ export async function run(title: string, instrumentFn: (cohereModule: any) => vo
   const client = new CohereClient({ token: "mock-key", baseUrl: MOCK_BASE_URL });
 
   await runChat(client);
+  await runChatToolCall(client);
   await runEmbeddings(client);
 
   await flushAndShutdownOtel(otel);

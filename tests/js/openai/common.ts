@@ -42,6 +42,37 @@ export async function runEmbeddings(client: OpenAI) {
   console.log(`    -> embedding dim: ${resp.data[0].embedding.length}`);
 }
 
+export async function runChatToolCall(client: OpenAI) {
+  console.log("  [chat_tool_call] chat with tool calling");
+  const tools: OpenAI.ChatCompletionTool[] = [
+    {
+      type: "function",
+      function: {
+        name: "get_weather",
+        description: "Get the current weather",
+        parameters: {
+          type: "object",
+          properties: {
+            location: { type: "string", description: "City name" },
+          },
+          required: ["location"],
+        },
+      },
+    },
+  ];
+  const resp = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+    tools,
+  });
+  const choice = resp.choices[0];
+  if (choice.message.tool_calls?.length) {
+    console.log(`    -> tool_call: ${choice.message.tool_calls[0].function.name}`);
+  } else {
+    console.log(`    -> ${choice.message.content?.slice(0, 60)}`);
+  }
+}
+
 export async function run(title: string, instrumentFn: (openaiModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -58,6 +89,7 @@ export async function run(title: string, instrumentFn: (openaiModule: any) => vo
 
   await runChat(client);
   await runChatStreaming(client);
+  await runChatToolCall(client);
   await runEmbeddings(client);
 
   await flushAndShutdownOtel(otel);
