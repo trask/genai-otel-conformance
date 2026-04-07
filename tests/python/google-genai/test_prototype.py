@@ -82,6 +82,75 @@ def run_chat():
         print(f"    -> {response.text[:60]}")
 
 
+def run_chat_tool_call():
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    from google import genai
+    from google.genai import types
+
+    print("  [chat_tool_call] chat with tool calling via Google GenAI (prototype)")
+    client = genai.Client(
+        api_key="mock-key",
+        http_options=types.HttpOptions(
+            base_url=MOCK_BASE_URL,
+            api_version="v1beta",
+        ),
+    )
+    request_model = "gemini-2.0-flash"
+    tool = types.Tool(function_declarations=[
+        types.FunctionDeclaration(
+            name="get_weather",
+            description="Get the current weather",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "location": types.Schema(type="STRING", description="City name"),
+                },
+                required=["location"],
+            ),
+        )
+    ])
+    tools = [tool]
+    with _prototype_tracer.start_as_current_span("chat gemini-2.0-flash") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "google_genai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
+            "function_declarations": [{
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            }]
+        }]))
+        response = client.models.generate_content(
+            model=request_model,
+            contents="What's the weather in Seattle?",
+            config=types.GenerateContentConfig(tools=tools),
+        )
+        if response.model_version:
+            span.set_attribute("gen_ai.response.model", response.model_version)
+        if response.candidates and response.candidates[0].finish_reason:
+            span.set_attribute("gen_ai.response.finish_reasons", [str(response.candidates[0].finish_reason)])
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            if hasattr(response.usage_metadata, "prompt_token_count") and response.usage_metadata.prompt_token_count:
+                span.set_attribute("gen_ai.usage.input_tokens", response.usage_metadata.prompt_token_count)
+            if hasattr(response.usage_metadata, "candidates_token_count") and response.usage_metadata.candidates_token_count:
+                span.set_attribute("gen_ai.usage.output_tokens", response.usage_metadata.candidates_token_count)
+        if response.candidates and response.candidates[0].content.parts:
+            part = response.candidates[0].content.parts[0]
+            if hasattr(part, "function_call") and part.function_call:
+                print(f"    -> tool_call: {part.function_call.name}")
+            else:
+                print(f"    -> {response.text[:60]}")
+        else:
+            print(f"    -> {response.text[:60]}")
+
+
 def run_chat_streaming():
     """Scenario: streaming chat completion with prototype instrumentation."""
     from google import genai
@@ -153,6 +222,7 @@ def main():
     # NO instrument() call – prototype instrumentation only
 
     run_chat()
+    run_chat_tool_call()
     run_chat_streaming()
     run_embeddings()
 

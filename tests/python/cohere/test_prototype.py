@@ -75,6 +75,52 @@ def run_chat(client):
         print(f"    -> {content[:60]}")
 
 
+def run_chat_tool_call(client):
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    print("  [chat_tool_call] chat with tool calling (prototype)")
+    request_model = "command-r-plus"
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    tools = [request_tool]
+    with _prototype_tracer.start_as_current_span("chat command-r-plus") as span:
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "cohere")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        resp = client.chat(
+            model=request_model,
+            messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+            tools=tools,
+        )
+        if hasattr(resp, "id") and resp.id:
+            span.set_attribute("gen_ai.response.id", resp.id)
+        if hasattr(resp, "finish_reason") and resp.finish_reason:
+            span.set_attribute("gen_ai.response.finish_reasons", [resp.finish_reason])
+        if hasattr(resp, "usage") and resp.usage:
+            if hasattr(resp.usage, "tokens") and resp.usage.tokens:
+                if hasattr(resp.usage.tokens, "input_tokens"):
+                    span.set_attribute("gen_ai.usage.input_tokens", int(resp.usage.tokens.input_tokens))
+                if hasattr(resp.usage.tokens, "output_tokens"):
+                    span.set_attribute("gen_ai.usage.output_tokens", int(resp.usage.tokens.output_tokens))
+        content = resp.message.content[0].text
+        if hasattr(resp.message, "tool_calls") and resp.message.tool_calls:
+            print(f"    -> tool_call: {resp.message.tool_calls[0].function.name}")
+        else:
+            print(f"    -> {content[:60]}")
+
+
 def run_embeddings(client):
     """Scenario: embedding generation with prototype instrumentation."""
     print("  [embeddings] embedding generation (prototype)")
@@ -109,6 +155,7 @@ def main():
     )
 
     run_chat(client)
+    run_chat_tool_call(client)
     run_embeddings(client)
 
     flush_and_shutdown(tp, lp, mp)

@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import json
 import os
 import time
 
@@ -82,11 +83,30 @@ def run_agent_prototype():
     os.environ.setdefault("GOOGLE_API_KEY", "mock-key")
     request_model = "gemini-2.0-flash"
 
+    def get_weather(location: str) -> str:
+        """Get the current weather."""
+        return f"Sunny in {location}"
+
+    tool_defs = [
+        {
+            "name": "get_weather",
+            "description": "Get the current weather.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "location": {"type": "STRING", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        }
+    ]
+
     with _suppress_adk_native_tracing():
         agent = Agent(
             name="test_agent",
             model=Gemini(model=request_model, base_url=MOCK_BASE_URL),
             instruction="You are a helpful assistant.",
+            tools=[get_weather],
         )
 
         session_service = InMemorySessionService()
@@ -101,6 +121,7 @@ def run_agent_prototype():
                 span.set_attribute("gen_ai.provider.name", "google_genai")
                 span.set_attribute("gen_ai.conversation.id", session.id)
                 span.set_attribute("gen_ai.request.model", request_model)
+                span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_defs))
                 usage_metadata = None
                 finish_reason = None
                 try:

@@ -77,6 +77,38 @@ def run_chat_streaming():
     print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call():
+    """Scenario: chat with tool calling via Vertex AI."""
+    from vertexai.generative_models import FunctionDeclaration, GenerativeModel, Tool
+
+    print("  [chat_tool_call] chat with tool calling via Vertex AI")
+    get_weather_func = FunctionDeclaration(
+        name="get_weather",
+        description="Get the current weather",
+        parameters={
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "City name"},
+            },
+            "required": ["location"],
+        },
+    )
+    tool = Tool(function_declarations=[get_weather_func])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        warnings.simplefilter("ignore", UserWarning)
+        model = GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            "What's the weather in Seattle?",
+            tools=[tool],
+        )
+    part = response.candidates[0].content.parts[0]
+    if hasattr(part, "function_call") and part.function_call and part.function_call.name:
+        print(f"    -> tool_call: {part.function_call.name}")
+    else:
+        print(f"    -> {response.text[:60]}")
+
+
 def main():
     print("=== OTel Contrib: Vertex AI Conformance Test ===")
 
@@ -86,6 +118,7 @@ def main():
 
     run_chat()
     run_chat_streaming()
+    run_chat_tool_call()
 
     flush_and_shutdown(tp, lp, mp)
 

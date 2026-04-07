@@ -72,6 +72,46 @@ async function main() {
     span.end();
   });
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling (prototype)");
+  await tracer.startActiveSpan("chat command-r-plus", async (span) => {
+    const requestModel = "command-r-plus";
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "cohere");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    const requestTool = {
+      name: "get_weather",
+      description: "Get the current weather",
+      parameterDefinitions: {
+        location: { description: "City name", type: "str" as const, required: true },
+      },
+    };
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    const resp = await client.chat({
+      model: requestModel,
+      message: "What's the weather in Seattle?",
+      tools: [requestTool],
+    });
+    if ((resp as any).generationId) {
+      span.setAttribute("gen_ai.response.id", (resp as any).generationId);
+    }
+    if ((resp as any).finishReason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [(resp as any).finishReason]);
+    }
+    if ((resp as any).meta?.billedUnits?.inputTokens) {
+      span.setAttribute("gen_ai.usage.input_tokens", (resp as any).meta.billedUnits.inputTokens);
+    }
+    if ((resp as any).meta?.billedUnits?.outputTokens) {
+      span.setAttribute("gen_ai.usage.output_tokens", (resp as any).meta.billedUnits.outputTokens);
+    }
+    if ((resp as any).toolCalls?.length) {
+      console.log(`    -> tool_call: ${(resp as any).toolCalls[0].name}`);
+    } else {
+      console.log(`    -> ${resp.text.slice(0, 60)}`);
+    }
+    span.end();
+  });
+
   // Scenario: embeddings
   console.log("  [embeddings] embedding generation (prototype)");
   await tracer.startActiveSpan("embeddings embed-english-v3.0", async (span) => {

@@ -1,5 +1,6 @@
 """Shared test infrastructure for OpenAI Assistants conformance tests."""
 
+import json
 import os
 from urllib.parse import urlparse
 
@@ -35,11 +36,29 @@ def run_invoke_agent(client):
     """
     print("  [invoke_agent] OpenAI Assistants: create + run")
 
+    tool_defs = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
     # Create assistant
     assistant = client.beta.assistants.create(
         model="gpt-4o-mini",
         name="conformance-test-assistant",
         instructions="You are a helpful assistant.",
+        tools=tool_defs,
     )
 
     # Create thread
@@ -59,6 +78,7 @@ def run_invoke_agent(client):
         span.set_attribute("gen_ai.agent.id", assistant.id)
         span.set_attribute("gen_ai.agent.name", assistant.name or "")
         span.set_attribute("gen_ai.request.model", "gpt-4o-mini")
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_defs))
         span.set_attribute("server.address", _SERVER_ADDRESS)
         span.set_attribute("server.port", _SERVER_PORT)
         try:

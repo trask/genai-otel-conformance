@@ -78,6 +78,49 @@ async function main() {
     span.end();
   });
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling (prototype)");
+  await tracer.startActiveSpan("chat gpt-4o-mini", async (span) => {
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "openai");
+    span.setAttribute("gen_ai.request.model", chatModel);
+    const requestTool = {
+      type: "function" as const,
+      function: {
+        name: "get_weather",
+        description: "Get the current weather",
+        parameters: {
+          type: "object",
+          properties: {
+            location: { type: "string", description: "City name" },
+          },
+          required: ["location"],
+        },
+      },
+    };
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    const resp = await llm.chat({
+      messages: [{ role: "user", content: "What's the weather in Seattle?" }],
+      additionalChatOptions: { tools: [requestTool] },
+    });
+    const raw = resp.raw as any;
+    if (raw?.model) span.setAttribute("gen_ai.response.model", raw.model);
+    if (raw?.id) span.setAttribute("gen_ai.response.id", raw.id);
+    if (raw?.choices?.[0]?.finish_reason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [raw.choices[0].finish_reason]);
+    }
+    if (raw?.usage) {
+      span.setAttribute("gen_ai.usage.input_tokens", raw.usage.prompt_tokens);
+      span.setAttribute("gen_ai.usage.output_tokens", raw.usage.completion_tokens);
+    }
+    if (raw?.choices?.[0]?.message?.tool_calls?.length) {
+      console.log(`    -> tool_call: ${raw.choices[0].message.tool_calls[0].function.name}`);
+    } else {
+      console.log(`    -> ${resp.message.content.toString().slice(0, 60)}`);
+    }
+    span.end();
+  });
+
   // Scenario: embeddings
   console.log("  [embeddings] embedding generation (prototype)");
   await tracer.startActiveSpan("embeddings text-embedding-3-small", async (span) => {

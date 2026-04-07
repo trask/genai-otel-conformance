@@ -112,6 +112,55 @@ async function main() {
     span.end();
   });
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] content generation with tool calling (prototype)");
+  await tracer.startActiveSpan("chat gemini-2.0-flash", async (span) => {
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.provider.name", "vertex_ai");
+    span.setAttribute("gen_ai.request.model", requestModel);
+    const requestTool = {
+      functionDeclarations: [{
+        name: "get_weather",
+        description: "Get the current weather",
+        parameters: {
+          type: "OBJECT" as const,
+          properties: {
+            location: { type: "STRING" as const, description: "City name" },
+          },
+          required: ["location"],
+        },
+      }],
+    };
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: "What's the weather in Seattle?" }] }],
+      tools: [requestTool],
+    });
+    const resp = result.response;
+    const responseModel = (resp as any).modelVersion ?? requestModel;
+    span.setAttribute("gen_ai.response.model", responseModel);
+    const candidate = resp.candidates?.[0];
+    if (candidate?.finishReason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [candidate.finishReason]);
+    }
+    if (resp.usageMetadata) {
+      if (resp.usageMetadata.promptTokenCount) {
+        span.setAttribute("gen_ai.usage.input_tokens", resp.usageMetadata.promptTokenCount);
+      }
+      if (resp.usageMetadata.candidatesTokenCount) {
+        span.setAttribute("gen_ai.usage.output_tokens", resp.usageMetadata.candidatesTokenCount);
+      }
+    }
+    const part = candidate?.content?.parts?.[0];
+    if (part && "functionCall" in part && part.functionCall) {
+      console.log(`    -> tool_call: ${part.functionCall.name}`);
+    } else {
+      const text = part?.text ?? "";
+      console.log(`    -> ${text.slice(0, 60)}`);
+    }
+    span.end();
+  });
+
   // Scenario: streaming chat
   console.log("  [chat_streaming] streaming content generation (prototype)");
   await tracer.startActiveSpan("chat gemini-2.0-flash", async (span) => {
