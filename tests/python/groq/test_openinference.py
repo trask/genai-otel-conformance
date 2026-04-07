@@ -6,7 +6,7 @@ against a mock OpenAI-compatible server, with the OpenInference Groq instrumenta
 
 from opentelemetry import trace
 
-from common import run, run_chat, run_chat_streaming
+from common import run, run_chat, run_chat_streaming, run_chat_tool_call
 
 
 def instrument():
@@ -18,5 +18,5 @@ if __name__ == "__main__":
     run(
         "OpenInference: Groq Conformance Test",
         instrument,
-        [run_chat, run_chat_streaming],
+        [run_chat, run_chat_streaming, run_chat_tool_call],
     )

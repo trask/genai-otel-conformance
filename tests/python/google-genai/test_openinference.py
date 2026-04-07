@@ -61,6 +61,47 @@ def run_chat_streaming():
     print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call():
+    """Scenario: chat with tool calling via Google GenAI."""
+    from google import genai
+    from google.genai import types
+
+    print("  [chat_tool_call] chat with tool calling via Google GenAI")
+    client = genai.Client(
+        api_key="mock-key",
+        http_options=types.HttpOptions(
+            base_url=MOCK_BASE_URL,
+            api_version="v1beta",
+        ),
+    )
+    tool = types.Tool(function_declarations=[
+        types.FunctionDeclaration(
+            name="get_weather",
+            description="Get the current weather",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "location": types.Schema(type="STRING", description="City name"),
+                },
+                required=["location"],
+            ),
+        )
+    ])
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="What's the weather in Seattle?",
+        config=types.GenerateContentConfig(tools=[tool]),
+    )
+    if response.candidates and response.candidates[0].content.parts:
+        part = response.candidates[0].content.parts[0]
+        if hasattr(part, "function_call") and part.function_call:
+            print(f"    -> tool_call: {part.function_call.name}")
+        else:
+            print(f"    -> {response.text[:60]}")
+    else:
+        print(f"    -> {response.text[:60]}")
+
+
 def run_embeddings():
     """Scenario: embedding generation via Google GenAI."""
     from google import genai
@@ -89,6 +130,7 @@ def main():
 
     run_chat()
     run_chat_streaming()
+    run_chat_tool_call()
     run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)

@@ -61,6 +61,37 @@ export async function runChatStreaming(model: GenerativeModel) {
   console.log(`    -> ${text.slice(0, 60)}`);
 }
 
+export async function runChatToolCall(model: GenerativeModel) {
+  console.log("  [chat_tool_call] content generation with tool calling");
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: "What's the weather in Seattle?" }] }],
+    tools: [
+      {
+        functionDeclarations: [
+          {
+            name: "get_weather",
+            description: "Get the current weather",
+            parameters: {
+              type: "OBJECT" as any,
+              properties: {
+                location: { type: "STRING" as any, description: "City name" },
+              },
+              required: ["location"],
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const part = result.response.candidates?.[0]?.content?.parts?.[0];
+  if (part && "functionCall" in part && part.functionCall) {
+    console.log(`    -> tool_call: ${part.functionCall.name}`);
+  } else {
+    const text = part?.text ?? "";
+    console.log(`    -> ${text.slice(0, 60)}`);
+  }
+}
+
 export async function run(title: string, instrumentFn: (vertexaiModule: any) => void) {
   console.log(`=== ${title} ===`);
 
@@ -89,6 +120,7 @@ export async function run(title: string, instrumentFn: (vertexaiModule: any) => 
 
   await runChat(model);
   await runChatStreaming(model);
+  await runChatToolCall(model);
 
   await flushAndShutdownOtel(otel);
 }

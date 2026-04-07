@@ -45,6 +45,39 @@ def run_chat_streaming():
     print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call():
+    import litellm
+    print("  [chat_tool_call] chat with tool calling via LiteLLM")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+    resp = litellm.completion(
+        model="openai/gpt-4o-mini",
+        messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+        api_base=MOCK_BASE_URL,
+        api_key="mock-key",
+        tools=tools,
+    )
+    choice = resp.choices[0]
+    if choice.message.tool_calls:
+        print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+    else:
+        print(f"    -> {choice.message.content[:60]}")
+
+
 def run_embeddings():
     import litellm
     print("  [embeddings] embedding generation via LiteLLM")
@@ -65,6 +98,7 @@ def main():
 
     run_chat()
     run_chat_streaming()
+    run_chat_tool_call()
     run_embeddings()
 
     flush_and_shutdown(tp, lp, mp)

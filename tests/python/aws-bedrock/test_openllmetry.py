@@ -4,7 +4,7 @@ Exercises: converse
 against a mock Bedrock server, with the Traceloop Bedrock instrumentation.
 """
 
-from common import run, run_converse, run_embeddings
+from common import run, run_converse, run_converse_tool_call, run_embeddings
 
 
 def instrument():
@@ -16,5 +16,5 @@ if __name__ == "__main__":
     run(
         "OpenLLMetry: AWS Bedrock Conformance Test",
         instrument,
-        [run_converse, run_embeddings],
+        [run_converse, run_converse_tool_call, run_embeddings],
     )

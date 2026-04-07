@@ -26,6 +26,23 @@ def run_chat(client):
     print(f"    -> {resp.message[:60]}")
 
 
+def run_chat_tool_call(client):
+    """Scenario: structured extraction with tool calling via Instructor."""
+    from pydantic import BaseModel
+
+    print("  [chat_tool_call] structured extraction with tool calling")
+
+    class WeatherRequest(BaseModel):
+        location: str
+
+    resp, completion = client.chat.completions.create_with_completion(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+        response_model=WeatherRequest,
+    )
+    print(f"    -> {resp.location}")
+
+
 def run(title, instrument_fn, scenarios):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")

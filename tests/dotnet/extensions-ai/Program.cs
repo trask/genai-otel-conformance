@@ -89,6 +89,17 @@ class Program
         }
         Console.WriteLine($"    -> {text[..Math.Min(60, text.Length)]}");
 
+        // Scenario: chat with tool calling
+        Console.WriteLine("  [chat_tool_call] chat with tool calling");
+        var toolResponse = await client.GetResponseAsync(
+            "What's the weather in Seattle?",
+            new ChatOptions
+            {
+                Tools = [AIFunctionFactory.Create((string location) => "Sunny, 72°F", "get_weather", "Get the current weather")]
+            });
+        var toolContent = toolResponse.Text ?? "";
+        Console.WriteLine($"    -> {toolContent[..Math.Min(60, toolContent.Length)]}");
+
         Console.WriteLine("Flushing telemetry...");
         tracerProvider.ForceFlush();
         meterProvider.ForceFlush();

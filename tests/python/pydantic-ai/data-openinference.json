@@ -15,10 +15,15 @@
       "gen_ai.response.id",
       "gen_ai.response.model",
       "gen_ai.system",
+      "gen_ai.tool.definitions",
       "gen_ai.usage.input_tokens",
       "gen_ai.usage.output_tokens",
       "server.address",
       "server.port"
+    ],
+    "execute_tool": [
+      "gen_ai.tool.call.id",
+      "gen_ai.tool.name"
     ]
   }
 }
