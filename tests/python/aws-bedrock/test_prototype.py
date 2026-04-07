@@ -8,6 +8,8 @@ from opentelemetry._logs import get_logger_provider
 
 from otel_setup import flush_and_shutdown, setup_otel
 
+from common import run_memory_operations
+
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
 _prototype_tracer = trace.get_tracer("gen_ai.prototype")
@@ -174,6 +176,7 @@ def main():
     run_converse_prototype(client)
     run_converse_tool_call_prototype(client)
     run_embeddings_prototype(client)
+    run_memory_operations(client)
 
     flush_and_shutdown(tp, lp, mp)
 

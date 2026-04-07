@@ -36,6 +36,15 @@ def _has_attr_prefix(attrs: dict[str, object], prefix: str) -> bool:
     return any(name == prefix or name.startswith(f"{prefix}.") for name in attrs)
 
 
+_MEMORY_OP_NAMES = {
+    "create_memory_store",
+    "search_memory",
+    "update_memory",
+    "delete_memory",
+    "delete_memory_store",
+}
+
+
 class SpanInfo(NamedTuple):
     """Pre-extracted span fields passed to each classifier."""
     name_lower: str
@@ -77,6 +86,7 @@ def _is_invoke_agent_like(ctx: SpanInfo) -> bool:
         or (
             _has_any_attr(ctx.attrs, "gen_ai.agent.name", "gen_ai.agent.id")
             and ctx.op_name != "create_agent"
+            and ctx.op_name not in _MEMORY_OP_NAMES
         )
         or _has_any_attr(ctx.attrs, "crewai.agent.id", "crewai.agent.role")
         or (
@@ -146,6 +156,44 @@ _SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[[SpanInfo], bool]]] = [
 ]
 
 
+def _classify_memory_span(ctx: SpanInfo) -> set[str]:
+    matched_types: set[str] = set()
+
+    if ctx.op_name in _MEMORY_OP_NAMES:
+        matched_types.add(ctx.op_name)
+        return matched_types
+
+    if not any(name.startswith("gen_ai.memory.") for name in ctx.attrs):
+        return matched_types
+
+    if (
+        ctx.attrs.get("gen_ai.memory.query.text") is not None
+        or ctx.attrs.get("gen_ai.memory.search.result.count") is not None
+    ):
+        matched_types.add("search_memory")
+        return matched_types
+
+    if ctx.attrs.get("gen_ai.memory.record.content") is not None:
+        matched_types.add("update_memory")
+        return matched_types
+
+    if ctx.attrs.get("gen_ai.memory.store.id") is None:
+        return matched_types
+
+    if "delete" in ctx.name_lower and "store" in ctx.name_lower:
+        matched_types.add("delete_memory_store")
+    elif "delete" in ctx.name_lower:
+        matched_types.add("delete_memory")
+    elif "create" in ctx.name_lower or "init" in ctx.name_lower:
+        matched_types.add("create_memory_store")
+    elif "search" in ctx.name_lower or "query" in ctx.name_lower or "recall" in ctx.name_lower:
+        matched_types.add("search_memory")
+    elif "update" in ctx.name_lower or "add" in ctx.name_lower or "remember" in ctx.name_lower:
+        matched_types.add("update_memory")
+
+    return matched_types
+
+
 def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
     """Classify a span into span types using heuristics on individual span data."""
     ctx = SpanInfo(
@@ -156,11 +204,13 @@ def _classify_span(span_name: str, span_attrs: dict[str, object]) -> set[str]:
         attrs=span_attrs,
     )
 
-    return {
+    matched_types = {
         span_type
         for span_type, predicate in _SPAN_TYPE_CLASSIFIERS
         if predicate(ctx)
     }
+    matched_types.update(_classify_memory_span(ctx))
+    return matched_types
 
 
 def _infer_operation_name(span_name: str, attrs: dict[str, object]) -> str:

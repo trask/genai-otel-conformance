@@ -11,6 +11,7 @@ import io.opentelemetry.api.common.Value;
 import io.opentelemetry.api.logs.Logger;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.instrumentation.awssdk.v2_2.AwsSdkTelemetry;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -61,6 +62,11 @@ public class AwsBedrockPrototypeTest {
         runConverseToolCall(client);
 
         client.close();
+
+        // Run memory scenarios
+        AwsSdkTelemetry telemetry = AwsSdkTelemetry.builder(GlobalOpenTelemetry.get()).build();
+        AwsBedrockOtelContribTest.runMemoryOperations(mockBaseUrl, telemetry);
+
         System.out.println("Done.");
     }
 

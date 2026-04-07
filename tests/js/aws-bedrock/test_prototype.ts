@@ -4,6 +4,7 @@
 import { trace } from "@opentelemetry/api";
 import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { flushAndShutdownOtel, setupOtel } from "../otel";
+import { runMemoryOperations } from "./common";
 
 const nodeProcess = globalThis.process as NodeJS.Process & {
   env: Record<string, string | undefined>;
@@ -200,6 +201,9 @@ async function main() {
     console.log(`    -> embedding dim: ${result.embedding.length}`);
     span.end();
   });
+
+  // Scenario: memory operations
+  await runMemoryOperations();
 
   await flushAndShutdownOtel(otel);
 }

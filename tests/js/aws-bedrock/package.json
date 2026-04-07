@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@arizeai/openinference-instrumentation-bedrock": "0.4.8",
+    "@aws-sdk/client-bedrock-agentcore": "3.1012.0",
+    "@aws-sdk/client-bedrock-agentcore-control": "3.1012.0",
     "@aws-sdk/client-bedrock-runtime": "3.1009.0",
     "@opentelemetry/instrumentation": "0.213.0",
     "@opentelemetry/instrumentation-aws-sdk": "0.68.0",

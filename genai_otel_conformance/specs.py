@@ -97,6 +97,9 @@ _INVOKE_AGENT_RECOMMENDED = [
     "gen_ai.usage.output_tokens",
 ]
 
+_MEMORY_COND_REQUIRED = ["server.port"]
+_MEMORY_RECOMMENDED = ["server.address"]
+
 SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
     "inference": SignalTypeSpec(
         label="Inference",
@@ -204,6 +207,72 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
             "gen_ai.output.messages",
         ),
     ),
+    "create_memory_store": SignalTypeSpec(
+        label="Create Memory Store",
+        discriminator_attrs=frozenset({
+            "gen_ai.memory.store.id",
+        }),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+        ]),
+        recommended=tuple(_MEMORY_RECOMMENDED),
+        opt_in=(),
+    ),
+    "search_memory": SignalTypeSpec(
+        label="Search Memory",
+        discriminator_attrs=frozenset({
+            "gen_ai.memory.query.text",
+            "gen_ai.memory.search.result.count",
+        }),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+        ]),
+        recommended=tuple(_MEMORY_RECOMMENDED),
+        opt_in=(
+            "gen_ai.memory.query.text",
+            "gen_ai.memory.search.result.count",
+        ),
+    ),
+    "update_memory": SignalTypeSpec(
+        label="Update Memory",
+        discriminator_attrs=frozenset({
+            "gen_ai.memory.record.id",
+            "gen_ai.memory.record.content",
+        }),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.record.id",
+        ]),
+        recommended=tuple(_MEMORY_RECOMMENDED),
+        opt_in=("gen_ai.memory.record.content",),
+    ),
+    "delete_memory": SignalTypeSpec(
+        label="Delete Memory",
+        discriminator_attrs=frozenset({
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.record.id",
+        }),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+            "gen_ai.memory.record.id",
+        ]),
+        recommended=tuple(_MEMORY_RECOMMENDED),
+        opt_in=(),
+    ),
+    "delete_memory_store": SignalTypeSpec(
+        label="Delete Memory Store",
+        discriminator_attrs=frozenset({"gen_ai.memory.store.id"}),
+        required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
+        conditionally_required=tuple(_COMMON_COND_REQUIRED + _MEMORY_COND_REQUIRED + [
+            "gen_ai.memory.store.id",
+        ]),
+        recommended=tuple(_MEMORY_RECOMMENDED),
+        opt_in=(),
+    ),
 }
 
 SPAN_TYPE_ORDER = [
@@ -215,6 +284,11 @@ SPAN_TYPE_ORDER = [
     "embeddings",
     "retrieval",
     "execute_tool",
+    "create_memory_store",
+    "search_memory",
+    "update_memory",
+    "delete_memory",
+    "delete_memory_store",
 ]
 
 EVENT_TYPE_SPECS: dict[str, SignalTypeSpec] = {
