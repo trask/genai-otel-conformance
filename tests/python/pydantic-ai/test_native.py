@@ -29,6 +29,28 @@ def run_chat():
     print(f"    -> {str(result.response)[:60]}")
 
 
+def run_chat_tool_call():
+    print("  [chat_tool_call] tool calling via Pydantic AI Agent")
+    from pydantic_ai import Agent, Tool
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(base_url=MOCK_BASE_URL, api_key="mock-key")
+    model = OpenAIChatModel("gpt-4o-mini", provider=provider)
+
+    def get_weather(location: str) -> str:
+        """Get the current weather for a location."""
+        return "Sunny, 72\u00b0F"
+
+    agent = Agent(
+        model,
+        system_prompt="You are a helpful assistant.",
+        tools=[Tool(get_weather)],
+    )
+    result = agent.run_sync("What's the weather in Seattle?")
+    print(f"    -> {str(result.response)[:60]}")
+
+
 def main():
     print("=== Native: Pydantic AI Conformance Test ===")
 
@@ -47,6 +69,7 @@ def main():
     Agent.instrument_all()
 
     run_chat()
+    run_chat_tool_call()
 
     print("Flushing telemetry...")
     otlp_processor.force_flush()

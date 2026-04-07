@@ -32,6 +32,37 @@ def run_chat_streaming(client):
     print(f"    -> {text[:60]}")
 
 
+def run_chat_tool_call(client):
+    """Scenario: chat with tool calling via Groq."""
+    print("  [chat_tool_call] chat with tool calling")
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+    resp = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+        tools=tools,
+    )
+    choice = resp.choices[0]
+    if choice.message.tool_calls:
+        print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+    else:
+        print(f"    -> {choice.message.content[:60]}")
+
+
 def run(title, instrument_fn, scenarios):
     """Run conformance test scenarios."""
     print(f"=== {title} ===")

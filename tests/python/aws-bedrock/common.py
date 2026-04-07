@@ -37,6 +37,45 @@ def run_converse(client):
     print(f"    -> {text[:60]}")
 
 
+def run_converse_tool_call(client):
+    """Scenario: Bedrock Converse API with tool calling."""
+    print("  [chat_tool_call] Bedrock Converse API with tool calling")
+    tool_config = {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": "get_weather",
+                    "description": "Get the current weather",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "location": {"type": "string", "description": "City name"},
+                            },
+                            "required": ["location"],
+                        }
+                    },
+                }
+            }
+        ],
+    }
+    response = client.converse(
+        modelId="anthropic.claude-3-haiku-20240307-v1:0",
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": "What's the weather in Seattle?"}],
+            }
+        ],
+        toolConfig=tool_config,
+    )
+    content = response["output"]["message"]["content"]
+    if content and "toolUse" in content[0]:
+        print(f"    -> tool_call: {content[0]['toolUse']['name']}")
+    else:
+        print(f"    -> {content[0]['text'][:60]}")
+
+
 def run_embeddings(client):
     """Scenario: Bedrock Titan Embeddings via InvokeModel."""
     import json as _json

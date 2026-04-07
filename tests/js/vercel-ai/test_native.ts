@@ -52,6 +52,31 @@ async function main() {
   await runChat(openai);
   await runChatStreaming(openai);
 
+  // Scenario: chat with tool calling
+  console.log("  [chat_tool_call] chat with tool calling");
+  const { z } = await import("zod");
+  const { tool } = await import("ai");
+  const toolResult = await generateText({
+    model: openai.chat("gpt-4o-mini"),
+    prompt: "What's the weather in Seattle?",
+    tools: {
+      get_weather: tool({
+        description: "Get the current weather for a location.",
+        parameters: z.object({
+          location: z.string().describe("City name"),
+        }),
+        execute: async ({ location }) => ({ location, weather: "Sunny, 72\u00b0F" }),
+      }),
+    },
+    experimental_telemetry: { isEnabled: true },
+  });
+  const toolCalls = (toolResult as any).toolCalls;
+  if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+    console.log(`    -> tool_call: ${toolCalls[0].toolName}`);
+  } else {
+    console.log(`    -> ${toolResult.text.slice(0, 60)}`);
+  }
+
   await flushAndShutdownOtel(otel);
 }
 

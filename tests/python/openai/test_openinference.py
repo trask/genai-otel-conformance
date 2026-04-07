@@ -2,7 +2,7 @@
 
 from opentelemetry import trace
 
-from common import run, run_chat, run_chat_streaming, run_embeddings
+from common import run, run_chat, run_chat_streaming, run_chat_tool_call, run_embeddings
 
 
 def instrument():
@@ -14,5 +14,5 @@ if __name__ == "__main__":
     run(
         "OpenInference: OpenAI Conformance Test",
         instrument,
-        [run_chat, run_chat_streaming, run_embeddings],
+        [run_chat, run_chat_streaming, run_chat_tool_call, run_embeddings],
     )
