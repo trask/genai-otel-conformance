@@ -1,5 +1,6 @@
 """Shared test infrastructure for Azure AI Foundry Agent conformance tests."""
 
+import json
 import os
 from urllib.parse import urlparse
 
@@ -49,11 +50,29 @@ def run_invoke_agent(client):
     """
     print("  [invoke_agent] Azure AI Foundry Agents: create + run")
 
+    tool_defs = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
     # Create agent
     agent = client.agents.create_agent(
         model=AGENT_MODEL,
         name=AGENT_NAME,
         instructions="You are a helpful assistant.",
+        tools=tool_defs,
     )
 
     # Create thread, add message, and run — all in one call, wrapped in manual span
@@ -65,6 +84,7 @@ def run_invoke_agent(client):
         span.set_attribute("gen_ai.agent.id", agent.id)
         span.set_attribute("gen_ai.agent.name", agent.name or "")
         span.set_attribute("gen_ai.request.model", AGENT_MODEL)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_defs))
         span.set_attribute("server.address", _SERVER_ADDRESS)
         span.set_attribute("server.port", _SERVER_PORT)
         try:
