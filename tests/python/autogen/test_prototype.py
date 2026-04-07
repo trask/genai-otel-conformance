@@ -2,8 +2,10 @@
 
 import asyncio
 import contextlib
+import json
 import os
 import time
+from urllib.parse import urlparse
 
 from opentelemetry import trace
 
@@ -71,12 +73,64 @@ def run_agent_prototype():
         _base_chat_agent.trace_invoke_agent_span = previous_invoke_agent_span
 
 
+def run_chat_tool_call_prototype():
+    """Scenario: chat with tool calling with prototype instrumentation."""
+    import openai
+
+    print("  [chat_tool_call] chat with tool calling (prototype)")
+    request_model = "gpt-4o-mini"
+    request_tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "City name"},
+                },
+                "required": ["location"],
+            },
+        },
+    }
+    tools = [request_tool]
+
+    client = openai.OpenAI(base_url=MOCK_BASE_URL, api_key="mock-key")
+    with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
+        endpoint = urlparse(MOCK_BASE_URL)
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", "openai")
+        span.set_attribute("gen_ai.request.model", request_model)
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        if endpoint.hostname:
+            span.set_attribute("server.address", endpoint.hostname)
+        if endpoint.port is not None:
+            span.set_attribute("server.port", endpoint.port)
+        resp = client.chat.completions.create(
+            model=request_model,
+            messages=[{"role": "user", "content": "What's the weather in Seattle?"}],
+            tools=tools,
+        )
+        span.set_attribute("gen_ai.response.model", resp.model)
+        span.set_attribute("gen_ai.response.id", resp.id)
+        span.set_attribute("gen_ai.response.finish_reasons", [c.finish_reason for c in resp.choices])
+        if resp.usage:
+            span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
+        choice = resp.choices[0]
+        if choice.message.tool_calls:
+            print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
+        else:
+            print(f"    -> {choice.message.content[:60]}")
+
+
 def main():
     print("=== Prototype: AutoGen Conformance Test ===")
 
     tp, lp, mp = setup_otel()
 
     run_agent_prototype()
+    run_chat_tool_call_prototype()
 
     time.sleep(2)
 
