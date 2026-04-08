@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.openai:openai-java:4.28.0")
+    implementation("com.openai:openai-java:4.30.0")
     implementation("io.opentelemetry.instrumentation:opentelemetry-openai-java-1.1:2.26.0-alpha")
     implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.60.1")
     implementation("io.opentelemetry:opentelemetry-sdk-extension-incubator:1.60.1-alpha")
