@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "cohere-ai": "8.0.0",
-    "@traceloop/instrumentation-cohere": "0.22.6"
+    "@traceloop/instrumentation-cohere": "0.24.0"
   }
 }

@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@llamaindex/openai": "0.4.23",
-    "@traceloop/instrumentation-llamaindex": "0.22.6",
+    "@traceloop/instrumentation-llamaindex": "0.24.0",
     "llamaindex": "0.12.1"
   }
 }
