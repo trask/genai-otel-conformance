@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.78.0",
-    "@arizeai/openinference-instrumentation-anthropic": "0.1.7",
+    "@arizeai/openinference-instrumentation-anthropic": "0.1.8",
     "@traceloop/instrumentation-anthropic": "0.22.6"
   }
 }
