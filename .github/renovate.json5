@@ -31,7 +31,7 @@
       ],
     },
     {
-      description: 'Group Python OpenTelemetry SDK packages',
+      description: 'Python OpenTelemetry SDK packages',
       matchManagers: ['pip_requirements'],
       matchPackageNames: [
         'opentelemetry-**',
@@ -40,7 +40,7 @@
       groupName: 'python-opentelemetry',
     },
     {
-      description: 'Group JS OpenTelemetry SDK packages',
+      description: 'JS OpenTelemetry SDK packages',
       matchManagers: ['npm'],
       matchPackageNames: [
         '@opentelemetry/**',
@@ -49,7 +49,7 @@
       groupName: 'js-opentelemetry',
     },
     {
-      description: 'Group Java OpenTelemetry SDK packages',
+      description: 'Java OpenTelemetry SDK packages',
       matchManagers: ['gradle'],
       matchPackageNames: [
         'io.opentelemetry**',
@@ -58,10 +58,46 @@
       groupName: 'java-opentelemetry',
     },
     {
-      description: 'Group all .NET OpenTelemetry packages',
+      description: '.NET OpenTelemetry packages',
       matchManagers: ['nuget'],
       matchPackageNames: ['OpenTelemetry**'],
       groupName: 'dotnet-opentelemetry',
+    },
+    {
+      description: 'Python OpenTelemetry instrumentation packages (OpenLLMetry + otel-python-contrib)',
+      matchManagers: ['pip_requirements'],
+      matchPackageNames: ['opentelemetry-instrumentation-**'],
+      groupName: 'python-opentelemetry-instrumentation',
+    },
+    {
+      description: 'Python OpenInference instrumentation packages',
+      matchManagers: ['pip_requirements'],
+      matchPackageNames: ['openinference-instrumentation-**'],
+      groupName: 'python-openinference-instrumentation',
+    },
+    {
+      description: 'JS Traceloop instrumentation packages',
+      matchManagers: ['npm'],
+      matchPackageNames: ['@traceloop/instrumentation-**'],
+      groupName: 'js-traceloop-instrumentation',
+    },
+    {
+      description: 'JS OpenTelemetry contrib instrumentation packages',
+      matchManagers: ['npm'],
+      matchPackageNames: ['@opentelemetry/instrumentation**'],
+      groupName: 'opentelemetry-js-contrib',
+    },
+    {
+      description: 'Python LlamaIndex packages',
+      matchManagers: ['pip_requirements'],
+      matchPackageNames: ['llama-index-**'],
+      groupName: 'python-llamaindex',
+    },
+    {
+      description: 'Python Google GenAI packages',
+      matchManagers: ['pip_requirements'],
+      matchPackageNames: ['google-genai', 'google-adk', 'google-cloud-aiplatform'],
+      groupName: 'python-google-genai',
     },
   ],
   "labels": [
