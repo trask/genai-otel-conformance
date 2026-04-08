@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "3.1009.0",
-    "@smithy/node-http-handler": "4.0.4"
+    "@smithy/node-http-handler": "4.5.2"
   }
 }
