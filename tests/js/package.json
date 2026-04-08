@@ -25,7 +25,7 @@
     "@opentelemetry/sdk-trace-node": "2.6.0"
   },
   "devDependencies": {
-    "@types/node": "24.0.0",
+    "@types/node": "24.12.2",
     "tsx": "4.21.0"
   }
 }
