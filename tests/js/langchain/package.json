@@ -10,7 +10,7 @@
   "dependencies": {
     "@arizeai/openinference-instrumentation-langchain": "4.0.7",
     "@langchain/core": "1.1.39",
-    "@langchain/openai": "1.2.13",
+    "@langchain/openai": "1.4.3",
     "@traceloop/instrumentation-langchain": "0.22.6"
   }
 }
