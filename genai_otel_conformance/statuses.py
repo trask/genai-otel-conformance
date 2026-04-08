@@ -119,9 +119,7 @@ def span_type_present_attributes(
 ) -> set[str]:
     """Return attrs present for a span type at the requested requirement level."""
     all_present = present_attributes(result)
-    if level is RequirementLevel.REQUIRED:
-        return result.spans.per_type_attrs.get(span_type_key, all_present)
-    return result.spans.per_type_any_attrs.get(span_type_key, all_present)
+    return result.spans.per_type_attrs.get(span_type_key, all_present)
 
 
 def relevant_span_type_keys(result: TestResult) -> list[str]:
