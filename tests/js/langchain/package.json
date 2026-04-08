@@ -8,7 +8,7 @@
     "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
-    "@arizeai/openinference-instrumentation-langchain": "4.0.6",
+    "@arizeai/openinference-instrumentation-langchain": "4.0.7",
     "@langchain/core": "1.1.32",
     "@langchain/openai": "1.2.13",
     "@traceloop/instrumentation-langchain": "0.22.6"
