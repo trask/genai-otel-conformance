@@ -1,4 +1,5 @@
 azure-ai-projects==2.0.1
+azure-ai-agents==1.1.0
 azure-identity==1.25.3
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0

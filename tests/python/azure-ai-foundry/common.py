@@ -31,10 +31,10 @@ class MockCredential:
 
 def create_client():
     """Create an Azure AI Projects client pointing at the mock server."""
-    from azure.ai.projects import AIProjectClient
+    from azure.ai.agents import AgentsClient
     from azure.core.pipeline.policies import SansIOHTTPPolicy
 
-    return AIProjectClient(
+    return AgentsClient(
         endpoint=MOCK_BASE_URL,
         credential=MockCredential(),
         authentication_policy=SansIOHTTPPolicy(),
@@ -68,7 +68,7 @@ def run_invoke_agent(client):
     ]
 
     # Create agent
-    agent = client.agents.create_agent(
+    agent = client.create_agent(
         model=AGENT_MODEL,
         name=AGENT_NAME,
         instructions="You are a helpful assistant.",
@@ -88,7 +88,7 @@ def run_invoke_agent(client):
         span.set_attribute("server.address", _SERVER_ADDRESS)
         span.set_attribute("server.port", _SERVER_PORT)
         try:
-            run = client.agents.create_thread_and_run(
+            run = client.create_thread_and_run(
                 agent_id=agent.id,
                 thread=AgentThreadCreationOptions(
                     messages=[
@@ -111,7 +111,7 @@ def run_invoke_agent(client):
             raise
 
     # Clean up
-    client.agents.delete_agent(agent.id)
+    client.delete_agent(agent.id)
 
 
 def run(title, instrument_fn, scenarios):
