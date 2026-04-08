@@ -13,7 +13,7 @@
     "@aws-sdk/client-bedrock-runtime": "3.1009.0",
     "@opentelemetry/instrumentation": "0.213.0",
     "@opentelemetry/instrumentation-aws-sdk": "0.68.0",
-    "@opentelemetry/sdk-node": "0.213.0",
+    "@opentelemetry/sdk-node": "0.214.0",
     "@traceloop/instrumentation-bedrock": "0.22.6"
   }
 }
