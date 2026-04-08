@@ -227,10 +227,18 @@ public class OpenAiPrototypeTest {
                                 .build())
                         .build())
                 .build();
-        // Derive from params.tools() — the same tools passed to the API call
         String toolDefinitionsJson;
         try {
-            toolDefinitionsJson = ObjectMappers.jsonMapper().writeValueAsString(params.tools().orElse(List.of()));
+            var toolDefs = params.tools().orElse(List.of()).stream().map(tool -> {
+                var fn = tool.asFunction().function();
+                var def = new java.util.LinkedHashMap<String, Object>();
+                def.put("type", "function");
+                def.put("name", fn.name());
+                fn.description().ifPresent(d -> def.put("description", d));
+                fn.parameters().ifPresent(p -> def.put("parameters", p));
+                return def;
+            }).toList();
+            toolDefinitionsJson = ObjectMappers.jsonMapper().writeValueAsString(toolDefs);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

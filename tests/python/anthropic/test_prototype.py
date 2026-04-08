@@ -114,7 +114,12 @@ def run_chat_tool_call_prototype(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "anthropic")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps([request_tool]))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
+            "type": "function",
+            "name": request_tool["name"],
+            "description": request_tool["description"],
+            "parameters": request_tool["input_schema"],
+        }]))
         resp = client.messages.create(
             model=request_model,
             max_tokens=100,

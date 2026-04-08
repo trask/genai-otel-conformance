@@ -78,7 +78,15 @@ def run_invoke_agent(client):
         span.set_attribute("gen_ai.agent.id", assistant.id)
         span.set_attribute("gen_ai.agent.name", assistant.name or "")
         span.set_attribute("gen_ai.request.model", "gpt-4o-mini")
-        span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_defs))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([
+            {
+                "type": t["type"],
+                "name": t["function"]["name"],
+                "description": t["function"]["description"],
+                "parameters": t["function"]["parameters"],
+            }
+            for t in tool_defs
+        ]))
         span.set_attribute("server.address", _SERVER_ADDRESS)
         span.set_attribute("server.port", _SERVER_PORT)
         try:

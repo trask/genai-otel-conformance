@@ -110,11 +110,9 @@ def run_chat_tool_call_prototype(client):
         span.set_attribute("gen_ai.request.model", request_model)
         span.set_attribute("gen_ai.tool.definitions", json.dumps([{
             "type": "function",
-            "function": {
-                "name": tool.function.name,
-                "description": tool.function.description,
-                "parameters": tool.function.parameters,
-            },
+            "name": tool.function.name,
+            "description": tool.function.description,
+            "parameters": tool.function.parameters,
         }]))
         if endpoint.hostname:
             span.set_attribute("server.address", endpoint.hostname)
