@@ -24,6 +24,11 @@ class UvNotInstalledError(RuntimeError):
     """Raised when uv is required but not installed."""
 
 
+PYTHON_TEST_ENV_VERSION_BY_LIBRARY = {
+    "crewai": "3.12",
+}
+
+
 @dataclass(frozen=True)
 class LanguageAdapter:
     install_dependencies: Callable[[str, str], None]
@@ -87,15 +92,31 @@ def _python_test_env_dir(lib: str, ecosystem: str) -> Path:
     return REPO_ROOT / ".cache" / "python-test-envs" / f"{lib}-{ecosystem}"
 
 
+def _requested_python_for_test_env(lib: str) -> str:
+    return PYTHON_TEST_ENV_VERSION_BY_LIBRARY.get(lib, sys.executable)
+
+
+def _python_version(python_executable: Path) -> str:
+    return subprocess.check_output(
+        [str(python_executable), "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+        text=True,
+    ).strip()
+
+
 def _ensure_python_test_env(lib: str, ecosystem: str) -> Path:
     """Create and populate an isolated Python env for one conformance test."""
     env_dir = _python_test_env_dir(lib, ecosystem)
     python_executable = _python_executable_for_env(env_dir)
+    requested_python = _requested_python_for_test_env(lib)
+    if python_executable.is_file() and requested_python != sys.executable:
+        if _python_version(python_executable) != requested_python:
+            shutil.rmtree(env_dir)
+
     if not python_executable.is_file():
         print(f"=== Creating isolated Python env: {env_dir} ===")
         env_dir.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
-            [_uv_cmd(), "venv", "--python", sys.executable, str(env_dir)],
+            [_uv_cmd(), "venv", "--python", requested_python, str(env_dir)],
             cwd=REPO_ROOT,
             check=True,
         )
