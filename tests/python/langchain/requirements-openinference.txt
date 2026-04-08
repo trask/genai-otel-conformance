@@ -4,4 +4,4 @@ langchain-core==1.2.27
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
 opentelemetry-exporter-otlp-proto-grpc==1.40.0
-openinference-instrumentation-langchain==0.1.61
+openinference-instrumentation-langchain==0.1.62
