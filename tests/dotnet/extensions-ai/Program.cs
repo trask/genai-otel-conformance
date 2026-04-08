@@ -166,6 +166,8 @@ class Program
             {
                 activity?.SetTag("gen_ai.usage.input_tokens", completion.Usage.InputTokenCount);
                 activity?.SetTag("gen_ai.usage.output_tokens", completion.Usage.OutputTokenCount);
+                if (completion.Usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                    activity?.SetTag("gen_ai.usage.reasoning.output_tokens", completion.Usage.OutputTokenDetails.ReasoningTokenCount);
             }
 
             var content = completion.Content[0].Text;
@@ -190,6 +192,7 @@ class Program
                 ["gen_ai.response.finish_reasons"] = new[] { completion.FinishReason.ToString() },
                 ["gen_ai.usage.input_tokens"] = completion.Usage?.InputTokenCount,
                 ["gen_ai.usage.output_tokens"] = completion.Usage?.OutputTokenCount,
+                ["gen_ai.usage.reasoning.output_tokens"] = completion.Usage?.OutputTokenDetails?.ReasoningTokenCount > 0 ? completion.Usage.OutputTokenDetails.ReasoningTokenCount : null,
                 ["gen_ai.input.messages"] = inputMessagesJson,
                 ["gen_ai.output.messages"] = outputMessagesJson,
                 ["server.address"] = endpoint.Host,
@@ -227,6 +230,8 @@ class Program
                 {
                     activity?.SetTag("gen_ai.usage.input_tokens", update.Usage.InputTokenCount);
                     activity?.SetTag("gen_ai.usage.output_tokens", update.Usage.OutputTokenCount);
+                    if (update.Usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                        activity?.SetTag("gen_ai.usage.reasoning.output_tokens", update.Usage.OutputTokenDetails.ReasoningTokenCount);
                 }
             }
 
@@ -300,6 +305,8 @@ class Program
             {
                 activity?.SetTag("gen_ai.usage.input_tokens", completion.Usage.InputTokenCount);
                 activity?.SetTag("gen_ai.usage.output_tokens", completion.Usage.OutputTokenCount);
+                if (completion.Usage.OutputTokenDetails?.ReasoningTokenCount > 0)
+                    activity?.SetTag("gen_ai.usage.reasoning.output_tokens", completion.Usage.OutputTokenDetails.ReasoningTokenCount);
             }
 
             if (completion.ToolCalls.Count > 0)
