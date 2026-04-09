@@ -100,7 +100,7 @@ def _is_remote_agent(ctx: SpanInfo) -> bool:
     )
 
 
-def _is_invoke_agent_span(ctx: SpanInfo) -> bool:
+def _is_invoke_agent_client_span(ctx: SpanInfo) -> bool:
     return _is_invoke_agent_like(ctx) and _is_remote_agent(ctx)
 
 
@@ -138,7 +138,7 @@ _SPAN_TYPE_CLASSIFIERS: list[tuple[str, Callable[[SpanInfo], bool]]] = [
     ("embeddings", _is_embeddings_span),
     ("inference", _is_inference_span),
     ("create_agent", _is_create_agent_span),
-    ("invoke_agent", _is_invoke_agent_span),
+    ("invoke_agent_client", _is_invoke_agent_client_span),
     ("invoke_agent_internal", _is_invoke_agent_internal_span),
     ("execute_tool", _is_execute_tool_span),
     ("invoke_workflow", _is_invoke_workflow_span),

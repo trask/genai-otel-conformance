@@ -1,6 +1,6 @@
 {
   "spans": {
-    "invoke_agent": [
+    "invoke_agent_client": [
       "gen_ai.agent.id",
       "gen_ai.agent.name",
       "gen_ai.operation.name",
