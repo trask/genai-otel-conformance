@@ -43,6 +43,9 @@ async function main() {
     if (resp.usage) {
       span.setAttribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens);
       span.setAttribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens);
+      if (resp.usage.completion_tokens_details?.reasoning_tokens) {
+        span.setAttribute("gen_ai.usage.reasoning.output_tokens", resp.usage.completion_tokens_details.reasoning_tokens);
+      }
     }
 
     // Emit inference operation details event
@@ -58,6 +61,7 @@ async function main() {
         "gen_ai.response.finish_reasons": resp.choices.map(c => c.finish_reason),
         "gen_ai.usage.input_tokens": resp.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": resp.usage?.completion_tokens,
+        "gen_ai.usage.reasoning.output_tokens": resp.usage?.completion_tokens_details?.reasoning_tokens || undefined,
         "gen_ai.input.messages": JSON.stringify(
           messages.map(m => ({ role: m.role, parts: [{ type: "text", content: m.content }] }))
         ),
@@ -101,6 +105,7 @@ async function main() {
     let finishReason = "";
     let inputTokens = 0;
     let outputTokens = 0;
+    let reasoningTokens: number | undefined;
     for await (const chunk of stream) {
       if (chunk.choices[0]?.delta?.content) {
         text += chunk.choices[0].delta.content;
@@ -113,6 +118,9 @@ async function main() {
       if (chunk.usage) {
         inputTokens = chunk.usage.prompt_tokens;
         outputTokens = chunk.usage.completion_tokens;
+        if (chunk.usage.completion_tokens_details?.reasoning_tokens) {
+          reasoningTokens = chunk.usage.completion_tokens_details.reasoning_tokens;
+        }
       }
     }
     span.setAttribute("gen_ai.response.model", model);
@@ -122,6 +130,7 @@ async function main() {
     }
     if (inputTokens) span.setAttribute("gen_ai.usage.input_tokens", inputTokens);
     if (outputTokens) span.setAttribute("gen_ai.usage.output_tokens", outputTokens);
+    if (reasoningTokens) span.setAttribute("gen_ai.usage.reasoning.output_tokens", reasoningTokens);
     console.log(`    -> ${text.slice(0, 60)}`);
     span.end();
   });
@@ -169,6 +178,9 @@ async function main() {
     if (resp.usage) {
       span.setAttribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens);
       span.setAttribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens);
+      if (resp.usage.completion_tokens_details?.reasoning_tokens) {
+        span.setAttribute("gen_ai.usage.reasoning.output_tokens", resp.usage.completion_tokens_details.reasoning_tokens);
+      }
     }
     const toolCall = resp.choices[0].message.tool_calls?.[0];
     if (toolCall?.type === "function") {
