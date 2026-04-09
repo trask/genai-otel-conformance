@@ -161,9 +161,9 @@ public class AwsBedrockPrototypeTest {
         ToolConfiguration toolConfig = ToolConfiguration.builder()
                 .tools(Tool.builder().toolSpec(toolSpec).build())
                 .build();
-        String toolDefinitionsJson = "[{\"toolSpec\":{\"name\":\"get_weather\",\"description\":\"Get the current weather\"," +
-                "\"inputSchema\":{\"json\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\"," +
-                "\"description\":\"City name\"}},\"required\":[\"location\"]}}}}]";
+        String toolDefinitionsJson = "[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get the current weather\"," +
+                "\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\"," +
+                "\"description\":\"City name\"}},\"required\":[\"location\"]}}]";
         Span span = tracer.spanBuilder("chat " + modelId).startSpan();
         try {
             try (var scope = span.makeCurrent()) {

@@ -131,7 +131,14 @@ async function main() {
         },
       }],
     };
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify(
+      requestTool.functionDeclarations.map((fn: any) => ({
+        type: "function",
+        name: fn.name,
+        description: fn.description,
+        parameters: fn.parameters,
+      }))
+    ));
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: "What's the weather in Seattle?" }] }],
       tools: [requestTool],

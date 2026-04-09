@@ -147,7 +147,15 @@ def run_chat_tool_call_prototype(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([
+            {
+                "type": t["type"],
+                "name": t["function"]["name"],
+                "description": t["function"]["description"],
+                "parameters": t["function"]["parameters"],
+            }
+            for t in tools
+        ]))
         if endpoint.hostname:
             span.set_attribute("server.address", endpoint.hostname)
         if endpoint.port is not None:
