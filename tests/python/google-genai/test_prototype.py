@@ -48,8 +48,6 @@ def run_chat():
                 span.set_attribute("gen_ai.usage.input_tokens", response.usage_metadata.prompt_token_count)
             if hasattr(response.usage_metadata, "candidates_token_count") and response.usage_metadata.candidates_token_count:
                 span.set_attribute("gen_ai.usage.output_tokens", response.usage_metadata.candidates_token_count)
-            if hasattr(response.usage_metadata, "thoughts_token_count") and response.usage_metadata.thoughts_token_count:
-                span.set_attribute("gen_ai.usage.reasoning.output_tokens", response.usage_metadata.thoughts_token_count)
 
         # Emit inference operation details event
         event_attrs = {
@@ -75,8 +73,6 @@ def run_chat():
                 event_attrs["gen_ai.usage.input_tokens"] = response.usage_metadata.prompt_token_count
             if hasattr(response.usage_metadata, "candidates_token_count") and response.usage_metadata.candidates_token_count:
                 event_attrs["gen_ai.usage.output_tokens"] = response.usage_metadata.candidates_token_count
-            if hasattr(response.usage_metadata, "thoughts_token_count") and response.usage_metadata.thoughts_token_count:
-                event_attrs["gen_ai.usage.reasoning.output_tokens"] = response.usage_metadata.thoughts_token_count
         get_logger_provider().get_logger("gen_ai.prototype").emit(
             event_name="gen_ai.client.inference.operation.details",
             body="Inference operation details",
@@ -190,8 +186,6 @@ def run_chat_streaming():
                 span.set_attribute("gen_ai.usage.input_tokens", last_chunk.usage_metadata.prompt_token_count)
             if hasattr(last_chunk.usage_metadata, "candidates_token_count") and last_chunk.usage_metadata.candidates_token_count:
                 span.set_attribute("gen_ai.usage.output_tokens", last_chunk.usage_metadata.candidates_token_count)
-            if hasattr(last_chunk.usage_metadata, "thoughts_token_count") and last_chunk.usage_metadata.thoughts_token_count:
-                span.set_attribute("gen_ai.usage.reasoning.output_tokens", last_chunk.usage_metadata.thoughts_token_count)
         print(f"    -> {text[:60]}")
 
 

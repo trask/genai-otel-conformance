@@ -36,9 +36,6 @@ OPENAI_CHAT_RESPONSE = {
         "prompt_tokens": 25,
         "completion_tokens": 12,
         "total_tokens": 37,
-        "completion_tokens_details": {
-            "reasoning_tokens": 5,
-        },
     },
 }
 
@@ -71,9 +68,6 @@ OPENAI_CHAT_TOOL_CALL_RESPONSE = {
         "prompt_tokens": 50,
         "completion_tokens": 20,
         "total_tokens": 70,
-        "completion_tokens_details": {
-            "reasoning_tokens": 8,
-        },
     },
 }
 
@@ -223,9 +217,6 @@ def _stream_openai_chat(body):
                 "prompt_tokens": 25,
                 "completion_tokens": 6,
                 "total_tokens": 31,
-                "completion_tokens_details": {
-                    "reasoning_tokens": 2,
-                },
             },
         }
     )
@@ -439,7 +430,6 @@ GOOGLE_GENAI_RESPONSE = {
         "promptTokenCount": 25,
         "candidatesTokenCount": 12,
         "totalTokenCount": 37,
-        "thoughtsTokenCount": 5,
     },
     "modelVersion": "gemini-2.0-flash",
 }
@@ -471,7 +461,6 @@ def _stream_google_genai():
             "promptTokenCount": 25,
             "candidatesTokenCount": 6,
             "totalTokenCount": 31,
-            "thoughtsTokenCount": 2,
         },
     }
     yield json.dumps(final) + "\n"
@@ -526,7 +515,6 @@ def _google_genai_stream_chunks():
             "promptTokenCount": 25,
             "candidatesTokenCount": 6,
             "totalTokenCount": 31,
-            "thoughtsTokenCount": 2,
         },
     })
     return chunks

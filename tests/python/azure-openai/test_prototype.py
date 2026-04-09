@@ -38,9 +38,6 @@ def run_chat_prototype(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
-            if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
-                if getattr(resp.usage.completion_tokens_details, "reasoning_tokens", None):
-                    span.set_attribute("gen_ai.usage.reasoning.output_tokens", resp.usage.completion_tokens_details.reasoning_tokens)
 
         # Emit inference operation details event
         event_attrs = {
@@ -65,9 +62,6 @@ def run_chat_prototype(client):
         if resp.usage:
             event_attrs["gen_ai.usage.input_tokens"] = resp.usage.prompt_tokens
             event_attrs["gen_ai.usage.output_tokens"] = resp.usage.completion_tokens
-            if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
-                if getattr(resp.usage.completion_tokens_details, "reasoning_tokens", None):
-                    event_attrs["gen_ai.usage.reasoning.output_tokens"] = resp.usage.completion_tokens_details.reasoning_tokens
         if endpoint.hostname:
             event_attrs["server.address"] = endpoint.hostname
         if endpoint.port is not None:
@@ -106,7 +100,6 @@ def run_chat_streaming_prototype(client):
         finish_reasons = []
         input_tokens = None
         output_tokens = None
-        reasoning_tokens = None
         for chunk in stream:
             model = model or getattr(chunk, "model", None)
             response_id = response_id or getattr(chunk, "id", None)
@@ -117,9 +110,6 @@ def run_chat_streaming_prototype(client):
             if chunk.usage:
                 input_tokens = chunk.usage.prompt_tokens
                 output_tokens = chunk.usage.completion_tokens
-                if hasattr(chunk.usage, "completion_tokens_details") and chunk.usage.completion_tokens_details:
-                    if getattr(chunk.usage.completion_tokens_details, "reasoning_tokens", None):
-                        reasoning_tokens = chunk.usage.completion_tokens_details.reasoning_tokens
         if model:
             span.set_attribute("gen_ai.response.model", model)
         if response_id:
@@ -130,8 +120,6 @@ def run_chat_streaming_prototype(client):
             span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
         if output_tokens is not None:
             span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
-        if reasoning_tokens:
-            span.set_attribute("gen_ai.usage.reasoning.output_tokens", reasoning_tokens)
         print(f"    -> {text[:60]}")
 
 
@@ -183,9 +171,6 @@ def run_chat_tool_call_prototype(client):
         if resp.usage:
             span.set_attribute("gen_ai.usage.input_tokens", resp.usage.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", resp.usage.completion_tokens)
-            if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
-                if getattr(resp.usage.completion_tokens_details, "reasoning_tokens", None):
-                    span.set_attribute("gen_ai.usage.reasoning.output_tokens", resp.usage.completion_tokens_details.reasoning_tokens)
         choice = resp.choices[0]
         if choice.message.tool_calls:
             print(f"    -> tool_call: {choice.message.tool_calls[0].function.name}")
