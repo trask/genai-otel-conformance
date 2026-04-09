@@ -259,6 +259,7 @@ def run_evaluation():
         display_table=False,
     )
 
+    history_before = len(lm.history)
     with _prototype_tracer.start_as_current_span("prototype.evaluation", kind=SpanKind.INTERNAL) as span:
         try:
             result = evaluate(EchoProgram())
@@ -273,6 +274,13 @@ def run_evaluation():
             response = history_entry.get("response") if history_entry is not None else None
             response_id = getattr(response, "id", None)
 
+            total_input_tokens = 0
+            total_output_tokens = 0
+            for entry in lm.history[history_before:]:
+                usage = entry.get("usage", {})
+                total_input_tokens += usage.get("prompt_tokens", 0)
+                total_output_tokens += usage.get("completion_tokens", 0)
+
             attributes = {
                 "gen_ai.evaluation.name": contains_mock_response.__name__,
                 "gen_ai.evaluation.score.label": score_label,
@@ -281,6 +289,10 @@ def run_evaluation():
             }
             if response_id:
                 attributes["gen_ai.response.id"] = response_id
+            if total_input_tokens:
+                attributes["gen_ai.usage.input_tokens"] = total_input_tokens
+            if total_output_tokens:
+                attributes["gen_ai.usage.output_tokens"] = total_output_tokens
             get_logger_provider().get_logger("gen_ai.evaluation.prototype").emit(
                 event_name="gen_ai.evaluation.result",
                 body="Evaluation result",
