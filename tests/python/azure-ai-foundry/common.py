@@ -45,10 +45,13 @@ def run_invoke_agent(client):
     """Exercise Azure AI Foundry Agents API with manual OTel spans.
 
     Creates a CLIENT span with gen_ai invoke_agent attributes to demonstrate
-    what an instrumentation library should capture for the Azure AI Agents API
-    (create agent, create_thread_and_process_run, get result).
+    what an instrumentation library should capture for the Azure AI Foundry v2
+    agent flow (create agent version, invoke through Responses API, get
+    result).
     """
     print("  [invoke_agent] Azure AI Foundry Agents: create + run")
+
+    from azure.ai.projects.models import PromptAgentDefinition
 
     tool_defs = [
         {
@@ -67,16 +70,18 @@ def run_invoke_agent(client):
         }
     ]
 
-    # Create agent
-    agent = client.agents.create_agent(
-        model=AGENT_MODEL,
-        name=AGENT_NAME,
-        instructions="You are a helpful assistant.",
-        tools=tool_defs,
+    # Create agent version using the v2 AIProjectClient surface.
+    agent = client.agents.create_version(
+        agent_name=AGENT_NAME,
+        definition=PromptAgentDefinition(
+            model=AGENT_MODEL,
+            instructions="You are a helpful assistant.",
+            tools=tool_defs,
+        ),
     )
 
-    # Create thread, add message, and run — all in one call, wrapped in manual span
-    from azure.ai.agents.models import AgentThreadCreationOptions, ThreadMessageOptions
+    # Invoke the agent through the Responses API, wrapped in a manual span.
+    openai_client = client.get_openai_client()
 
     with tracer.start_as_current_span("invoke_agent", kind=SpanKind.CLIENT) as span:
         span.set_attribute("gen_ai.operation.name", "invoke_agent")
@@ -88,30 +93,30 @@ def run_invoke_agent(client):
         span.set_attribute("server.address", _SERVER_ADDRESS)
         span.set_attribute("server.port", _SERVER_PORT)
         try:
-            run = client.agents.create_thread_and_run(
-                agent_id=agent.id,
-                thread=AgentThreadCreationOptions(
-                    messages=[
-                        ThreadMessageOptions(
-                            role="user",
-                            content="Hello, agent!",
-                        ),
-                    ],
-                ),
+            response = openai_client.responses.create(
+                input="Hello, agent!",
+                extra_body={
+                    "agent_reference": {
+                        "name": agent.name,
+                        "type": "agent_reference",
+                    }
+                },
             )
 
-            if run.usage:
-                span.set_attribute("gen_ai.usage.input_tokens", run.usage.prompt_tokens)
-                span.set_attribute("gen_ai.usage.output_tokens", run.usage.completion_tokens)
+            if response.usage:
+                span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
+                span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
 
-            print(f"    -> run status: {run.status}")
+            print(f"    -> response id: {response.id}")
         except Exception as exc:
             span.set_status(StatusCode.ERROR, str(exc))
             span.set_attribute("error.type", type(exc).__qualname__)
             raise
+        finally:
+            openai_client.close()
 
     # Clean up
-    client.agents.delete_agent(agent.id)
+    client.agents.delete_version(agent_name=agent.name, agent_version=agent.version)
 
 
 def run(title, instrument_fn, scenarios):

@@ -276,6 +276,7 @@ def openai_embeddings(deployment=None):
 
 
 @app.route("/v1/responses", methods=["POST"])
+@app.route("/openai/v1/responses", methods=["POST"])
 def openai_responses():
     body = request.get_json(silent=True) or {}
     resp = dict(OPENAI_RESPONSES_RESPONSE)
@@ -775,6 +776,32 @@ def cohere_embed_v1():
 
 # Shared state to track which run has been polled (for completing on second poll)
 _run_poll_count: dict[str, int] = {}
+
+
+@app.route("/agents/<agent_name>/versions", methods=["POST"])
+def create_agent_version(agent_name):
+    body = request.get_json(silent=True) or {}
+    definition = body.get("definition", {})
+    return {
+        "object": "agent.version",
+        "id": "agent-version-mock-001",
+        "name": agent_name,
+        "version": "1",
+        "description": body.get("description"),
+        "created_at": "2026-04-08T00:00:00Z",
+        "metadata": body.get("metadata", {}),
+        "definition": definition,
+    }
+
+
+@app.route("/agents/<agent_name>/versions/<agent_version>", methods=["DELETE"])
+def delete_agent_version(agent_name, agent_version):
+    return {
+        "object": "agent.version.deleted",
+        "name": agent_name,
+        "version": agent_version,
+        "deleted": True,
+    }
 
 
 @app.route("/v1/assistants", methods=["POST"])
