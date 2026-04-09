@@ -1,5 +1,5 @@
 instructor==1.15.1
-openai==2.30.0
+openai==2.31.0
 pydantic==2.12.5
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
