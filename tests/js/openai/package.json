@@ -9,7 +9,7 @@
     "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
-    "openai": "6.33.0",
+    "openai": "6.34.0",
     "@traceloop/instrumentation-openai": "0.24.0",
     "@arizeai/openinference-instrumentation-openai": "4.0.6",
     "@opentelemetry/instrumentation-openai": "0.12.0"
