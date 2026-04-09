@@ -82,9 +82,6 @@ async function main() {
       if (resp.usageMetadata.candidatesTokenCount) {
         span.setAttribute("gen_ai.usage.output_tokens", resp.usageMetadata.candidatesTokenCount);
       }
-      if ((resp.usageMetadata as any).thoughtsTokenCount) {
-        span.setAttribute("gen_ai.usage.reasoning.output_tokens", (resp.usageMetadata as any).thoughtsTokenCount);
-      }
     }
     const text = candidate?.content?.parts?.[0]?.text ?? "";
 
@@ -100,7 +97,6 @@ async function main() {
         "gen_ai.response.finish_reasons": candidate?.finishReason ? [candidate.finishReason] : undefined,
         "gen_ai.usage.input_tokens": resp.usageMetadata?.promptTokenCount,
         "gen_ai.usage.output_tokens": resp.usageMetadata?.candidatesTokenCount,
-        "gen_ai.usage.reasoning.output_tokens": (resp.usageMetadata as any)?.thoughtsTokenCount || undefined,
         "gen_ai.input.messages": JSON.stringify([
           { role: "user", parts: [{ type: "text", content: userMessage }] }
         ]),
@@ -197,9 +193,6 @@ async function main() {
       }
       if (aggregated.usageMetadata.candidatesTokenCount) {
         span.setAttribute("gen_ai.usage.output_tokens", aggregated.usageMetadata.candidatesTokenCount);
-      }
-      if ((aggregated.usageMetadata as any).thoughtsTokenCount) {
-        span.setAttribute("gen_ai.usage.reasoning.output_tokens", (aggregated.usageMetadata as any).thoughtsTokenCount);
       }
     }
     console.log(`    -> ${text.slice(0, 60)}`);
