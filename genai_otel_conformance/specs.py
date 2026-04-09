@@ -177,7 +177,7 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
         recommended=tuple(_CLIENT_RECOMMENDED),
         opt_in=("gen_ai.system_instructions",),
     ),
-    "invoke_agent": SignalTypeSpec(
+    "invoke_agent_client": SignalTypeSpec(
         label="Invoke Agent Client",
         discriminator_attrs=frozenset({"gen_ai.agent.id", "gen_ai.agent.name"}),
         required=tuple(_COMMON_REQUIRED + _PROVIDER_REQUIRED),
@@ -208,7 +208,7 @@ SPAN_TYPE_SPECS: dict[str, SignalTypeSpec] = {
 
 SPAN_TYPE_ORDER = [
     "create_agent",
-    "invoke_agent",
+    "invoke_agent_client",
     "invoke_agent_internal",
     "invoke_workflow",
     "inference",
