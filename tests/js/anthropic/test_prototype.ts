@@ -147,12 +147,7 @@ async function main() {
     span.setAttribute("gen_ai.provider.name", "anthropic");
     span.setAttribute("gen_ai.request.model", requestModel);
     span.setAttribute("gen_ai.request.max_tokens", requestMaxTokens);
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([{
-      type: "function",
-      name: requestTool.name,
-      description: requestTool.description,
-      parameters: requestTool.input_schema,
-    }]));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
     const resp = await client.messages.create({
       model: requestModel,
       max_tokens: requestMaxTokens,

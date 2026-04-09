@@ -98,12 +98,7 @@ async function main() {
         },
       },
     };
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([{
-      type: requestTool.type,
-      name: requestTool.function.name,
-      description: requestTool.function.description,
-      parameters: requestTool.function.parameters,
-    }]));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
     const resp = await llm.chat({
       messages: [{ role: "user", content: "What's the weather in Seattle?" }],
       additionalChatOptions: { tools: [requestTool] },

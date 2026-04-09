@@ -271,13 +271,17 @@ class Program
             };
             options.Tools.Add(weatherTool);
 
+            // Derive from options.Tools — the same collection passed to CompleteChatAsync (OpenAI function-calling format)
             var toolDefinitionsJson = JsonSerializer.Serialize(
                 options.Tools.Select(t => new Dictionary<string, object>
                 {
                     ["type"] = "function",
-                    ["name"] = t.FunctionName,
-                    ["description"] = t.FunctionDescription,
-                    ["parameters"] = JsonSerializer.Deserialize<JsonElement>(t.FunctionParameters)
+                    ["function"] = new
+                    {
+                        name = t.FunctionName,
+                        description = t.FunctionDescription,
+                        parameters = JsonSerializer.Deserialize<JsonElement>(t.FunctionParameters)
+                    }
                 }).ToArray()
             );
             activity?.SetTag("gen_ai.operation.name", "chat");

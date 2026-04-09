@@ -171,12 +171,7 @@ def run_chat_tool_call():
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps([{
-            "type": request_tool["type"],
-            "name": request_tool["function"]["name"],
-            "description": request_tool["function"]["description"],
-            "parameters": request_tool["function"]["parameters"],
-        }]))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([request_tool]))
         span.set_attribute(
             "gen_ai.input.messages",
             json.dumps([
