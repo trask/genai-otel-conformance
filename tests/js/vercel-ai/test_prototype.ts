@@ -146,10 +146,9 @@ async function main() {
       "gen_ai.tool.definitions",
       JSON.stringify(
         Object.entries(tools).map(([name, t]) => ({
-          type: "function",
           name: name,
           description: t.description,
-          parameters: toJSONSchema(t.inputSchema!),
+          inputSchema: toJSONSchema(t.inputSchema!),
         })),
       ),
     );

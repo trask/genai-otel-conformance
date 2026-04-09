@@ -157,12 +157,7 @@ async function main() {
     span.setAttribute("gen_ai.operation.name", "chat");
     span.setAttribute("gen_ai.provider.name", "openai");
     span.setAttribute("gen_ai.request.model", requestModel);
-    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([{
-      type: requestTool.type,
-      name: requestTool.function.name,
-      description: requestTool.function.description,
-      parameters: requestTool.function.parameters,
-    }]));
+    span.setAttribute("gen_ai.tool.definitions", JSON.stringify([requestTool]));
     span.setAttribute("server.address", endpoint.hostname);
     if (endpoint.port) {
       span.setAttribute("server.port", Number(endpoint.port));

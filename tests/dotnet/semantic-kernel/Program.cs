@@ -301,23 +301,28 @@ class Program
         using (var activity = s_manualActivitySource.StartActivity("chat gpt-4o-mini"))
         {
             var endpoint = new Uri(mockBaseUrl);
+            // Semantic Kernel converts plugins to OpenAI function-calling format
+            // before sending to the API, so we mirror that shape here.
             var toolDefinitionsJson = JsonSerializer.Serialize(
                 kernel.Plugins
                     .SelectMany(p => p)
                     .Select(f => new Dictionary<string, object>
                     {
                         ["type"] = "function",
-                        ["name"] = f.Name,
-                        ["description"] = f.Description,
-                        ["parameters"] = new
+                        ["function"] = new
                         {
-                            type = "object",
-                            properties = f.Metadata.Parameters.ToDictionary(
-                                p => p.Name,
-                                p => new { type = ToJsonSchemaType(p.ParameterType) }),
-                            required = f.Metadata.Parameters
-                                .Where(p => p.IsRequired)
-                                .Select(p => p.Name)
+                            name = f.Name,
+                            description = f.Description,
+                            parameters = new
+                            {
+                                type = "object",
+                                properties = f.Metadata.Parameters.ToDictionary(
+                                    p => p.Name,
+                                    p => new { type = ToJsonSchemaType(p.ParameterType) }),
+                                required = f.Metadata.Parameters
+                                    .Where(p => p.IsRequired)
+                                    .Select(p => p.Name)
+                            }
                         }
                     }));
             activity?.SetTag("gen_ai.operation.name", "chat");

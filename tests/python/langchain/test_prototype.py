@@ -120,10 +120,9 @@ def run_agent_prototype(llm, request_model):
         return "Sunny, 72°F"
 
     tool_definition = {
-        "type": "function",
         "name": get_weather.name,
         "description": get_weather.description,
-        "parameters": get_weather.args_schema.model_json_schema(),
+        "args_schema": get_weather.args_schema.model_json_schema(),
     }
 
     with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:

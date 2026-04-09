@@ -98,15 +98,7 @@ def run_chat_tool_call(client):
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "cohere")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps([
-            {
-                "type": t["type"],
-                "name": t["function"]["name"],
-                "description": t["function"]["description"],
-                "parameters": t["function"]["parameters"],
-            }
-            for t in tools
-        ]))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps(tools))
         resp = client.chat(
             model=request_model,
             messages=[{"role": "user", "content": "What's the weather in Seattle?"}],

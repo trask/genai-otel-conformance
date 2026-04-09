@@ -121,15 +121,7 @@ def run_agent_prototype():
                 span.set_attribute("gen_ai.provider.name", "google_genai")
                 span.set_attribute("gen_ai.conversation.id", session.id)
                 span.set_attribute("gen_ai.request.model", request_model)
-                span.set_attribute("gen_ai.tool.definitions", json.dumps([
-                    {
-                        "type": "function",
-                        "name": t["name"],
-                        "description": t["description"],
-                        "parameters": t["parameters"],
-                    }
-                    for t in tool_defs
-                ]))
+                span.set_attribute("gen_ai.tool.definitions", json.dumps(tool_defs))
                 usage_metadata = None
                 finish_reason = None
                 try:
