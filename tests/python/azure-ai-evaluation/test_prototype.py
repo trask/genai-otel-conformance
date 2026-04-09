@@ -36,23 +36,15 @@ def run_evaluation():
             score = float(result["relevance"])
             score_label = str(result["relevance_result"])
 
-            attributes = {
-                "gen_ai.evaluation.name": evaluation_name,
-                "gen_ai.evaluation.score.label": score_label,
-                "gen_ai.evaluation.score.value": score,
-                "gen_ai.evaluation.explanation": str(result["relevance_reason"]),
-            }
-            prompt_tokens = result.get("relevance_prompt_tokens")
-            completion_tokens = result.get("relevance_completion_tokens")
-            if prompt_tokens is not None:
-                attributes["gen_ai.usage.input_tokens"] = int(prompt_tokens)
-            if completion_tokens is not None:
-                attributes["gen_ai.usage.output_tokens"] = int(completion_tokens)
-
             get_logger_provider().get_logger("gen_ai.evaluation.prototype").emit(
                 event_name="gen_ai.evaluation.result",
                 body="Evaluation result",
-                attributes=attributes,
+                attributes={
+                    "gen_ai.evaluation.explanation": str(result["relevance_reason"]),
+                    "gen_ai.evaluation.name": evaluation_name,
+                    "gen_ai.evaluation.score.label": score_label,
+                    "gen_ai.evaluation.score.value": score,
+                },
             )
 
             print(f"    -> score: {score}")
