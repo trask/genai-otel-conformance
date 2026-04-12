@@ -10,6 +10,6 @@
   "dependencies": {
     "ai": "6.0.158",
     "@ai-sdk/openai": "3.0.52",
-    "@arizeai/openinference-vercel": "2.7.2"
+    "@arizeai/openinference-vercel": "2.7.3"
   }
 }
