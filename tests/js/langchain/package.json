@@ -11,6 +11,6 @@
     "@arizeai/openinference-instrumentation-langchain": "4.0.8",
     "@langchain/core": "1.1.39",
     "@langchain/openai": "1.4.4",
-    "@traceloop/instrumentation-langchain": "0.24.0"
+    "@traceloop/instrumentation-langchain": "0.25.0"
   }
 }

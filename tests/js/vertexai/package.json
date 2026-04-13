@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@google-cloud/vertexai": "1.11.0",
-    "@traceloop/instrumentation-vertexai": "0.24.0"
+    "@traceloop/instrumentation-vertexai": "0.25.0"
   }
 }
