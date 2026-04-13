@@ -22,6 +22,30 @@
   ],
   "packageRules": [
     {
+      description: 'Group all non-major Python dependency updates into a single PR',
+      matchManagers: ['pip_requirements'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      groupName: 'python-minor',
+    },
+    {
+      description: 'Group all non-major JS dependency updates into a single PR',
+      matchManagers: ['npm'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      groupName: 'js-minor',
+    },
+    {
+      description: 'Group all non-major Java dependency updates into a single PR',
+      matchManagers: ['gradle'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      groupName: 'java-minor',
+    },
+    {
+      description: 'Group all non-major .NET dependency updates into a single PR',
+      matchManagers: ['nuget'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      groupName: 'dotnet-minor',
+    },
+    {
       groupName: 'github actions',
       matchManagers: [
         'github-actions',
@@ -29,75 +53,6 @@
       schedule: [
         '* * 2 * *', // monthly, on the 2nd
       ],
-    },
-    {
-      description: 'Python OpenTelemetry SDK packages',
-      matchManagers: ['pip_requirements'],
-      matchPackageNames: [
-        'opentelemetry-**',
-        '!opentelemetry-instrumentation**',
-      ],
-      groupName: 'python-opentelemetry',
-    },
-    {
-      description: 'JS OpenTelemetry SDK packages',
-      matchManagers: ['npm'],
-      matchPackageNames: [
-        '@opentelemetry/**',
-        '!@opentelemetry/instrumentation**',
-      ],
-      groupName: 'js-opentelemetry',
-    },
-    {
-      description: 'Java OpenTelemetry SDK packages',
-      matchManagers: ['gradle'],
-      matchPackageNames: [
-        'io.opentelemetry**',
-        '!io.opentelemetry.instrumentation**',
-      ],
-      groupName: 'java-opentelemetry',
-    },
-    {
-      description: '.NET OpenTelemetry packages',
-      matchManagers: ['nuget'],
-      matchPackageNames: ['OpenTelemetry**'],
-      groupName: 'dotnet-opentelemetry',
-    },
-    {
-      description: 'Python OpenTelemetry instrumentation packages (OpenLLMetry + otel-python-contrib)',
-      matchManagers: ['pip_requirements'],
-      matchPackageNames: ['opentelemetry-instrumentation-**'],
-      groupName: 'python-opentelemetry-instrumentation',
-    },
-    {
-      description: 'Python OpenInference instrumentation packages',
-      matchManagers: ['pip_requirements'],
-      matchPackageNames: ['openinference-instrumentation-**'],
-      groupName: 'python-openinference-instrumentation',
-    },
-    {
-      description: 'JS Traceloop instrumentation packages',
-      matchManagers: ['npm'],
-      matchPackageNames: ['@traceloop/instrumentation-**'],
-      groupName: 'js-traceloop-instrumentation',
-    },
-    {
-      description: 'JS OpenTelemetry contrib instrumentation packages',
-      matchManagers: ['npm'],
-      matchPackageNames: ['@opentelemetry/instrumentation**'],
-      groupName: 'opentelemetry-js-contrib',
-    },
-    {
-      description: 'Python LlamaIndex packages',
-      matchManagers: ['pip_requirements'],
-      matchPackageNames: ['llama-index-**'],
-      groupName: 'python-llamaindex',
-    },
-    {
-      description: 'Python Google GenAI packages',
-      matchManagers: ['pip_requirements'],
-      matchPackageNames: ['google-genai', 'google-adk', 'google-cloud-aiplatform'],
-      groupName: 'python-google-genai',
     },
   ],
   "labels": [
