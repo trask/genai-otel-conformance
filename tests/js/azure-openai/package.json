@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "openai": "6.34.0",
-    "@traceloop/instrumentation-openai": "0.24.0",
+    "@traceloop/instrumentation-openai": "0.25.0",
     "@arizeai/openinference-instrumentation-openai": "4.0.7",
     "@opentelemetry/instrumentation-openai": "0.12.0"
   }
