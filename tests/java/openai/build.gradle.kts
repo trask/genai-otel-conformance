@@ -20,9 +20,9 @@ repositories {
 dependencies {
     implementation("com.openai:openai-java:4.31.0")
     implementation("io.opentelemetry.instrumentation:opentelemetry-openai-java-1.1:2.26.0-alpha")
-    implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.60.1")
-    implementation("io.opentelemetry:opentelemetry-sdk-extension-incubator:1.60.1-alpha")
-    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.60.1")
+    implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.61.0")
+    implementation("io.opentelemetry:opentelemetry-sdk-extension-incubator:1.61.0-alpha")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.61.0")
 }
 
 val mainSourceSet = sourceSets["main"]
