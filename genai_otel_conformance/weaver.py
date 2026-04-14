@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
@@ -15,6 +16,15 @@ import zipfile
 from pathlib import Path
 
 from genai_otel_conformance import REPO_ROOT
+
+POLICIES_SOURCE_DIR = REPO_ROOT / "policies"
+
+# Maps Rego constant name → schema filename in docs/gen-ai/ of the semconv repo.
+_GENAI_SCHEMA_FILES: dict[str, str] = {
+    "input_messages":      "gen-ai-input-messages.json",
+    "output_messages":     "gen-ai-output-messages.json",
+    "system_instructions": "gen-ai-system-instructions.json",
+}
 
 VERSIONS_FILE = REPO_ROOT / "versions.env"
 
@@ -203,3 +213,49 @@ def ensure_semconv_registry() -> str:
         )
 
     return str(model_dir)
+
+
+def _generate_schemas_rego(schemas: dict[str, object]) -> str:
+    """Return a Rego source that defines schema constants for the live_check_advice package.
+
+    Each constant is named _schema_<key> and holds the JSON Schema object inlined
+    from the semconv repository.  Written to policies/_schemas.rego at test-run time
+    (listed in .gitignore).
+    """
+    lines = [
+        "# Auto-generated from the semconv repository.  Do not edit.",
+        "# Re-generated each time prepare_advice_policies_dir() is called.",
+        "package live_check_advice",
+        "",
+        "import rego.v1",
+        "",
+    ]
+    for key, schema in schemas.items():
+        lines.append(f"_schema_{key} := {json.dumps(schema)}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def prepare_advice_policies_dir(semconv_registry: str) -> Path:
+    """Generate _schemas.rego into the policies directory and return it.
+
+    The directory is passed to ``weaver registry live-check --advice-policies``.
+    Weaver only loads .rego files from this directory, so JSON schemas are inlined
+    as Rego constants rather than loaded as OPA data documents.
+    """
+    semconv_root = Path(semconv_registry).parent  # model/ → semconv repo root
+    docs_genai = semconv_root / "docs" / "gen-ai"
+
+    schemas: dict[str, object] = {}
+    for key, filename in _GENAI_SCHEMA_FILES.items():
+        schema_path = docs_genai / filename
+        if schema_path.exists():
+            schemas[key] = json.loads(schema_path.read_text(encoding="utf-8"))
+        else:
+            print(f"Warning: GenAI schema not found: {schema_path}", file=sys.stderr)
+
+    (POLICIES_SOURCE_DIR / "_schemas.rego").write_text(
+        _generate_schemas_rego(schemas), encoding="utf-8"
+    )
+
+    return POLICIES_SOURCE_DIR

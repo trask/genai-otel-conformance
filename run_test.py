@@ -61,6 +61,7 @@ from genai_otel_conformance.data_files import (
 from genai_otel_conformance.weaver import (
     ensure_semconv_registry,
     ensure_weaver,
+    prepare_advice_policies_dir,
 )
 
 MOCK_SERVER_PORT = 8080
@@ -164,6 +165,7 @@ def _build_weaver_command(
     config: PipelineConfig,
     weaver_bin: Path,
     result_dir: Path,
+    advice_policies_dir: Path | None = None,
 ) -> list[str]:
     command = [str(weaver_bin), "registry", "live-check"]
     if config.registry:
@@ -182,6 +184,8 @@ def _build_weaver_command(
             str(WEAVER_INACTIVITY_TIMEOUT_SECONDS),
         ]
     )
+    if advice_policies_dir is not None:
+        command.extend(["--advice-policies", str(advice_policies_dir)])
     command.extend(config.extra_weaver_args)
     return command
 
@@ -204,6 +208,8 @@ def _build_test_environment(mock_url: str, weaver_port: int) -> dict[str, str]:
         **os.environ,
         "MOCK_LLM_URL": mock_url,
         "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{weaver_port}",
+        # OTel opt-in for experimental GenAI semantic conventions.
+        "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
     }
 
 
@@ -239,6 +245,7 @@ def _start_weaver_live_check(
     config: PipelineConfig,
     state: PipelineState,
     location: TestLocation,
+    advice_policies_dir: Path | None = None,
 ) -> Path:
     """Start Weaver live-check and return the result directory."""
     test_results_dir = location.results_dir(TESTS_DIR).resolve()
@@ -246,7 +253,7 @@ def _start_weaver_live_check(
 
     print(f"=== Starting weaver live-check for: {config.test_name} (ports {config.weaver_port}/{config.admin_port}) ===")
     weaver_bin = ensure_weaver()
-    weaver_cmd = _build_weaver_command(config, weaver_bin, test_results_dir)
+    weaver_cmd = _build_weaver_command(config, weaver_bin, test_results_dir, advice_policies_dir)
 
     state.weaver_proc = subprocess.Popen(weaver_cmd)
 
@@ -311,9 +318,11 @@ def _run_test_pipeline(
     # can cause it to shut down before the test sends any data.
     LANGUAGE_ADAPTERS[location.lang].prebuild_test(location.library)
 
-    test_results_dir = _start_weaver_live_check(config, state, location)
+    advice_policies_dir = prepare_advice_policies_dir(config.registry)
+    test_results_dir = _start_weaver_live_check(config, state, location, advice_policies_dir)
 
-    test_env = _build_test_environment(config.mock_url, config.weaver_port)
+    language_extra_env = LANGUAGE_ADAPTERS[location.lang].extra_env_vars
+    test_env = {**_build_test_environment(config.mock_url, config.weaver_port), **language_extra_env}
     print(f"=== Running test: {config.test_name} ===")
     test_run = run_test_cmd(config.test_name, test_env)
     if not test_run.found:

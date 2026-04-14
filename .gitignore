@@ -1,6 +1,9 @@
 # Weaver results (generated under tests/<lang>/<lib>/results/<eco>/)
 results/
 
+# Generated at test-run time from the semconv repository
+policies/_schemas.rego
+
 # Python
 __pycache__/
 .venv/

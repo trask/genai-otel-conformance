@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
 
@@ -30,6 +30,7 @@ class LanguageAdapter:
     prebuild_test: Callable[[str], None]
     run_test: Callable[[str, str, dict[str, str]], TestCommandResult]
     list_tests: Callable[[], list[str]]
+    extra_env_vars: dict[str, str] = field(default_factory=dict)
 
 
 # ── Shared helpers ──────────────────────────────────────────────────
@@ -279,29 +280,38 @@ def _list_tests_from_matches(
 
 
 LANGUAGE_ADAPTERS: dict[str, LanguageAdapter] = {
+    # OTel python uses enum values for content capture ("SPAN_ONLY", "EVENT_ONLY", etc.).
     "python": LanguageAdapter(
         install_dependencies=_python_install_dependencies,
         prebuild_test=_noop_prebuild,
         run_test=_python_run_test,
         list_tests=_python_list_tests,
+        extra_env_vars={
+            "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "span_only",
+            "TRACELOOP_TRACE_CONTENT": "true",
+        },
     ),
+    # JS, Java, and .NET read OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT as a boolean.
     "js": LanguageAdapter(
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_js_prebuild_test,
         run_test=_js_run_test,
         list_tests=_js_list_tests,
+        extra_env_vars={"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true"},
     ),
     "java": LanguageAdapter(
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_java_prebuild_test,
         run_test=_java_run_test,
         list_tests=_java_list_tests,
+        extra_env_vars={"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true"},
     ),
     "dotnet": LanguageAdapter(
         install_dependencies=_noop_install_dependencies,
         prebuild_test=_dotnet_prebuild_test,
         run_test=_dotnet_run_test,
         list_tests=_dotnet_list_tests,
+        extra_env_vars={"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true"},
     ),
 }
 
