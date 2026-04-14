@@ -18,8 +18,8 @@ repositories {
 }
 
 dependencies {
-    implementation("software.amazon.awssdk:bedrockagentruntime:2.42.33")
-    implementation("software.amazon.awssdk:apache-client:2.42.33")
+    implementation("software.amazon.awssdk:bedrockagentruntime:2.42.34")
+    implementation("software.amazon.awssdk:apache-client:2.42.34")
     implementation("io.opentelemetry:opentelemetry-api:1.61.0")
     implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.61.0")
     implementation("io.opentelemetry:opentelemetry-sdk-extension-incubator:1.61.0-alpha")
