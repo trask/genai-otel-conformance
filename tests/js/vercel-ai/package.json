@@ -8,8 +8,8 @@
     "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
-    "ai": "6.0.159",
-    "@ai-sdk/openai": "3.0.52",
+    "ai": "6.0.160",
+    "@ai-sdk/openai": "3.0.53",
     "@arizeai/openinference-vercel": "2.7.3"
   }
 }
