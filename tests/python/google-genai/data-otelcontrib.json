@@ -22,7 +22,7 @@
       "gen_ai.token.type"
     ]
   },
-    "events": {
+  "events": {
     "gen_ai.client.inference.operation.details": [
       "gen_ai.response.finish_reasons",
       "gen_ai.tool.definitions",
