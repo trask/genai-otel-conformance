@@ -119,6 +119,7 @@ def run_agent():
         },
     )
     tool_definition = {
+        "type": "function",
         "name": weather_tool.name,
         "description": weather_tool.description,
         "parameters": weather_tool.parameters,

@@ -54,16 +54,12 @@ def run_crew():
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
-        # CrewAI converts tools to OpenAI function-calling format before
-        # passing them to litellm, so we mirror that shape here.
         span.set_attribute("gen_ai.tool.definitions", json.dumps([
             {
                 "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.func.__doc__,
-                    "parameters": t.args_schema.model_json_schema(),
-                },
+                "name": t.name,
+                "description": t.func.__doc__,
+                "parameters": t.args_schema.model_json_schema(),
             }
             for t in tools
         ]))

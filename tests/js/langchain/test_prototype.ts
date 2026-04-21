@@ -129,10 +129,9 @@ async function main() {
         }),
       },
     ];
-    // Derive from the same tools array passed to bindTools (LangChain StructuredToolParams format)
     span.setAttribute(
       "gen_ai.tool.definitions",
-      JSON.stringify(tools.map((t) => ({ name: t.name, description: t.description, schema: toJSONSchema(t.schema) }))),
+      JSON.stringify(tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: toJSONSchema(t.schema) }))),
     );
 
     const llmWithTools = llm.bindTools(tools, { tool_choice: "auto" });

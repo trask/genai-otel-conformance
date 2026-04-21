@@ -147,6 +147,7 @@ def run_tool_call():
     dspy.configure(lm=lm)
     messages = [{"role": "user", "content": prompt_text}]
     tool_definition = {
+        "type": "function",
         "name": "get_weather",
         "description": "Get the current weather for a location.",
         "parameters": {
@@ -157,14 +158,18 @@ def run_tool_call():
     }
     request_tool = {
         "type": "function",
-        "function": tool_definition,
+        "function": {
+            "name": tool_definition["name"],
+            "description": tool_definition["description"],
+            "parameters": tool_definition["parameters"],
+        },
     }
 
     with _prototype_tracer.start_as_current_span("chat gpt-4o-mini") as span:
         span.set_attribute("gen_ai.operation.name", "chat")
         span.set_attribute("gen_ai.provider.name", "openai")
         span.set_attribute("gen_ai.request.model", request_model)
-        span.set_attribute("gen_ai.tool.definitions", json.dumps([request_tool]))
+        span.set_attribute("gen_ai.tool.definitions", json.dumps([tool_definition]))
         result = lm(
             messages=messages,
             tools=[request_tool],
