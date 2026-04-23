@@ -8,8 +8,8 @@
     "test:prototype": "tsx test_prototype.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.89.0",
-    "@arizeai/openinference-instrumentation-anthropic": "0.1.9",
-    "@traceloop/instrumentation-anthropic": "0.25.0"
+    "@anthropic-ai/sdk": "0.91.0",
+    "@arizeai/openinference-instrumentation-anthropic": "0.1.10",
+    "@traceloop/instrumentation-anthropic": "0.26.0"
   }
 }
