@@ -89,6 +89,10 @@ public class OpenAiPrototypeTest {
             completion.usage().ifPresent(usage -> {
                 span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
                 span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+                usage.completionTokensDetails().ifPresent(details -> {
+                    details.reasoningTokens().filter(r -> r > 0).ifPresent(reasoning ->
+                        span.setAttribute(longKey("gen_ai.usage.reasoning.output_tokens"), reasoning));
+                });
             });
 
             String content = choice.message().content().orElse("");
@@ -132,6 +136,10 @@ public class OpenAiPrototypeTest {
                 logBuilder
                     .setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens())
                     .setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+                usage.completionTokensDetails().ifPresent(details -> {
+                    details.reasoningTokens().filter(r -> r > 0).ifPresent(reasoning ->
+                        logBuilder.setAttribute(longKey("gen_ai.usage.reasoning.output_tokens"), reasoning));
+                });
             });
             logBuilder.emit();
 
@@ -173,6 +181,10 @@ public class OpenAiPrototypeTest {
                     chunk.usage().ifPresent(usage -> {
                         span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
                         span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+                        usage.completionTokensDetails().ifPresent(details -> {
+                            details.reasoningTokens().filter(r -> r > 0).ifPresent(reasoning ->
+                                span.setAttribute(longKey("gen_ai.usage.reasoning.output_tokens"), reasoning));
+                        });
                     });
                 });
             } catch (Exception e) {
@@ -238,6 +250,10 @@ public class OpenAiPrototypeTest {
             completion.usage().ifPresent(usage -> {
                 span.setAttribute(longKey("gen_ai.usage.input_tokens"), usage.promptTokens());
                 span.setAttribute(longKey("gen_ai.usage.output_tokens"), usage.completionTokens());
+                usage.completionTokensDetails().ifPresent(details -> {
+                    details.reasoningTokens().filter(r -> r > 0).ifPresent(reasoning ->
+                        span.setAttribute(longKey("gen_ai.usage.reasoning.output_tokens"), reasoning));
+                });
             });
 
             List<ChatCompletionMessageToolCall> toolCalls =

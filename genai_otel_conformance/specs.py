@@ -64,6 +64,7 @@ _INFERENCE_RECOMMENDED = [
     "gen_ai.usage.cache_read.input_tokens",
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
+    "gen_ai.usage.reasoning.output_tokens",
 ]
 _INFERENCE_OPT_IN = [
     "gen_ai.input.messages",

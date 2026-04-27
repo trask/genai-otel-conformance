@@ -147,13 +147,17 @@ def run_agent_prototype():
                     if usage_metadata is not None:
                         prompt_token_count = getattr(usage_metadata, "prompt_token_count", None)
                         candidate_token_count = getattr(usage_metadata, "candidates_token_count", None)
+                        thoughts_token_count = getattr(usage_metadata, "thoughts_token_count", None)
                         if isinstance(usage_metadata, dict):
                             prompt_token_count = usage_metadata.get("prompt_token_count")
                             candidate_token_count = usage_metadata.get("candidates_token_count")
+                            thoughts_token_count = usage_metadata.get("thoughts_token_count")
                         if prompt_token_count is not None:
                             span.set_attribute("gen_ai.usage.input_tokens", prompt_token_count)
                         if candidate_token_count is not None:
                             span.set_attribute("gen_ai.usage.output_tokens", candidate_token_count)
+                        if thoughts_token_count:
+                            span.set_attribute("gen_ai.usage.reasoning.output_tokens", thoughts_token_count)
                     if finish_reason is not None:
                         span.set_attribute(
                             "gen_ai.response.finish_reasons",
