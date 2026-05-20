@@ -3,4 +3,5 @@ openai-agents==0.13.6
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
 opentelemetry-exporter-otlp-proto-grpc==1.40.0
+openinference-instrumentation>=0.1.51
 openinference-instrumentation-openai-agents==1.4.1

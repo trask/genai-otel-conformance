@@ -7,14 +7,14 @@ NOTE: Google ADK imports are deferred inside run_agent() (in common.py) so that
 instrumentation is fully active before ADK caches its tracer at import time.
 """
 
-from opentelemetry import trace
-
 from common import run, run_agent
 
 
 def instrument():
     from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-    GoogleADKInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    GoogleADKInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
     print("  [instrument] GoogleADKInstrumentor activated")
 
 

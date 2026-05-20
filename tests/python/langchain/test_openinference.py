@@ -1,13 +1,13 @@
 """Conformance test: OpenInference (Arize) LangChain instrumentation."""
 
-from opentelemetry import trace
-
 from common import MOCK_BASE_URL, run
 
 
 def instrument():
     from openinference.instrumentation.langchain import LangChainInstrumentor
-    LangChainInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    LangChainInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 if __name__ == "__main__":

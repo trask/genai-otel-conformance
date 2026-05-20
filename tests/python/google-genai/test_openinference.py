@@ -6,8 +6,6 @@ google-genai SDK.  Exercises: chat, chat_streaming.
 
 import os
 
-from opentelemetry import trace
-
 from otel_setup import setup_otel, flush_and_shutdown
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
@@ -15,7 +13,9 @@ MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
 def instrument():
     from openinference.instrumentation.google_genai import GoogleGenAIInstrumentor
-    GoogleGenAIInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    GoogleGenAIInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 def run_chat():

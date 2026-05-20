@@ -6,14 +6,14 @@ Exercises: chat, chat_streaming, embeddings.
 import os
 
 from otel_setup import setup_otel, flush_and_shutdown
-from opentelemetry import trace
-
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
 
 
 def instrument():
     from openinference.instrumentation.litellm import LiteLLMInstrumentor
-    LiteLLMInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    LiteLLMInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 def run_chat():

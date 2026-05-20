@@ -7,8 +7,6 @@ against a mock OpenAI server, with the OpenInference autogen-agentchat instrumen
 import asyncio
 import os
 
-from opentelemetry import trace
-
 from otel_setup import setup_otel, flush_and_shutdown
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
@@ -16,8 +14,9 @@ MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
 
 def instrument():
     from openinference.instrumentation.autogen_agentchat import AutogenAgentChatInstrumentor
+    from openinference.instrumentation.config import TraceConfig
 
-    AutogenAgentChatInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    AutogenAgentChatInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 def run_agent():

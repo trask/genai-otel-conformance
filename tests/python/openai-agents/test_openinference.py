@@ -7,8 +7,6 @@ against a mock OpenAI server, with the OpenInference OpenAI Agents instrumentati
 import asyncio
 import os
 
-from opentelemetry import trace
-
 from otel_setup import setup_otel, flush_and_shutdown
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
@@ -16,7 +14,9 @@ MOCK_BASE_URL = os.environ["MOCK_LLM_URL"] + "/v1"
 
 def instrument():
     from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-    OpenAIAgentsInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    OpenAIAgentsInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 async def run_agent():
