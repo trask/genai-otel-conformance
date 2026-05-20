@@ -7,8 +7,6 @@ Vertex AI SDK.  Exercises: chat, chat_streaming.
 import os
 import warnings
 
-from opentelemetry import trace
-
 from otel_setup import setup_otel, flush_and_shutdown
 
 MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
@@ -37,7 +35,9 @@ def _mock_host():
 
 def instrument():
     from openinference.instrumentation.vertexai import VertexAIInstrumentor
-    VertexAIInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    VertexAIInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 def _init_vertexai():

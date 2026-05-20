@@ -4,14 +4,14 @@ Exercises: converse
 against a mock Bedrock server, with the OpenInference Bedrock instrumentation.
 """
 
-from opentelemetry import trace
-
 from common import run, run_converse, run_converse_tool_call, run_embeddings
 
 
 def instrument():
     from openinference.instrumentation.bedrock import BedrockInstrumentor
-    BedrockInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    BedrockInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 if __name__ == "__main__":

@@ -4,14 +4,14 @@ Exercises: agent_query
 against a mock Claude CLI, with the OpenInference Claude Agent SDK instrumentation.
 """
 
-from opentelemetry import trace
-
 from common import run
 
 
 def instrument():
     from openinference.instrumentation.claude_agent_sdk import ClaudeAgentSDKInstrumentor
-    ClaudeAgentSDKInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+    from openinference.instrumentation.config import TraceConfig
+
+    ClaudeAgentSDKInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 if __name__ == "__main__":

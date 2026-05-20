@@ -13,7 +13,9 @@ MOCK_BASE_URL = os.environ["MOCK_LLM_URL"]
 
 def instrument():
     from openinference.instrumentation.mistralai import MistralAIInstrumentor
-    MistralAIInstrumentor().instrument()
+    from openinference.instrumentation.config import TraceConfig
+
+    MistralAIInstrumentor().instrument(config=TraceConfig(enable_genai_semconv=True))
 
 
 def run_chat(client):
